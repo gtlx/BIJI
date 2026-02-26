@@ -16,9 +16,27 @@ export function SettingsModal({ settings, onClose, onSave }: SettingsModalProps)
     onClose();
   };
 
+  const handleSelectStoragePath = async () => {
+    if (window.electronAPI && window.electronAPI.selectPath) {
+      const path = await window.electronAPI.selectPath();
+      if (path) {
+        setLocalSettings({ ...localSettings, storagePath: path });
+      }
+    }
+  };
+
+  const handleSelectSyncPath = async () => {
+    if (window.electronAPI && window.electronAPI.selectPath) {
+      const path = await window.electronAPI.selectPath();
+      if (path) {
+        setLocalSettings({ ...localSettings, syncPath: path });
+      }
+    }
+  };
+
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal settings-modal" onClick={e => e.stopPropagation()}>
+      <div className="modal settings-modal settings-modal-wide" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h2 className="modal-title">设置</h2>
           <button className="btn-icon" onClick={onClose}>
@@ -29,6 +47,25 @@ export function SettingsModal({ settings, onClose, onSave }: SettingsModalProps)
         </div>
 
         <div className="modal-body">
+          <div className="settings-section">
+            <h3 className="settings-section-title">存储</h3>
+            
+            <div className="settings-item">
+              <label>数据存储路径</label>
+              <div className="path-input">
+                <input
+                  type="text"
+                  className="input"
+                  value={localSettings.storagePath || '默认路径'}
+                  readOnly
+                />
+                <button className="btn btn-secondary" onClick={handleSelectStoragePath}>
+                  选择
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div className="settings-section">
             <h3 className="settings-section-title">外观</h3>
             
@@ -58,13 +95,15 @@ export function SettingsModal({ settings, onClose, onSave }: SettingsModalProps)
             </div>
 
             <div className="settings-item">
-              <label>字体</label>
-              <input
-                type="text"
+              <label>默认编辑器</label>
+              <select
                 className="input"
-                value={localSettings.fontFamily}
-                onChange={e => setLocalSettings({ ...localSettings, fontFamily: e.target.value })}
-              />
+                value={localSettings.editorMode}
+                onChange={e => setLocalSettings({ ...localSettings, editorMode: e.target.value as any })}
+              >
+                <option value="markdown">Markdown</option>
+                <option value="rich">富文本</option>
+              </select>
             </div>
           </div>
 
@@ -91,11 +130,72 @@ export function SettingsModal({ settings, onClose, onSave }: SettingsModalProps)
                 disabled={!localSettings.syncEnabled}
               >
                 <option value="">选择服务商</option>
+                <option value="local">本地同步文件夹</option>
+                <option value="web">Web 同步</option>
                 <option value="google">Google Drive</option>
                 <option value="onedrive">OneDrive</option>
-                <option value="local">本地同步文件夹</option>
               </select>
             </div>
+
+            {localSettings.syncProvider === 'local' && (
+              <div className="settings-item">
+                <label>同步文件夹路径</label>
+                <div className="path-input">
+                  <input
+                    type="text"
+                    className="input"
+                    value={localSettings.syncPath || ''}
+                    onChange={e => setLocalSettings({ ...localSettings, syncPath: e.target.value })}
+                    placeholder="选择同步文件夹"
+                    disabled={!localSettings.syncEnabled}
+                  />
+                  <button className="btn btn-secondary" onClick={handleSelectSyncPath} disabled={!localSettings.syncEnabled}>
+                    选择
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {localSettings.syncProvider === 'web' && (
+              <>
+                <div className="settings-item">
+                  <label>Web 同步地址</label>
+                  <input
+                    type="text"
+                    className="input"
+                    value={localSettings.syncWebUrl || ''}
+                    onChange={e => setLocalSettings({ ...localSettings, syncWebUrl: e.target.value })}
+                    placeholder="https://your-sync-server.com/api/sync"
+                    disabled={!localSettings.syncEnabled}
+                  />
+                </div>
+                <div className="settings-item">
+                  <label>Web 同步令牌</label>
+                  <input
+                    type="password"
+                    className="input"
+                    value={localSettings.syncWebToken || ''}
+                    onChange={e => setLocalSettings({ ...localSettings, syncWebToken: e.target.value })}
+                    placeholder="访问令牌"
+                    disabled={!localSettings.syncEnabled}
+                  />
+                </div>
+              </>
+            )}
+
+            {localSettings.syncEnabled && (localSettings.syncProvider === 'local' || localSettings.syncProvider === 'web') && (
+              <div className="settings-item">
+                <label>同步模式</label>
+                <select
+                  className="input"
+                  value={localSettings.syncMode}
+                  onChange={e => setLocalSettings({ ...localSettings, syncMode: e.target.value as any })}
+                >
+                  <option value="incremental">增量同步（仅上传更改）</option>
+                  <option value="bidirectional">双向同步（带删除）</option>
+                </select>
+              </div>
+            )}
           </div>
 
           <div className="settings-section">

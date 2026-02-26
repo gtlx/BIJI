@@ -1,42 +1,100 @@
-import Store from 'electron-store';
+import * as fs from 'fs';
+import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import log from 'electron-log';
 import type { Note, Folder, SearchQuery } from '../../shared/types';
 
-interface StoreSchema {
-  notes: Note[];
-  folders: Folder[];
-}
-
 export class Database {
-  private store: Store<StoreSchema>;
+  private basePath: string;
+  private notesFile: string;
+  private foldersFile: string;
+  private settingsPath: string;
 
-  constructor(userDataPath: string) {
-    this.store = new Store<StoreSchema>({
-      name: 'biji-data',
-      defaults: {
-        notes: [],
-        folders: [],
-      },
-    });
+  constructor(customPath?: string) {
+    this.basePath = customPath || this.getDefaultPath();
+    this.notesFile = path.join(this.basePath, 'notes.json');
+    this.foldersFile = path.join(this.basePath, 'folders.json');
+    this.settingsPath = path.join(this.basePath, 'settings.json');
   }
 
-  async init(): Promise<void> {
-    log.info('Database initialized with electron-store');
+  private getDefaultPath(): string {
+    const { app } = require('electron');
+    return app.getPath('userData');
   }
 
-  getAllNotes(): Note[] {
-    const notes = this.store.get('notes', []);
-    return notes.sort((a, b) => b.updatedAt - a.updatedAt);
+  async init(customPath?: string): Promise<void> {
+    if (customPath) {
+      this.basePath = customPath;
+      this.notesFile = path.join(this.basePath, 'notes.json');
+      this.foldersFile = path.join(this.basePath, 'folders.json');
+      this.settingsPath = path.join(this.basePath, 'settings.json');
+    }
+
+    if (!fs.existsSync(this.basePath)) {
+      fs.mkdirSync(this.basePath, { recursive: true });
+    }
+
+    if (!fs.existsSync(this.notesFile)) {
+      this.saveNotes([]);
+    }
+    if (!fs.existsSync(this.foldersFile)) {
+      this.saveFolders([]);
+    }
+
+    log.info('Database initialized at:', this.basePath);
+  }
+
+  getStoragePath(): string {
+    return this.basePath;
+  }
+
+  setStoragePath(newPath: string): void {
+    this.basePath = newPath;
+    this.notesFile = path.join(this.basePath, 'notes.json');
+    this.foldersFile = path.join(this.basePath, 'folders.json');
+    this.settingsPath = path.join(this.basePath, 'settings.json');
+    this.init(newPath);
+  }
+
+  private loadNotes(): Note[] {
+    try {
+      const data = fs.readFileSync(this.notesFile, 'utf-8');
+      return JSON.parse(data);
+    } catch {
+      return [];
+    }
+  }
+
+  private saveNotes(notes: Note[]): void {
+    fs.writeFileSync(this.notesFile, JSON.stringify(notes, null, 2), 'utf-8');
+  }
+
+  private loadFolders(): Folder[] {
+    try {
+      const data = fs.readFileSync(this.foldersFile, 'utf-8');
+      return JSON.parse(data);
+    } catch {
+      return [];
+    }
+  }
+
+  private saveFolders(folders: Folder[]): void {
+    fs.writeFileSync(this.foldersFile, JSON.stringify(folders, null, 2), 'utf-8');
+  }
+
+  getAllNotes(includeDeleted = false): Note[] {
+    const notes = this.loadNotes();
+    const filtered = includeDeleted ? notes : notes.filter(n => !n.deletedAt);
+    return filtered.sort((a, b) => b.updatedAt - a.updatedAt);
   }
 
   getNote(id: string): Note | null {
-    const notes = this.store.get('notes', []);
+    const notes = this.loadNotes();
     return notes.find(n => n.id === id) || null;
   }
 
   saveNote(note: Note): void {
-    const notes = this.store.get('notes', []);
+    const notes = this.loadNotes();
     const index = notes.findIndex(n => n.id === note.id);
     
     const noteToSave = {
@@ -55,16 +113,38 @@ export class Database {
       });
     }
 
-    this.store.set('notes', notes);
+    this.saveNotes(notes);
   }
 
-  deleteNote(id: string): void {
-    const notes = this.store.get('notes', []);
-    this.store.set('notes', notes.filter(n => n.id !== id));
+  deleteNote(id: string, permanent = false): void {
+    const notes = this.loadNotes();
+    
+    if (permanent) {
+      this.saveNotes(notes.filter(n => n.id !== id));
+    } else {
+      const index = notes.findIndex(n => n.id === id);
+      if (index >= 0) {
+        notes[index] = { ...notes[index], deletedAt: Date.now() };
+        this.saveNotes(notes);
+      }
+    }
+  }
+
+  restoreNote(id: string): void {
+    const notes = this.loadNotes();
+    const index = notes.findIndex(n => n.id === id);
+    if (index >= 0) {
+      notes[index] = { ...notes[index], deletedAt: undefined };
+      this.saveNotes(notes);
+    }
   }
 
   searchNotes(query: SearchQuery): Note[] {
-    let notes = this.store.get('notes', []);
+    let notes = this.loadNotes();
+
+    if (!query.includeDeleted) {
+      notes = notes.filter(n => !n.deletedAt);
+    }
 
     if (query.keyword) {
       const keyword = query.keyword.toLowerCase();
@@ -95,12 +175,14 @@ export class Database {
     return notes.sort((a, b) => b.updatedAt - a.updatedAt);
   }
 
-  getAllFolders(): Folder[] {
-    return this.store.get('folders', []).sort((a, b) => a.name.localeCompare(b.name));
+  getAllFolders(includeDeleted = false): Folder[] {
+    const folders = this.loadFolders();
+    const filtered = includeDeleted ? folders : folders.filter(f => !f.deletedAt);
+    return filtered.sort((a, b) => a.name.localeCompare(b.name));
   }
 
   saveFolder(folder: Folder): void {
-    const folders = this.store.get('folders', []);
+    const folders = this.loadFolders();
     const index = folders.findIndex(f => f.id === folder.id);
 
     const folderToSave = {
@@ -115,28 +197,63 @@ export class Database {
       folders.push(folderToSave);
     }
 
-    this.store.set('folders', folders);
+    this.saveFolders(folders);
   }
 
-  deleteFolder(id: string): void {
-    const notes = this.store.get('notes', []).map(n => 
+  deleteFolder(id: string, permanent = false): void {
+    const notes = this.loadNotes().map(n => 
       n.folderId === id ? { ...n, folderId: null } : n
     );
-    this.store.set('notes', notes);
+    this.saveNotes(notes);
 
-    const folders = this.store.get('folders', []);
-    this.store.set('folders', folders.filter(f => f.id !== id));
+    if (permanent) {
+      const folders = this.loadFolders().filter(f => f.id !== id);
+      this.saveFolders(folders);
+    } else {
+      const folders = this.loadFolders();
+      const index = folders.findIndex(f => f.id === id);
+      if (index >= 0) {
+        folders[index] = { ...folders[index], deletedAt: Date.now() };
+        this.saveFolders(folders);
+      }
+    }
   }
 
   getPendingSyncNotes(): Note[] {
-    return this.store.get('notes', []).filter(n => n.syncStatus === 'pending');
+    return this.loadNotes().filter(n => n.syncStatus === 'pending' && !n.deletedAt);
   }
 
   markSynced(noteIds: string[]): void {
-    const notes = this.store.get('notes', []).map(n => 
+    const notes = this.loadNotes().map(n => 
       noteIds.includes(n.id) ? { ...n, syncStatus: 'synced' as const } : n
     );
-    this.store.set('notes', notes);
+    this.saveNotes(notes);
+  }
+
+  importNotes(notes: Note[], mode: 'merge' | 'replace' = 'merge'): void {
+    if (mode === 'replace') {
+      this.saveNotes(notes);
+      return;
+    }
+
+    const existingNotes = this.loadNotes();
+    const existingMap = new Map(existingNotes.map(n => [n.id, n]));
+
+    for (const note of notes) {
+      const existing = existingMap.get(note.id);
+      if (!existing || note.updatedAt > existing.updatedAt) {
+        existingMap.set(note.id, note);
+      }
+    }
+
+    this.saveNotes(Array.from(existingMap.values()));
+  }
+
+  exportData(): { notes: Note[]; folders: Folder[] } {
+    return {
+      notes: this.loadNotes(),
+      folders: this.loadFolders(),
+    };
   }
 
   async close(): Promise<void> {

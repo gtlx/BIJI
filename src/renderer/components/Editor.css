@@ -117,3 +117,133 @@
   font-size: 13px;
   color: var(--text-tertiary);
 }
+
+.editor-mode-switch,
+.preview-mode-switch {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background-color: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+}
+
+.mode-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: transparent;
+  transition: all 0.15s ease;
+}
+
+.mode-btn:hover {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.mode-btn.active {
+  background-color: var(--accent-color);
+  color: white;
+}
+
+.markdown-editor {
+  flex: 1;
+  display: flex;
+  gap: 16px;
+  overflow: hidden;
+}
+
+.markdown-editor .editor-content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.markdown-preview {
+  flex: 1;
+  padding: 16px;
+  background-color: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  overflow-y: auto;
+  line-height: 1.8;
+}
+
+.markdown-preview h1 {
+  font-size: 24px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: var(--text-primary);
+}
+
+.markdown-preview h2 {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+}
+
+.markdown-preview h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+
+.markdown-preview p {
+  margin-bottom: 12px;
+}
+
+.markdown-preview code {
+  padding: 2px 6px;
+  background-color: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  font-family: 'Fira Code', monospace;
+  font-size: 13px;
+}
+
+.markdown-preview pre {
+  padding: 16px;
+  background-color: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  margin-bottom: 12px;
+}
+
+.markdown-preview pre code {
+  padding: 0;
+  background: none;
+}
+
+.markdown-preview li {
+  margin-left: 20px;
+  margin-bottom: 4px;
+}
+
+.markdown-live .editor-content,
+.markdown-live .markdown-preview {
+  flex: 1;
+}
+
+.markdown-edit .editor-content {
+  flex: 1;
+}
+
+.markdown-edit .markdown-preview {
+  display: none;
+}
+
+.markdown-preview-only .editor-content {
+  display: none;
+}
+
+.markdown-preview-only .markdown-preview {
+  flex: 1;
+}
+
+.markdown-preview .editor-content {
+  display: none;
+}

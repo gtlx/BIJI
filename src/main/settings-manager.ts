@@ -10,10 +10,17 @@ const defaultSettings: AppSettings = {
   language: 'zh-CN',
   syncEnabled: false,
   syncProvider: null,
+  syncMode: 'incremental',
+  syncPath: '',
+  syncWebUrl: '',
+  syncWebToken: '',
   encryptionEnabled: false,
   encryptionKey: '',
   autoSave: true,
   autoSaveInterval: 30000,
+  editorMode: 'markdown',
+  markdownPreviewMode: 'live',
+  storagePath: '',
 };
 
 export class SettingsManager {

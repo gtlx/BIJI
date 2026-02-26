@@ -8,6 +8,7 @@ export interface Note {
   folderId: string | null;
   isEncrypted: boolean;
   syncStatus: 'synced' | 'pending' | 'conflict';
+  deletedAt?: number;
 }
 
 export interface Folder {
@@ -16,6 +17,7 @@ export interface Folder {
   parentId: string | null;
   createdAt: number;
   color?: string;
+  deletedAt?: number;
 }
 
 export interface Plugin {
@@ -46,6 +48,8 @@ export interface PluginAPI {
   showNotification: (title: string, body: string) => void;
   getSettings: () => Promise<AppSettings>;
   setSettings: (settings: Partial<AppSettings>) => Promise<void>;
+  onSyncStatus: (callback: (status: SyncStatus) => void) => void;
+  startSync: (mode: SyncMode) => Promise<SyncResult>;
 }
 
 export interface AppSettings {
@@ -54,18 +58,56 @@ export interface AppSettings {
   fontFamily: string;
   language: string;
   syncEnabled: boolean;
-  syncProvider: 'google' | 'onedrive' | 'local' | null;
+  syncProvider: SyncProviderType | null;
+  syncMode: SyncMode;
+  syncPath: string;
+  syncWebUrl: string;
+  syncWebToken: string;
   encryptionEnabled: boolean;
+  encryptionKey: string;
   autoSave: boolean;
   autoSaveInterval: number;
+  editorMode: EditorMode;
+  markdownPreviewMode: MarkdownPreviewMode;
+  storagePath: string;
 }
+
+export type SyncProviderType = 'google' | 'onedrive' | 'local' | 'web';
+export type SyncMode = 'incremental' | 'bidirectional';
+export type EditorMode = 'rich' | 'markdown';
+export type MarkdownPreviewMode = 'live' | 'edit' | 'preview';
 
 export interface SyncProvider {
   name: string;
+  type: SyncProviderType;
   authenticate: () => Promise<boolean>;
-  upload: (data: Note[]) => Promise<void>;
-  download: () => Promise<Note[]>;
+  upload: (data: Note[], mode: SyncMode) => Promise<SyncResult>;
+  download: (mode: SyncMode) => Promise<SyncResult>;
   isAuthenticated: boolean;
+}
+
+export interface SyncResult {
+  success: boolean;
+  uploaded: number;
+  downloaded: number;
+  deleted: number;
+  conflicts: Note[];
+  error?: string;
+}
+
+export interface SyncStatus {
+  isSyncing: boolean;
+  lastSync: number;
+  pending: number;
+  progress?: number;
+  error?: string;
+}
+
+export interface WebSyncData {
+  notes: Note[];
+  folders: Folder[];
+  lastModified: number;
+  deviceId: string;
 }
 
 export interface SearchQuery {
@@ -74,4 +116,5 @@ export interface SearchQuery {
   folderId?: string;
   dateFrom?: number;
   dateTo?: number;
+  includeDeleted?: boolean;
 }

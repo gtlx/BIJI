@@ -2,6 +2,10 @@
   width: 500px;
 }
 
+.settings-modal-wide {
+  width: 650px;
+}
+
 .settings-section {
   margin-bottom: 24px;
 }
@@ -35,6 +39,7 @@
 
 .settings-item input[type="text"],
 .settings-item input[type="number"],
+.settings-item input[type="password"],
 .settings-item select {
   width: 200px;
 }
@@ -43,4 +48,15 @@
   width: 18px;
   height: 18px;
   accent-color: var(--accent-color);
+}
+
+.path-input {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+  max-width: 350px;
+}
+
+.path-input input {
+  flex: 1;
 }
