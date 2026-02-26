@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import log from 'electron-log';
-import type { AppSettings } from '../../shared/types';
+import type { AppSettings, DEFAULT_SHORTCUTS } from '../../shared/types';
 
 const defaultSettings: AppSettings = {
   theme: 'system',
@@ -21,6 +21,17 @@ const defaultSettings: AppSettings = {
   editorMode: 'markdown',
   markdownPreviewMode: 'live',
   storagePath: '',
+  template: 'blank',
+  customCss: '',
+  shortcuts: {
+    newNote: 'Ctrl+N',
+    newFolder: 'Ctrl+Shift+N',
+    save: 'Ctrl+S',
+    search: 'Ctrl+F',
+    toggleTheme: 'Ctrl+Alt+T',
+    openSettings: 'Ctrl+,',
+    sync: 'Ctrl+Shift+S',
+  },
 };
 
 export class SettingsManager {

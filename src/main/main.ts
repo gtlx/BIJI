@@ -200,6 +200,24 @@ function setupIPC() {
   ipcMain.handle('settings:get', async () => settingsManager.getSettings());
   ipcMain.handle('settings:set', async (_, settings) => settingsManager.setSettings(settings));
 
+  ipcMain.handle('dialog:selectPath', async () => {
+    const result = await dialog.showOpenDialog(mainWindow!, {
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    if (!result.canceled && result.filePaths[0]) {
+      return result.filePaths[0];
+    }
+    return null;
+  });
+
+  ipcMain.handle('storage:setPath', async (_, newPath: string) => {
+    database.setStoragePath(newPath);
+    await settingsManager.setSettings({ storagePath: newPath });
+    return true;
+  });
+
+  ipcMain.handle('storage:getPath', async () => database.getStoragePath());
+
   ipcMain.handle('sync:start', async () => syncManager.sync());
   ipcMain.handle('sync:status', async () => syncManager.getStatus());
 

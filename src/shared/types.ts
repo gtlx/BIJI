@@ -29,6 +29,7 @@ export interface Plugin {
   enabled: boolean;
   permissions: PluginPermission[];
   entryPoint: string;
+  provides?: string[];
 }
 
 export interface PluginPermission {
@@ -70,12 +71,26 @@ export interface AppSettings {
   editorMode: EditorMode;
   markdownPreviewMode: MarkdownPreviewMode;
   storagePath: string;
+  template: string;
+  customCss: string;
+  shortcuts: ShortcutSettings;
 }
 
 export type SyncProviderType = 'google' | 'onedrive' | 'local' | 'web';
 export type SyncMode = 'incremental' | 'bidirectional';
 export type EditorMode = 'rich' | 'markdown';
 export type MarkdownPreviewMode = 'live' | 'edit' | 'preview';
+
+export interface ShortcutSettings {
+  newNote: string;
+  newFolder: string;
+  save: string;
+  search: string;
+  toggleTheme: string;
+  openSettings: string;
+  sync: string;
+  [key: string]: string;
+}
 
 export interface SyncProvider {
   name: string;
@@ -118,3 +133,27 @@ export interface SearchQuery {
   dateTo?: number;
   includeDeleted?: boolean;
 }
+
+export interface NoteTemplate {
+  id: string;
+  name: string;
+  content: string;
+  icon?: string;
+}
+
+export const DEFAULT_SHORTCUTS: ShortcutSettings = {
+  newNote: 'Ctrl+N',
+  newFolder: 'Ctrl+Shift+N',
+  save: 'Ctrl+S',
+  search: 'Ctrl+F',
+  toggleTheme: 'Ctrl+Alt+T',
+  openSettings: 'Ctrl+,',
+  sync: 'Ctrl+Shift+S',
+};
+
+export const DEFAULT_TEMPLATES: NoteTemplate[] = [
+  { id: 'blank', name: '空白笔记', content: '' },
+  { id: 'meeting', name: '会议记录', content: '# 会议记录\n\n## 会议主题\n\n## 参会人员\n\n## 会议内容\n\n## 待办事项\n- [ ] \n' },
+  { id: 'daily', name: '每日日志', content: '# {{date}}\n\n## 今日完成\n\n## 遇到的问题\n\n## 明日计划\n' },
+  { id: 'todo', name: '待办清单', content: '# 待办清单\n\n- [ ] \n- [ ] \n- [ ] \n' },
+];

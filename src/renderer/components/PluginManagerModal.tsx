@@ -4,9 +4,10 @@ import './PluginManagerModal.css';
 
 interface PluginManagerModalProps {
   onClose: () => void;
+  onPluginChange?: (plugins: Plugin[]) => void;
 }
 
-export function PluginManagerModal({ onClose }: PluginManagerModalProps) {
+export function PluginManagerModal({ onClose, onPluginChange }: PluginManagerModalProps) {
   const [plugins, setPlugins] = useState<Plugin[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -27,15 +28,17 @@ export function PluginManagerModal({ onClose }: PluginManagerModalProps) {
 
   const handleToggle = async (id: string, enabled: boolean) => {
     await window.electronAPI.togglePlugin(id, enabled);
-    setPlugins(plugins.map(p => 
-      p.id === id ? { ...p, enabled } : p
-    ));
+    const updated = plugins.map(p => p.id === id ? { ...p, enabled } : p);
+    setPlugins(updated);
+    onPluginChange?.(updated);
   };
 
   const handleUninstall = async (id: string) => {
     if (confirm('确定要卸载这个插件吗？')) {
       await window.electronAPI.uninstallPlugin(id);
-      setPlugins(plugins.filter(p => p.id !== id));
+      const updated = plugins.filter(p => p.id !== id);
+      setPlugins(updated);
+      onPluginChange?.(updated);
     }
   };
 

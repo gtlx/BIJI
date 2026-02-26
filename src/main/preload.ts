@@ -15,6 +15,10 @@ const electronAPI = {
   getSettings: (): Promise<AppSettings> => ipcRenderer.invoke('settings:get'),
   setSettings: (settings: Partial<AppSettings>): Promise<void> => ipcRenderer.invoke('settings:set', settings),
 
+  selectPath: (): Promise<string | null> => ipcRenderer.invoke('dialog:selectPath'),
+  setStoragePath: (path: string): Promise<boolean> => ipcRenderer.invoke('storage:setPath', path),
+  getStoragePath: (): Promise<string> => ipcRenderer.invoke('storage:getPath'),
+
   syncStart: (): Promise<void> => ipcRenderer.invoke('sync:start'),
   syncStatus: (): Promise<{ lastSync: number; pending: number }> => ipcRenderer.invoke('sync:status'),
 

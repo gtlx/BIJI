@@ -7,9 +7,10 @@ interface EditorProps {
   onSave: (note: Note) => void;
   onDelete: (id: string) => void;
   settings: AppSettings | null;
+  syncEnabled?: boolean;
 }
 
-export function Editor({ note, onSave, onDelete, settings }: EditorProps) {
+export function Editor({ note, onSave, onDelete, settings, syncEnabled = false }: EditorProps) {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [tags, setTags] = useState<string[]>([]);
