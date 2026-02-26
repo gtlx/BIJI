@@ -1,0 +1,12 @@
+{
+  "id": "markdown-export",
+  "name": "Markdown 导出",
+  "version": "1.0.0",
+  "description": "支持将笔记导出为 Markdown 格式",
+  "author": "Biji Team",
+  "entryPoint": "index.js",
+  "permissions": [
+    { "type": "storage", "allowed": true },
+    { "type": "filesystem", "allowed": true }
+  ]
+}
