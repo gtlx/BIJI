@@ -16,9 +16,10 @@ interface GraphEdge extends d3.SimulationLinkDatum<GraphNode> {
 interface GraphViewProps {
   onSelectNote: (noteId: string) => void;
   currentNoteId?: string;
+  onRefresh?: () => void;
 }
 
-export function GraphView({ onSelectNote, currentNoteId }: GraphViewProps) {
+export function GraphView({ onSelectNote, currentNoteId, onRefresh }: GraphViewProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -220,6 +221,7 @@ export function GraphView({ onSelectNote, currentNoteId }: GraphViewProps) {
         </div>
         <div className="graph-actions">
           <button onClick={handleCenter} title="居中">居中</button>
+          {onRefresh && <button onClick={onRefresh} title="刷新">刷新</button>}
         </div>
       </div>
       <svg ref={svgRef}></svg>

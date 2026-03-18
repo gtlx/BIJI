@@ -74,6 +74,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [zoom, setZoom] = useState(100);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [graphKey, setGraphKey] = useState(0);
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
     const id = crypto.randomUUID();
@@ -145,6 +146,7 @@ export default function App() {
       window.electronAPI.onImported((count) => {
         showToast(`已导入 ${count} 篇笔记`);
         loadData();
+        setGraphKey(k => k + 1);
       }),
       window.electronAPI.onImportError((error) => {
         showToast(`导入失败: ${error}`, 'error');
@@ -248,6 +250,9 @@ export default function App() {
     });
     
     setSelectedNote(updatedNote);
+    if (showGraph) {
+      setGraphKey(k => k + 1);
+    }
     showToast('笔记已保存');
   };
 
@@ -351,6 +356,7 @@ export default function App() {
       <div className="main-content">
         {showGraph ? (
           <GraphView
+            key={graphKey}
             onSelectNote={(noteId) => {
               const note = notes.find(n => n.id === noteId);
               if (note) {
@@ -359,6 +365,7 @@ export default function App() {
               }
             }}
             currentNoteId={selectedNote?.id}
+            onRefresh={() => setGraphKey(k => k + 1)}
           />
         ) : (
           <Editor
