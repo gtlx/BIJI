@@ -160,3 +160,26 @@ export const DEFAULT_TEMPLATES: NoteTemplate[] = [
   { id: 'daily', name: '每日日志', content: '# {{date}}\n\n## 今日完成\n\n## 遇到的问题\n\n## 明日计划\n' },
   { id: 'todo', name: '待办清单', content: '# 待办清单\n\n- [ ] \n- [ ] \n- [ ] \n' },
 ];
+
+export interface NoteLink {
+  id: string;
+  source: Note;
+  target: Note | null;
+  targetTitle: string;
+}
+
+export interface GraphData {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}
+
+export interface GraphNode {
+  id: string;
+  title: string;
+  linkCount: number;
+}
+
+export interface GraphEdge {
+  source: string;
+  target: string;
+}

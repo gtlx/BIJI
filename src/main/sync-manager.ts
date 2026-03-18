@@ -1,15 +1,15 @@
 import log from 'electron-log';
 import type { Note } from '../shared/types';
-import { Database } from './database';
+import { SqliteDatabase } from './sqlite-database';
 import { SettingsManager } from './settings-manager';
 
 export class SyncManager {
-  private database: Database;
+  private database: SqliteDatabase;
   private settingsManager: SettingsManager;
   private lastSyncTime: number = 0;
   private isSyncing: boolean = false;
 
-  constructor(database: Database, settingsManager: SettingsManager) {
+  constructor(database: SqliteDatabase, settingsManager: SettingsManager) {
     this.database = database;
     this.settingsManager = settingsManager;
   }

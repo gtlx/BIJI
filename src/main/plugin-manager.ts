@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import log from 'electron-log';
 import type { Plugin, PluginAPI, PluginPermission, Note, SyncStatus, SyncResult, SyncMode } from '../shared/types';
-import { Database } from './database';
+import { SqliteDatabase } from './sqlite-database';
 
 interface LoadedPlugin {
   manifest: Plugin;
@@ -14,9 +14,9 @@ interface LoadedPlugin {
 export class PluginManager {
   private pluginsDir: string;
   private plugins: Map<string, LoadedPlugin> = new Map();
-  private database: Database;
+  private database: SqliteDatabase;
 
-  constructor(userDataPath: string, database: Database) {
+  constructor(userDataPath: string, database: SqliteDatabase) {
     this.pluginsDir = path.join(userDataPath, 'plugins');
     this.database = database;
   }

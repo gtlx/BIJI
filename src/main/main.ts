@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage, dialog } from 'electron';
 import * as path from 'path';
 import log from 'electron-log';
-import { Database } from './database';
+import { SqliteDatabase } from './sqlite-database';
 import { PluginManager } from './plugin-manager';
 import { SyncManager } from './sync-manager';
 import { SettingsManager } from './settings-manager';
@@ -27,7 +27,7 @@ process.on('unhandledRejection', (reason) => {
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
-let database: Database;
+let database: SqliteDatabase;
 let pluginManager: PluginManager;
 let syncManager: SyncManager;
 let settingsManager: SettingsManager;
@@ -203,6 +203,30 @@ function setupIPC() {
   ipcMain.handle('db:saveNote', async (_, note) => database.saveNote(note));
   ipcMain.handle('db:deleteNote', async (_, id: string) => database.deleteNote(id));
   ipcMain.handle('db:searchNotes', async (_, query) => database.searchNotes(query));
+  ipcMain.handle('db:getBacklinks', async (_, noteId: string) => database.getBacklinks(noteId));
+  ipcMain.handle('db:getAllLinks', async () => database.getAllLinks());
+  ipcMain.handle('db:getGraphData', async () => {
+    const links = database.getAllLinks();
+    const nodesMap = new Map<string, { id: string; title: string; linkCount: number }>();
+    const edges: { source: string; target: string }[] = [];
+
+    for (const link of links) {
+      if (!nodesMap.has(link.source.id)) {
+        nodesMap.set(link.source.id, { id: link.source.id, title: link.source.title, linkCount: 0 });
+      }
+      nodesMap.get(link.source.id)!.linkCount++;
+
+      if (link.target) {
+        if (!nodesMap.has(link.target.id)) {
+          nodesMap.set(link.target.id, { id: link.target.id, title: link.target.title, linkCount: 0 });
+        }
+        nodesMap.get(link.target.id)!.linkCount++;
+        edges.push({ source: link.source.id, target: link.target.id });
+      }
+    }
+
+    return { nodes: Array.from(nodesMap.values()), edges };
+  });
 
   ipcMain.handle('db:getFolders', async () => database.getAllFolders());
   ipcMain.handle('db:saveFolder', async (_, folder) => database.saveFolder(folder));
@@ -253,7 +277,7 @@ app.whenReady().then(async () => {
 
   encryptionService = new EncryptionService(settingsManager.getSettings().encryptionKey);
 
-  database = new Database(userDataPath);
+  database = new SqliteDatabase(userDataPath);
   await database.init();
 
   pluginManager = new PluginManager(userDataPath, database);

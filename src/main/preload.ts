@@ -32,6 +32,10 @@ const electronAPI = {
 
   getVersion: (): Promise<string> => ipcRenderer.invoke('app:getVersion'),
 
+  getBacklinks: (noteId: string): Promise<Note[]> => ipcRenderer.invoke('db:getBacklinks', noteId),
+  getAllLinks: (): Promise<{ source: Note; target: Note | null; targetTitle: string }[]> => ipcRenderer.invoke('db:getAllLinks'),
+  getGraphData: (): Promise<{ nodes: { id: string; title: string; linkCount: number }[]; edges: { source: string; target: string }[] }> => ipcRenderer.invoke('db:getGraphData'),
+
   onNewNote: (callback: () => void) => {
     ipcRenderer.on('menu:new-note', callback);
     return () => ipcRenderer.removeListener('menu:new-note', callback);

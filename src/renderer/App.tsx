@@ -5,6 +5,7 @@ import { NoteList } from './components/NoteList';
 import { SettingsModal } from './components/SettingsModal';
 import { SearchModal } from './components/SearchModal';
 import { StatusBar } from './components/StatusBar';
+import { GraphView } from './components/GraphView';
 import { DEFAULT_TEMPLATES } from '@shared/types';
 import type { Note, Folder, AppSettings, SearchQuery, Plugin } from '@shared/types';
 
@@ -31,6 +32,9 @@ declare global {
       installPlugin: (path: string) => Promise<void>;
       uninstallPlugin: (id: string) => Promise<void>;
       getVersion: () => Promise<string>;
+      getBacklinks: (noteId: string) => Promise<Note[]>;
+      getAllLinks: () => Promise<{ source: Note; target: Note | null; targetTitle: string }[]>;
+      getGraphData: () => Promise<{ nodes: { id: string; title: string; linkCount: number }[]; edges: { source: string; target: string }[] }>;
       onNewNote: (callback: () => void) => () => void;
       onNewFolder: (callback: () => void) => () => void;
       onSearch: (callback: () => void) => () => void;
@@ -51,6 +55,7 @@ export default function App() {
   const [storagePath, setStoragePath] = useState<string>('');
   const [showSettings, setShowSettings] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [showGraph, setShowGraph] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [zoom, setZoom] = useState(100);
 
@@ -157,7 +162,7 @@ export default function App() {
     applyZoom(zoom);
   }, [zoom]);
 
-  const handleNewNote = () => {
+  const handleNewNote = async () => {
     const templateId = settings?.template || 'blank';
     const template = DEFAULT_TEMPLATES.find(t => t.id === templateId);
     
@@ -178,6 +183,9 @@ export default function App() {
       isEncrypted: false,
       syncStatus: 'pending',
     };
+    
+    await window.electronAPI.saveNote(newNote);
+    setNotes(prev => [newNote, ...prev]);
     setSelectedNote(newNote);
   };
 
@@ -266,6 +274,8 @@ export default function App() {
         selectedFolderId={selectedFolderId}
         onSelectFolder={setSelectedFolderId}
         onOpenSettings={() => setShowSettings(true)}
+        onNewNote={handleNewNote}
+        onNewFolder={handleNewFolder}
       />
       <NoteList
         notes={notes.filter(n => !selectedFolderId || n.folderId === selectedFolderId)}
@@ -275,13 +285,27 @@ export default function App() {
         onSearch={handleSearch}
       />
       <div className="main-content">
-        <Editor
-          note={selectedNote}
-          onSave={handleSaveNote}
-          onDelete={handleDeleteNote}
-          settings={settings}
-          syncEnabled={isPluginEnabled('sync-plugin')}
-        />
+        {showGraph ? (
+          <GraphView
+            onSelectNote={(noteId) => {
+              const note = notes.find(n => n.id === noteId);
+              if (note) {
+                setSelectedNote(note);
+                setShowGraph(false);
+              }
+            }}
+            currentNoteId={selectedNote?.id}
+          />
+        ) : (
+          <Editor
+            note={selectedNote}
+            onSave={handleSaveNote}
+            onDelete={handleDeleteNote}
+            settings={settings}
+            syncEnabled={isPluginEnabled('sync-plugin')}
+            onOpenGraph={() => setShowGraph(true)}
+          />
+        )}
         <StatusBar
           storagePath={storagePath}
           syncEnabled={isPluginEnabled('sync-plugin')}
