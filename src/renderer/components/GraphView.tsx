@@ -62,116 +62,118 @@ export function GraphView({ onSelectNote, currentNoteId, onRefresh }: GraphViewP
   }, [onSelectNote, currentNoteId]);
 
   function renderGraph(nodes: GraphNode[], edges: GraphEdge[]) {
-    const svgElement = svgRef.current;
-    const container = containerRef.current;
-    if (!container || !svgElement) {
-      console.error('[GraphView] SVG or container not found');
-      return;
-    }
+    requestAnimationFrame(() => {
+      const svgElement = svgRef.current;
+      const container = containerRef.current;
+      if (!container || !svgElement) {
+        console.error('[GraphView] SVG or container not found');
+        return;
+      }
 
-    const width = container.clientWidth;
-    const height = container.clientHeight;
-    console.log('[GraphView] Rendering graph:', { nodes: nodes.length, edges: edges.length, width, height });
+      const width = container.clientWidth;
+      const height = container.clientHeight;
+      console.log('[GraphView] Rendering graph:', { nodes: nodes.length, edges: edges.length, width, height });
 
-    const svg = d3.select(svgElement);
-    svg.selectAll('*').remove();
-    svg.attr('width', width).attr('height', height);
+      const svg = d3.select(svgElement);
+      svg.selectAll('*').remove();
+      svg.attr('width', width).attr('height', height);
 
-    const g = svg.append('g');
+      const g = svg.append('g');
 
-    const zoom = d3.zoom<SVGSVGElement, unknown>()
-      .scaleExtent([0.1, 4])
-      .on('zoom', (event) => {
-        g.attr('transform', event.transform);
+      const zoom = d3.zoom<SVGSVGElement, unknown>()
+        .scaleExtent([0.1, 4])
+        .on('zoom', (event) => {
+          g.attr('transform', event.transform);
+        });
+
+      svg.call(zoom);
+
+      const simulation = d3.forceSimulation(nodes)
+        .force('link', d3.forceLink<GraphNode, GraphEdge>(edges).id(d => d.id).distance(120).strength(0.5))
+        .force('charge', d3.forceManyBody().strength(-400).distanceMax(300))
+        .force('center', d3.forceCenter(width / 2, height / 2))
+        .force('collision', d3.forceCollide().radius(50))
+        .alphaDecay(0.02)
+        .velocityDecay(0.4);
+
+      const link = g.append('g')
+        .attr('class', 'links')
+        .selectAll('line')
+        .data(edges)
+        .enter()
+        .append('line')
+        .attr('class', 'link')
+        .attr('stroke', '#999')
+        .attr('stroke-opacity', 0)
+        .attr('stroke-width', 1)
+        .transition()
+        .duration(500)
+        .delay((_, i) => i * 20 + 300)
+        .attr('stroke-opacity', 0.6);
+
+      const nodeGroup = g.append('g')
+        .attr('class', 'nodes')
+        .selectAll('g')
+        .data(nodes)
+        .enter()
+        .append('g')
+        .attr('class', 'node')
+        .style('cursor', 'pointer')
+        .on('click', (_event, d) => {
+          onSelectNote(d.id);
+        });
+
+      const drag = d3.drag<SVGGElement, GraphNode>()
+        .on('start', (event, d) => {
+          if (!event.active) simulation.alphaTarget(0.3).restart();
+          d.fx = d.x;
+          d.fy = d.y;
+        })
+        .on('drag', (event, d) => {
+          d.fx = event.x;
+          d.fy = event.y;
+        })
+        .on('end', (event, d) => {
+          if (!event.active) simulation.alphaTarget(0);
+          d.fx = null;
+          d.fy = null;
+        });
+
+      nodeGroup.call(drag);
+
+      nodeGroup.append('circle')
+        .attr('r', d => Math.min(8 + d.linkCount * 2, 25))
+        .attr('fill', d => d.id === currentNoteId ? '#4a90d9' : '#69b3a2')
+        .attr('stroke', d => d.id === currentNoteId ? '#2d5a8a' : '#408e71')
+        .attr('stroke-width', 2)
+        .attr('opacity', 0)
+        .transition()
+        .duration(500)
+        .delay((_, i) => i * 30)
+        .attr('opacity', 1);
+
+      nodeGroup.append('text')
+        .attr('dy', d => Math.min(8 + d.linkCount * 2, 25) + 15)
+        .attr('text-anchor', 'middle')
+        .attr('font-size', '11px')
+        .attr('fill', '#666')
+        .text(d => truncateTitle(d.title, 20));
+
+      nodeGroup.append('title')
+        .text(d => `${d.title}\n链接数: ${d.linkCount}`);
+
+      simulation.on('tick', () => {
+        link
+          .attr('x1', d => (d.source as GraphNode).x!)
+          .attr('y1', d => (d.source as GraphNode).y!)
+          .attr('x2', d => (d.target as GraphNode).x!)
+          .attr('y2', d => (d.target as GraphNode).y!);
+
+        nodeGroup.attr('transform', d => `translate(${d.x},${d.y})`);
       });
 
-    svg.call(zoom);
-
-    const simulation = d3.forceSimulation(nodes)
-      .force('link', d3.forceLink<GraphNode, GraphEdge>(edges).id(d => d.id).distance(120).strength(0.5))
-      .force('charge', d3.forceManyBody().strength(-400).distanceMax(300))
-      .force('center', d3.forceCenter(width / 2, height / 2))
-      .force('collision', d3.forceCollide().radius(50))
-      .alphaDecay(0.02)
-      .velocityDecay(0.4);
-
-    const link = g.append('g')
-      .attr('class', 'links')
-      .selectAll('line')
-      .data(edges)
-      .enter()
-      .append('line')
-      .attr('class', 'link')
-      .attr('stroke', '#999')
-      .attr('stroke-opacity', 0)
-      .attr('stroke-width', 1)
-      .transition()
-      .duration(500)
-      .delay((_, i) => i * 20 + 300)
-      .attr('stroke-opacity', 0.6);
-
-    const nodeGroup = g.append('g')
-      .attr('class', 'nodes')
-      .selectAll('g')
-      .data(nodes)
-      .enter()
-      .append('g')
-      .attr('class', 'node')
-      .style('cursor', 'pointer')
-      .on('click', (_event, d) => {
-        onSelectNote(d.id);
-      });
-
-    const drag = d3.drag<SVGGElement, GraphNode>()
-      .on('start', (event, d) => {
-        if (!event.active) simulation.alphaTarget(0.3).restart();
-        d.fx = d.x;
-        d.fy = d.y;
-      })
-      .on('drag', (event, d) => {
-        d.fx = event.x;
-        d.fy = event.y;
-      })
-      .on('end', (event, d) => {
-        if (!event.active) simulation.alphaTarget(0);
-        d.fx = null;
-        d.fy = null;
-      });
-
-    nodeGroup.call(drag);
-
-    nodeGroup.append('circle')
-      .attr('r', d => Math.min(8 + d.linkCount * 2, 25))
-      .attr('fill', d => d.id === currentNoteId ? '#4a90d9' : '#69b3a2')
-      .attr('stroke', d => d.id === currentNoteId ? '#2d5a8a' : '#408e71')
-      .attr('stroke-width', 2)
-      .attr('opacity', 0)
-      .transition()
-      .duration(500)
-      .delay((_, i) => i * 30)
-      .attr('opacity', 1);
-
-    nodeGroup.append('text')
-      .attr('dy', d => Math.min(8 + d.linkCount * 2, 25) + 15)
-      .attr('text-anchor', 'middle')
-      .attr('font-size', '11px')
-      .attr('fill', '#666')
-      .text(d => truncateTitle(d.title, 20));
-
-    nodeGroup.append('title')
-      .text(d => `${d.title}\n链接数: ${d.linkCount}`);
-
-    simulation.on('tick', () => {
-      link
-        .attr('x1', d => (d.source as GraphNode).x!)
-        .attr('y1', d => (d.source as GraphNode).y!)
-        .attr('x2', d => (d.target as GraphNode).x!)
-        .attr('y2', d => (d.target as GraphNode).y!);
-
-      nodeGroup.attr('transform', d => `translate(${d.x},${d.y})`);
+      console.log('[GraphView] Graph rendered successfully');
     });
-
-    console.log('[GraphView] Graph rendered successfully');
   }
 
   function truncateTitle(title: string, maxLength: number): string {
