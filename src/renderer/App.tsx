@@ -6,8 +6,17 @@ import { SettingsModal } from './components/SettingsModal';
 import { SearchModal } from './components/SearchModal';
 import { StatusBar } from './components/StatusBar';
 import { GraphView } from './components/GraphView';
+import { Toolbar } from './components/Toolbar';
+import { ToastContainer } from './components/Toast';
 import { DEFAULT_TEMPLATES } from '@shared/types';
 import type { Note, Folder, AppSettings, SearchQuery, Plugin } from '@shared/types';
+import './App.css';
+
+interface ToastItem {
+  id: string;
+  message: string;
+  type?: 'success' | 'error' | 'info';
+}
 
 declare global {
   interface Window {
@@ -58,6 +67,16 @@ export default function App() {
   const [showGraph, setShowGraph] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [zoom, setZoom] = useState(100);
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    const id = crypto.randomUUID();
+    setToasts(prev => [...prev, { id, message, type }]);
+  }, []);
+
+  const removeToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
 
   const isPluginEnabled = (pluginId: string) => {
     const plugin = plugins.find(p => p.id === pluginId);
@@ -82,10 +101,11 @@ export default function App() {
       setZoom(settingsData.zoom);
     } catch (error) {
       console.error('Failed to load data:', error);
+      showToast('加载数据失败', 'error');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [showToast]);
 
   const applyTheme = (theme: 'light' | 'dark' | 'system') => {
     let isDark = false;
@@ -187,6 +207,7 @@ export default function App() {
     await window.electronAPI.saveNote(newNote);
     setNotes(prev => [newNote, ...prev]);
     setSelectedNote(newNote);
+    showToast('已创建新笔记');
   };
 
   const handleNewFolder = () => {
@@ -198,6 +219,7 @@ export default function App() {
     };
     window.electronAPI.saveFolder(newFolder);
     setFolders(prev => [...prev, newFolder]);
+    showToast('已创建新文件夹');
   };
 
   const handleSaveNote = async (note: Note) => {
@@ -213,6 +235,7 @@ export default function App() {
     });
     
     setSelectedNote(updatedNote);
+    showToast('笔记已保存');
   };
 
   const handleDeleteNote = async (id: string) => {
@@ -221,11 +244,13 @@ export default function App() {
     if (selectedNote?.id === id) {
       setSelectedNote(null);
     }
+    showToast('笔记已删除');
   };
 
   const handleSearch = async (query: SearchQuery) => {
     const results = await window.electronAPI.searchNotes(query);
     setNotes(results);
+    showToast(`找到 ${results.length} 条结果`);
   };
 
   const handleSettingsChange = async (newSettings: Partial<AppSettings>) => {
@@ -261,6 +286,10 @@ export default function App() {
   const handlePluginToggle = async (id: string, enabled: boolean) => {
     await window.electronAPI.togglePlugin(id, enabled);
     setPlugins(prev => prev.map(p => p.id === id ? { ...p, enabled } : p));
+  };
+
+  const handlePluginClick = (pluginId: string) => {
+    showToast(`插件 ${pluginId} 功能开发中`);
   };
 
   if (isLoading) {
@@ -303,7 +332,6 @@ export default function App() {
             onDelete={handleDeleteNote}
             settings={settings}
             syncEnabled={isPluginEnabled('sync-plugin')}
-            onOpenGraph={() => setShowGraph(true)}
           />
         )}
         <StatusBar
@@ -312,6 +340,15 @@ export default function App() {
           onChangeStoragePath={handleStoragePathChange}
         />
       </div>
+
+      <Toolbar
+        plugins={plugins}
+        onPluginClick={handlePluginClick}
+        onGraphClick={() => setShowGraph(!showGraph)}
+        isGraphActive={showGraph}
+      />
+
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
 
       {showSettings && settings && (
         <SettingsModal

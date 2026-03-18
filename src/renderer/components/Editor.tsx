@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Note, AppSettings, EditorMode, MarkdownPreviewMode } from '@shared/types';
 import './Editor.css';
 
@@ -20,8 +20,9 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
   const [isSaving, setIsSaving] = useState(false);
   const [editorMode, setEditorMode] = useState<EditorMode>('markdown');
   const [previewMode, setPreviewMode] = useState<MarkdownPreviewMode>('live');
-  const saveTimeoutRef = useRef<NodeJS.Timeout>();
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const isComposingRef = useRef(false);
   
   void syncEnabled;
 
@@ -35,7 +36,7 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
       setContent('');
       setTags([]);
     }
-  }, [note]);
+  }, [note?.id]);
 
   useEffect(() => {
     if (settings?.editorMode) {
@@ -46,21 +47,24 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
     }
   }, [settings?.editorMode, settings?.markdownPreviewMode]);
 
-  const handleSave = useCallback(async () => {
+  const handleSave = useCallback(() => {
     if (!note) return;
     
-    setIsSaving(true);
     const updatedNote: Note = {
-      ...note,
+      id: note.id,
       title,
       content,
       tags,
+      folderId: note.folderId,
+      createdAt: note.createdAt,
+      updatedAt: Date.now(),
+      isEncrypted: note.isEncrypted,
+      syncStatus: 'pending',
     };
-    await onSave(updatedNote);
-    setTimeout(() => setIsSaving(false), 300);
+    onSave(updatedNote);
   }, [note, title, content, tags, onSave]);
 
-  useEffect(() => {
+  const scheduleAutoSave = useCallback(() => {
     if (!note || !settings?.autoSave) return;
 
     if (saveTimeoutRef.current) {
@@ -69,14 +73,40 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
 
     saveTimeoutRef.current = setTimeout(() => {
       handleSave();
-    }, settings.autoSaveInterval || 30000);
+      setIsSaving(true);
+      setTimeout(() => setIsSaving(false), 300);
+    }, settings.autoSaveInterval || 3000);
+  }, [note, settings?.autoSave, settings?.autoSaveInterval, handleSave]);
 
+  useEffect(() => {
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [title, content, tags, note, settings?.autoSave, settings?.autoSaveInterval, handleSave]);
+  }, []);
+
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setTitle(e.target.value);
+    scheduleAutoSave();
+  };
+
+  const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    if (isComposingRef.current) return;
+    setContent(e.target.value);
+    scheduleAutoSave();
+  };
+
+  const handleCompositionStart = () => {
+    isComposingRef.current = true;
+  };
+
+  const handleCompositionEnd = (e: React.CompositionEvent<HTMLTextAreaElement>) => {
+    isComposingRef.current = false;
+    const target = e.target as HTMLTextAreaElement;
+    setContent(target.value);
+    scheduleAutoSave();
+  };
 
   const handleAddTag = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && tagInput.trim()) {
@@ -84,6 +114,7 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
       const newTag = tagInput.trim().toLowerCase();
       if (!tags.includes(newTag)) {
         setTags([...tags, newTag]);
+        scheduleAutoSave();
       }
       setTagInput('');
     }
@@ -91,6 +122,7 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
 
   const handleRemoveTag = (tagToRemove: string) => {
     setTags(tags.filter(t => t !== tagToRemove));
+    scheduleAutoSave();
   };
 
   const handleDelete = () => {
@@ -103,12 +135,18 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 's') {
       e.preventDefault();
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
       handleSave();
+      setIsSaving(true);
+      setTimeout(() => setIsSaving(false), 300);
     }
   };
 
   const renderMarkdownPreview = (text: string) => {
     let html = text
+      .replace(/\[\[([^\]]+)\]\]/g, '<span class="wikilink" data-note="$1">$1</span>')
       .replace(/^### (.*$)/gim, '<h3>$1</h3>')
       .replace(/^## (.*$)/gim, '<h2>$1</h2>')
       .replace(/^# (.*$)/gim, '<h1>$1</h1>')
@@ -117,20 +155,25 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
       .replace(/`([^`]+)`/g, '<code>$1</code>')
       .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
       .replace(/^\- (.*$)/gim, '<li>$1</li>')
-      .replace(/^\d+\. (.*$)/gim, '<li>$1</li>')
+      .replace(/^\* (.*$)/gim, '<li>$1</li>')
+      .replace(/^> (.*$)/gim, '<blockquote>$1</blockquote>')
       .replace(/\n/g, '<br>');
+    
+    html = html.replace(/(<li>.*<\/li>)/g, '<ul>$1</ul>');
+    html = html.replace(/<br><ul>/g, '<ul>');
+    html = html.replace(/<\/ul><br>/g, '</ul>');
+    
     return html;
   };
 
   if (!note) {
     return (
       <div className="editor-container">
-        <div className="empty-state">
+        <div className="editor-empty">
           <svg viewBox="0 0 24 24" width="64" height="64" fill="currentColor">
             <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>
           </svg>
-          <p>选择一篇笔记开始编辑</p>
-          <p className="hint">或按 Ctrl+N 新建笔记</p>
+          <p>选择或创建一篇笔记开始编辑</p>
         </div>
       </div>
     );
@@ -144,7 +187,7 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
             type="text"
             className="editor-title"
             value={title}
-            onChange={e => setTitle(e.target.value)}
+            onChange={handleTitleChange}
             placeholder="标题"
           />
           <div className="editor-actions">
@@ -225,7 +268,14 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
             </button>
             <button 
               className="btn btn-primary"
-              onClick={handleSave}
+              onClick={() => {
+                if (saveTimeoutRef.current) {
+                  clearTimeout(saveTimeoutRef.current);
+                }
+                handleSave();
+                setIsSaving(true);
+                setTimeout(() => setIsSaving(false), 300);
+              }}
             >
               保存
             </button>
@@ -254,7 +304,9 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
             ref={textareaRef}
             className="editor-content"
             value={content}
-            onChange={e => setContent(e.target.value)}
+            onChange={handleContentChange}
+            onCompositionStart={handleCompositionStart}
+            onCompositionEnd={handleCompositionEnd}
             placeholder="开始编写笔记... (富文本模式)"
             style={{
               fontFamily: settings?.fontFamily || 'inherit',
@@ -268,8 +320,10 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
                 ref={textareaRef}
                 className="editor-content"
                 value={content}
-                onChange={e => setContent(e.target.value)}
-                placeholder="开始编写笔记... (支持 Markdown)"
+                onChange={handleContentChange}
+                onCompositionStart={handleCompositionStart}
+                onCompositionEnd={handleCompositionEnd}
+                placeholder="开始编写笔记... (支持 Markdown，使用 [[标题]] 创建链接)"
                 style={{
                   fontFamily: settings?.fontFamily || 'inherit',
                   fontSize: `${settings?.fontSize || 14}px`,
