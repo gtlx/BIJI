@@ -9,9 +9,10 @@ interface EditorProps {
   settings: AppSettings | null;
   syncEnabled: boolean;
   onOpenGraph?: () => void;
+  onLinkClick?: (noteTitle: string) => void;
 }
 
-export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGraph }: EditorProps) {
+export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGraph, onLinkClick }: EditorProps) {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [tags, setTags] = useState<string[]>([]);
@@ -141,6 +142,17 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
       handleSave();
       setIsSaving(true);
       setTimeout(() => setIsSaving(false), 300);
+    }
+  };
+
+  const handleWikilinkClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.classList.contains('wikilink') && onLinkClick) {
+      e.preventDefault();
+      const noteTitle = target.getAttribute('data-note');
+      if (noteTitle) {
+        onLinkClick(noteTitle);
+      }
     }
   };
 
@@ -334,6 +346,7 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
               <div 
                 className="markdown-preview"
                 dangerouslySetInnerHTML={{ __html: renderMarkdownPreview(content) }}
+                onClick={handleWikilinkClick}
               />
             )}
           </div>

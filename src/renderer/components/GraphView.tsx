@@ -87,10 +87,12 @@ export function GraphView({ onSelectNote, currentNoteId }: GraphViewProps) {
     svg.call(zoom);
 
     const simulation = d3.forceSimulation(nodes)
-      .force('link', d3.forceLink<GraphNode, GraphEdge>(edges).id(d => d.id).distance(100))
-      .force('charge', d3.forceManyBody().strength(-300))
+      .force('link', d3.forceLink<GraphNode, GraphEdge>(edges).id(d => d.id).distance(120).strength(0.5))
+      .force('charge', d3.forceManyBody().strength(-400).distanceMax(300))
       .force('center', d3.forceCenter(width / 2, height / 2))
-      .force('collision', d3.forceCollide().radius(40));
+      .force('collision', d3.forceCollide().radius(50))
+      .alphaDecay(0.02)
+      .velocityDecay(0.4);
 
     const link = g.append('g')
       .attr('class', 'links')
@@ -100,8 +102,12 @@ export function GraphView({ onSelectNote, currentNoteId }: GraphViewProps) {
       .append('line')
       .attr('class', 'link')
       .attr('stroke', '#999')
-      .attr('stroke-opacity', 0.6)
-      .attr('stroke-width', 1);
+      .attr('stroke-opacity', 0)
+      .attr('stroke-width', 1)
+      .transition()
+      .duration(500)
+      .delay((_, i) => i * 20 + 300)
+      .attr('stroke-opacity', 0.6);
 
     const nodeGroup = g.append('g')
       .attr('class', 'nodes')
@@ -137,7 +143,12 @@ export function GraphView({ onSelectNote, currentNoteId }: GraphViewProps) {
       .attr('r', d => Math.min(8 + d.linkCount * 2, 25))
       .attr('fill', d => d.id === currentNoteId ? '#4a90d9' : '#69b3a2')
       .attr('stroke', d => d.id === currentNoteId ? '#2d5a8a' : '#408e71')
-      .attr('stroke-width', 2);
+      .attr('stroke-width', 2)
+      .attr('opacity', 0)
+      .transition()
+      .duration(500)
+      .delay((_, i) => i * 30)
+      .attr('opacity', 1);
 
     nodeGroup.append('text')
       .attr('dy', d => Math.min(8 + d.linkCount * 2, 25) + 15)

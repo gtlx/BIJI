@@ -76,6 +76,22 @@ const electronAPI = {
     ipcRenderer.on('menu:open-settings', callback);
     return () => ipcRenderer.removeListener('menu:open-settings', callback);
   },
+
+  onImported: (callback: (count: number) => void) => {
+    ipcRenderer.on('file:imported', (_, count) => callback(count));
+    return () => ipcRenderer.removeAllListeners('file:imported');
+  },
+  onImportError: (callback: (error: string) => void) => {
+    ipcRenderer.on('file:import-error', (_, error) => callback(error));
+    return () => ipcRenderer.removeAllListeners('file:import-error');
+  },
+
+  selectExportPath: (): Promise<string | null> => ipcRenderer.invoke('dialog:selectExportPath'),
+  exportToMarkdown: (exportPath: string): Promise<{ success: boolean; count: number; error?: string }> => 
+    ipcRenderer.invoke('export:markdown', exportPath),
+  selectImportPath: (): Promise<string | null> => ipcRenderer.invoke('dialog:selectImportPath'),
+  importFromMarkdown: (importPath: string): Promise<{ success: boolean; count: number; error?: string }> => 
+    ipcRenderer.invoke('import:markdown', importPath),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

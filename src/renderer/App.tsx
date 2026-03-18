@@ -50,6 +50,12 @@ declare global {
       onToggleTheme: (callback: (dark: boolean) => void) => () => void;
       onOpenSettings: (callback: () => void) => () => void;
       onFeedback: (callback: () => void) => () => void;
+      selectExportPath: () => Promise<string | null>;
+      exportToMarkdown: (path: string) => Promise<{ success: boolean; count: number; error?: string }>;
+      selectImportPath: () => Promise<string | null>;
+      importFromMarkdown: (path: string) => Promise<{ success: boolean; count: number; error?: string }>;
+      onImported: (callback: (count: number) => void) => () => void;
+      onImportError: (callback: (error: string) => void) => () => void;
     };
   }
 }
@@ -64,7 +70,7 @@ export default function App() {
   const [storagePath, setStoragePath] = useState<string>('');
   const [showSettings, setShowSettings] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
-  const [showGraph, setShowGraph] = useState(false);
+  const [showGraph, setShowGraph] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [zoom, setZoom] = useState(100);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
@@ -136,6 +142,13 @@ export default function App() {
         document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
       }),
       window.electronAPI.onOpenSettings(() => setShowSettings(true)),
+      window.electronAPI.onImported((count) => {
+        showToast(`已导入 ${count} 篇笔记`);
+        loadData();
+      }),
+      window.electronAPI.onImportError((error) => {
+        showToast(`导入失败: ${error}`, 'error');
+      }),
     ];
 
     return () => cleanups.forEach(cleanup => cleanup());
@@ -292,6 +305,28 @@ export default function App() {
     showToast(`插件 ${pluginId} 功能开发中`);
   };
 
+  const handleLinkClick = (noteTitle: string) => {
+    const linkedNote = notes.find(n => n.title === noteTitle);
+    if (linkedNote) {
+      setSelectedNote(linkedNote);
+      setShowGraph(false);
+    } else {
+      showToast(`未找到笔记: ${noteTitle}`, 'info');
+    }
+  };
+
+  const handleExport = async () => {
+    const exportPath = await window.electronAPI.selectExportPath();
+    if (exportPath) {
+      const result = await window.electronAPI.exportToMarkdown(exportPath);
+      if (result.success) {
+        showToast(`已导出 ${result.count} 篇笔记`);
+      } else {
+        showToast(`导出失败: ${result.error}`, 'error');
+      }
+    }
+  };
+
   if (isLoading) {
     return <div className="loading">加载中...</div>;
   }
@@ -332,6 +367,7 @@ export default function App() {
             onDelete={handleDeleteNote}
             settings={settings}
             syncEnabled={isPluginEnabled('sync-plugin')}
+            onLinkClick={handleLinkClick}
           />
         )}
         <StatusBar
@@ -345,6 +381,7 @@ export default function App() {
         plugins={plugins}
         onPluginClick={handlePluginClick}
         onGraphClick={() => setShowGraph(!showGraph)}
+        onExportClick={handleExport}
         isGraphActive={showGraph}
       />
 

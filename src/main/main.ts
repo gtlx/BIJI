@@ -1,11 +1,13 @@
 import { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage, dialog } from 'electron';
 import * as path from 'path';
+import * as fs from 'fs';
 import log from 'electron-log';
 import { SqliteDatabase } from './sqlite-database';
 import { PluginManager } from './plugin-manager';
 import { SyncManager } from './sync-manager';
 import { SettingsManager } from './settings-manager';
 import { EncryptionService } from './encryption';
+import type { Note, Folder } from '../shared/types';
 
 log.initialize();
 log.info('Application starting...');
@@ -164,14 +166,213 @@ function createTray() {
 
 async function handleImport() {
   const result = await dialog.showOpenDialog(mainWindow!, {
-    properties: ['openFile'],
-    filters: [
-      { name: '笔记文件', extensions: ['json', 'md', 'html'] },
-    ],
+    properties: ['openDirectory'],
+    title: '选择导入文件夹',
   });
 
   if (!result.canceled && result.filePaths[0]) {
-    mainWindow?.webContents.send('file:import', result.filePaths[0]);
+    const importResult = await importFromMarkdown(result.filePaths[0]);
+    if (importResult.success) {
+      mainWindow?.webContents.send('file:imported', importResult.count);
+    } else {
+      mainWindow?.webContents.send('file:import-error', importResult.error);
+    }
+  }
+}
+
+function sanitizeFilename(name: string): string {
+  return name.replace(/[<>:"/\\|?*]/g, '_').trim() || 'untitled';
+}
+
+async function importFromMarkdown(importPath: string): Promise<{ success: boolean; count: number; error?: string }> {
+  try {
+    const entries = fs.readdirSync(importPath, { withFileTypes: true });
+    const notes: Note[] = [];
+    const foldersMap = new Map<string, Folder>();
+
+    function processDirectory(dirPath: string, parentId: string | null): void {
+      const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+      
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          const folder: Folder = {
+            id: crypto.randomUUID(),
+            name: entry.name,
+            parentId,
+            createdAt: Date.now(),
+          };
+          database.saveFolder(folder);
+          foldersMap.set(folder.id, folder);
+          processDirectory(path.join(dirPath, entry.name), folder.id);
+        } else if (entry.isFile() && entry.name.endsWith('.md')) {
+          const filePath = path.join(dirPath, entry.name);
+          const content = fs.readFileSync(filePath, 'utf-8');
+          const { title, body } = parseMarkdownFile(content, entry.name);
+          
+          const note: Note = {
+            id: crypto.randomUUID(),
+            title,
+            content: body,
+            folderId: parentId,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            tags: [],
+            isEncrypted: false,
+            syncStatus: 'pending',
+          };
+          notes.push(note);
+        }
+      }
+    }
+
+    function parseMarkdownFile(content: string, filename: string): { title: string; body: string } {
+      const lines = content.split('\n');
+      let title = filename.replace('.md', '');
+      let body = content;
+      
+      const titleMatch = content.match(/^#\s+(.+)$/m);
+      if (titleMatch) {
+        title = titleMatch[1].trim();
+        body = content.replace(/^#\s+.+$/m, '').trim();
+      }
+
+      const frontMatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
+      if (frontMatterMatch) {
+        body = body.replace(/^---\n[\s\S]*?\n---\n?/, '').trim();
+        
+        const tagsMatch = frontMatterMatch[1].match(/tags:\s*(.+)/);
+        if (tagsMatch) {
+          const tags = tagsMatch[1].split(/[\s,]+/).filter(t => t.startsWith('#')).map(t => t.replace(/^#/, ''));
+          body = body + '\n\n' + tags.map(t => `#${t}`).join(' ');
+        }
+      }
+      
+      return { title, body };
+    }
+
+    processDirectory(importPath, null);
+
+    for (const note of notes) {
+      database.saveNote(note);
+    }
+
+    log.info(`Imported ${notes.length} notes from ${importPath}`);
+    return { success: true, count: notes.length };
+  } catch (error) {
+    log.error('Import failed:', error);
+    return { success: false, count: 0, error: String(error) };
+  }
+}
+
+async function exportToMarkdown(exportPath: string): Promise<{ success: boolean; count: number; error?: string }> {
+  try {
+    const notes = database.getAllNotes();
+    const folders = database.getAllFolders();
+    
+    const folderMap = new Map<string, Folder>();
+    folders.forEach(f => folderMap.set(f.id, f));
+
+    const notesByFolder = new Map<string, Note[]>();
+    notesByFolder.set('root', []);
+    
+    folders.forEach(f => {
+      notesByFolder.set(f.id, []);
+    });
+
+    notes.forEach(note => {
+      const folderId = note.folderId || 'root';
+      if (!notesByFolder.has(folderId)) {
+        notesByFolder.set(folderId, []);
+      }
+      notesByFolder.get(folderId)!.push(note);
+    });
+
+    const baseExportPath = path.join(exportPath, 'biji-export');
+    if (!fs.existsSync(baseExportPath)) {
+      fs.mkdirSync(baseExportPath, { recursive: true });
+    }
+
+    function createFolderStructure(folderId: string, parentPath: string): void {
+      if (folderId !== 'root') {
+        const folder = folderMap.get(folderId);
+        if (folder) {
+          const folderPath = path.join(parentPath, sanitizeFilename(folder.name));
+          if (!fs.existsSync(folderPath)) {
+            fs.mkdirSync(folderPath, { recursive: true });
+          }
+          
+          const childFolders = folders.filter(f => f.parentId === folderId);
+          childFolders.forEach(child => {
+            createFolderStructure(child.id, folderPath);
+          });
+          
+          const folderNotes = notesByFolder.get(folderId) || [];
+          folderNotes.forEach(note => {
+            const notePath = path.join(folderPath, `${sanitizeFilename(note.title)}.md`);
+            const content = convertNoteToMarkdown(note);
+            fs.writeFileSync(notePath, content, 'utf-8');
+          });
+        }
+      }
+    }
+
+    function convertNoteToMarkdown(note: Note): string {
+      const lines: string[] = [];
+      
+      lines.push(`# ${note.title}`);
+      lines.push('');
+      
+      if (note.tags.length > 0) {
+        lines.push(`tags: ${note.tags.map(t => `#${t}`).join(' ')}`);
+        lines.push('');
+      }
+      
+      lines.push(`created: ${new Date(note.createdAt).toISOString()}`);
+      lines.push(`modified: ${new Date(note.updatedAt).toISOString()}`);
+      lines.push('');
+      
+      lines.push('---');
+      lines.push('');
+      
+      lines.push(note.content);
+      
+      return lines.join('\n');
+    }
+
+    const rootNotes = notesByFolder.get('root') || [];
+    rootNotes.forEach(note => {
+      const notePath = path.join(baseExportPath, `${sanitizeFilename(note.title)}.md`);
+      const content = convertNoteToMarkdown(note);
+      fs.writeFileSync(notePath, content, 'utf-8');
+    });
+
+    const topLevelFolders = folders.filter(f => !f.parentId);
+    topLevelFolders.forEach(folder => {
+      const folderPath = path.join(baseExportPath, sanitizeFilename(folder.name));
+      if (!fs.existsSync(folderPath)) {
+        fs.mkdirSync(folderPath, { recursive: true });
+      }
+      
+      const childFolders = folders.filter(f => f.parentId === folder.id);
+      childFolders.forEach(child => {
+        createFolderStructure(child.id, folderPath);
+      });
+      
+      const folderNotes = notesByFolder.get(folder.id) || [];
+      folderNotes.forEach(note => {
+        const notePath = path.join(folderPath, `${sanitizeFilename(note.title)}.md`);
+        const content = convertNoteToMarkdown(note);
+        fs.writeFileSync(notePath, content, 'utf-8');
+      });
+    });
+
+    const totalNotes = notes.length;
+    log.info(`Exported ${totalNotes} notes to ${baseExportPath}`);
+    
+    return { success: true, count: totalNotes };
+  } catch (error) {
+    log.error('Export failed:', error);
+    return { success: false, count: 0, error: String(error) };
   }
 }
 
@@ -206,22 +407,26 @@ function setupIPC() {
   ipcMain.handle('db:getBacklinks', async (_, noteId: string) => database.getBacklinks(noteId));
   ipcMain.handle('db:getAllLinks', async () => database.getAllLinks());
   ipcMain.handle('db:getGraphData', async () => {
+    const notes = database.getAllNotes();
     const links = database.getAllLinks();
     const nodesMap = new Map<string, { id: string; title: string; linkCount: number }>();
     const edges: { source: string; target: string }[] = [];
 
-    for (const link of links) {
-      if (!nodesMap.has(link.source.id)) {
-        nodesMap.set(link.source.id, { id: link.source.id, title: link.source.title, linkCount: 0 });
-      }
-      nodesMap.get(link.source.id)!.linkCount++;
+    for (const note of notes) {
+      nodesMap.set(note.id, { id: note.id, title: note.title, linkCount: 0 });
+    }
 
+    for (const link of links) {
+      if (nodesMap.has(link.source.id)) {
+        nodesMap.get(link.source.id)!.linkCount++;
+      }
       if (link.target) {
-        if (!nodesMap.has(link.target.id)) {
-          nodesMap.set(link.target.id, { id: link.target.id, title: link.target.title, linkCount: 0 });
+        if (nodesMap.has(link.target.id)) {
+          nodesMap.get(link.target.id)!.linkCount++;
         }
-        nodesMap.get(link.target.id)!.linkCount++;
-        edges.push({ source: link.source.id, target: link.target.id });
+        if (nodesMap.has(link.source.id)) {
+          edges.push({ source: link.source.id, target: link.target.id });
+        }
       }
     }
 
@@ -243,6 +448,36 @@ function setupIPC() {
       return result.filePaths[0];
     }
     return null;
+  });
+
+  ipcMain.handle('dialog:selectExportPath', async () => {
+    const result = await dialog.showOpenDialog(mainWindow!, {
+      properties: ['openDirectory', 'createDirectory'],
+      title: '选择导出位置',
+    });
+    if (!result.canceled && result.filePaths[0]) {
+      return result.filePaths[0];
+    }
+    return null;
+  });
+
+  ipcMain.handle('dialog:selectImportPath', async () => {
+    const result = await dialog.showOpenDialog(mainWindow!, {
+      properties: ['openDirectory'],
+      title: '选择导入文件夹',
+    });
+    if (!result.canceled && result.filePaths[0]) {
+      return result.filePaths[0];
+    }
+    return null;
+  });
+
+  ipcMain.handle('export:markdown', async (_, exportPath: string) => {
+    return exportToMarkdown(exportPath);
+  });
+
+  ipcMain.handle('import:markdown', async (_, importPath: string) => {
+    return importFromMarkdown(importPath);
   });
 
   ipcMain.handle('storage:setPath', async (_, newPath: string) => {
