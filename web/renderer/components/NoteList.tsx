@@ -1,3 +1,4 @@
+import React from 'react';
 import type { Note, SearchQuery } from '@shared/types';
 import './NoteList.css';
 
@@ -14,7 +15,7 @@ export function NoteList({
   selectedNoteId, 
   onSelectNote, 
   onNewNote,
-  onSearch: _onSearch 
+  onSearch 
 }: NoteListProps) {
   const formatDate = (timestamp: number) => {
     const date = new Date(timestamp);

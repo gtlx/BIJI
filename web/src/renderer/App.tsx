@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Editor } from './components/Editor';
 import { NoteList } from './components/NoteList';
 import { SettingsModal } from './components/SettingsModal';
+import { PluginManagerModal } from './components/PluginManagerModal';
 import { SearchModal } from './components/SearchModal';
 import { StatusBar } from './components/StatusBar';
-import { DEFAULT_TEMPLATES } from '@shared/types';
 import type { Note, Folder, AppSettings, SearchQuery, Plugin } from '@shared/types';
 
 declare global {
@@ -35,7 +35,8 @@ declare global {
       onNewFolder: (callback: () => void) => () => void;
       onSearch: (callback: () => void) => () => void;
       onToggleTheme: (callback: (dark: boolean) => void) => () => void;
-      onOpenSettings: (callback: () => void) => () => void;
+      onPluginManager: (callback: () => void) => () => void;
+      onPluginMarket: (callback: () => void) => () => void;
       onFeedback: (callback: () => void) => () => void;
     };
   }
@@ -50,9 +51,10 @@ export default function App() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [storagePath, setStoragePath] = useState<string>('');
   const [showSettings, setShowSettings] = useState(false);
+  const [showPluginManager, setShowPluginManager] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState<SearchQuery>({});
   const [isLoading, setIsLoading] = useState(true);
-  const [zoom, setZoom] = useState(100);
 
   const isPluginEnabled = (pluginId: string) => {
     const plugin = plugins.find(p => p.id === pluginId);
@@ -74,7 +76,6 @@ export default function App() {
       setPlugins(pluginsData);
       setStoragePath(path);
       applyTheme(settingsData.theme);
-      setZoom(settingsData.zoom);
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
@@ -92,14 +93,6 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
   };
 
-  const applyZoom = (zoomLevel: number) => {
-    document.body.style.zoom = `${zoomLevel}%`;
-    document.body.style.transform = `scale(${zoomLevel / 100})`;
-    document.body.style.transformOrigin = 'top left';
-    document.body.style.width = `${10000 / zoomLevel}%`;
-    document.body.style.height = `${10000 / zoomLevel}%`;
-  };
-
   useEffect(() => {
     loadData();
 
@@ -110,7 +103,7 @@ export default function App() {
       window.electronAPI.onToggleTheme((dark) => {
         document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
       }),
-      window.electronAPI.onOpenSettings(() => setShowSettings(true)),
+      window.electronAPI.onPluginManager(() => setShowPluginManager(true)),
     ];
 
     return () => cleanups.forEach(cleanup => cleanup());
@@ -151,20 +144,19 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [settings, isPluginEnabled]);
-
-  useEffect(() => {
-    applyZoom(zoom);
-  }, [zoom]);
+  }, [settings]);
 
   const handleNewNote = () => {
-    const templateId = settings?.template || 'blank';
-    const template = DEFAULT_TEMPLATES.find(t => t.id === templateId);
+    const template = settings?.template || 'blank';
+    let content = '';
     
-    let content = template?.content || '';
-    if (templateId === 'daily') {
+    if (template === 'meeting') {
+      content = '# 会议记录\n\n## 会议主题\n\n## 参会人员\n\n## 会议内容\n\n## 待办事项\n- [ ] ';
+    } else if (template === 'daily') {
       const today = new Date().toLocaleDateString('zh-CN');
-      content = content.replace('{{date}}', today);
+      content = `# ${today}\n\n## 今日完成\n\n## 遇到的问题\n\n## 明日计划\n`;
+    } else if (template === 'todo') {
+      content = '# 待办清单\n\n- [ ] \n- [ ] \n- [ ] \n';
     }
 
     const newNote: Note = {
@@ -216,6 +208,7 @@ export default function App() {
   };
 
   const handleSearch = async (query: SearchQuery) => {
+    setSearchQuery(query);
     const results = await window.electronAPI.searchNotes(query);
     setNotes(results);
   };
@@ -229,9 +222,6 @@ export default function App() {
     }
     if (newSettings.customCss) {
       applyCustomCss(newSettings.customCss);
-    }
-    if (newSettings.zoom) {
-      setZoom(newSettings.zoom);
     }
   };
 
@@ -266,6 +256,7 @@ export default function App() {
         selectedFolderId={selectedFolderId}
         onSelectFolder={setSelectedFolderId}
         onOpenSettings={() => setShowSettings(true)}
+        onOpenPluginManager={() => setShowPluginManager(true)}
       />
       <NoteList
         notes={notes.filter(n => !selectedFolderId || n.folderId === selectedFolderId)}
@@ -296,6 +287,13 @@ export default function App() {
           onClose={() => setShowSettings(false)}
           onSave={handleSettingsChange}
           onTogglePlugin={handlePluginToggle}
+        />
+      )}
+
+      {showPluginManager && (
+        <PluginManagerModal 
+          onClose={() => setShowPluginManager(false)} 
+          onPluginChange={setPlugins}
         />
       )}
 

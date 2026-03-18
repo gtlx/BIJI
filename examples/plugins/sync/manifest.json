@@ -2,9 +2,11 @@
   "id": "sync-plugin",
   "name": "云同步插件",
   "version": "1.0.0",
-  "description": "支持多种云服务的同步插件，包括本地文件夹、Google Drive、OneDrive 和 Web 同步",
+  "description": "支持本地文件夹、Web 同步功能",
   "author": "Biji Team",
   "entryPoint": "index.js",
+  "builtIn": true,
+  "settingsKey": "sync",
   "permissions": [
     { "type": "storage", "allowed": true },
     { "type": "network", "allowed": true },

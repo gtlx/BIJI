@@ -10,11 +10,17 @@ import { EncryptionService } from './encryption';
 log.initialize();
 log.info('Application starting...');
 
+/**
+ * 全局异常处理器 - 捕获未处理的异常并记录日志
+ */
 process.on('uncaughtException', (error) => {
   log.error('Uncaught exception:', error);
   app.exit(1);
 });
 
+/**
+ * 全局 Promise 拒绝处理器 - 捕获未处理的 Promise 拒绝
+ */
 process.on('unhandledRejection', (reason) => {
   log.error('Unhandled rejection:', reason);
 });
@@ -29,6 +35,9 @@ let encryptionService: EncryptionService;
 
 const isDev = !app.isPackaged;
 
+/**
+ * 创建应用主窗口
+ */
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -80,6 +89,8 @@ function createMenu() {
         { type: 'separator' },
         { label: '导入', click: () => handleImport() },
         { label: '导出', click: () => handleExport() },
+        { type: 'separator' },
+        { label: '设置', accelerator: 'CmdOrCtrl+,', click: () => mainWindow?.webContents.send('menu:open-settings') },
         { type: 'separator' },
         { label: '退出', accelerator: 'CmdOrCtrl+Q', click: () => app.quit() },
       ],
@@ -178,10 +189,10 @@ async function handleExport() {
 }
 
 function showAbout() {
-  dialog.showMessageBox(mainWindow!, {
+    dialog.showMessageBox(mainWindow!, {
     type: 'info',
     title: '关于 Biji Note',
-    message: 'Biji Note v1.0.0',
+    message: 'Biji Note',
     detail: '跨平台笔记编辑器\n支持插件系统、云同步、离线功能',
   });
 }

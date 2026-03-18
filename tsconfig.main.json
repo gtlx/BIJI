@@ -4,16 +4,17 @@
     "lib": ["ES2022"],
     "module": "CommonJS",
     "moduleResolution": "node",
-    "outDir": "dist/main",
+    "outDir": "dist",
     "rootDir": "src",
-    "strict": false,
+    "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "declaration": false,
     "declarationMap": false,
-    "noImplicitAny": false
+    "noImplicitAny": false,
+    "types": ["node"]
   },
   "include": ["src/main/**/*", "src/shared/**/*"]
 }

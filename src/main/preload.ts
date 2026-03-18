@@ -68,6 +68,10 @@ const electronAPI = {
     ipcRenderer.on('menu:feedback', callback);
     return () => ipcRenderer.removeListener('menu:feedback', callback);
   },
+  onOpenSettings: (callback: () => void) => {
+    ipcRenderer.on('menu:open-settings', callback);
+    return () => ipcRenderer.removeListener('menu:open-settings', callback);
+  },
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

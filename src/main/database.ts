@@ -2,8 +2,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import log from 'electron-log';
-import type { Note, Folder, SearchQuery } from '../../shared/types';
+import { app } from 'electron';
+import type { Note, Folder, SearchQuery } from '../shared/types';
 
+/**
+ * 数据库管理器 - 负责笔记和文件夹的持久化存储
+ * 使用本地 JSON 文件作为存储介质
+ */
 export class Database {
   private basePath: string;
   private notesFile: string;
@@ -18,7 +23,6 @@ export class Database {
   }
 
   private getDefaultPath(): string {
-    const { app } = require('electron');
     return app.getPath('userData');
   }
 
@@ -56,15 +60,24 @@ export class Database {
     this.init(newPath);
   }
 
+  /**
+   * 从文件加载笔记列表
+   * @returns 笔记数组，加载失败时返回空数组
+   */
   private loadNotes(): Note[] {
     try {
       const data = fs.readFileSync(this.notesFile, 'utf-8');
       return JSON.parse(data);
-    } catch {
+    } catch (error) {
+      log.error('Failed to load notes:', error);
       return [];
     }
   }
 
+  /**
+   * 保存笔记列表到文件
+   * @param notes 笔记数组
+   */
   private saveNotes(notes: Note[]): void {
     fs.writeFileSync(this.notesFile, JSON.stringify(notes, null, 2), 'utf-8');
   }
@@ -73,7 +86,8 @@ export class Database {
     try {
       const data = fs.readFileSync(this.foldersFile, 'utf-8');
       return JSON.parse(data);
-    } catch {
+    } catch (error) {
+      log.error('Failed to load folders:', error);
       return [];
     }
   }
@@ -82,6 +96,11 @@ export class Database {
     fs.writeFileSync(this.foldersFile, JSON.stringify(folders, null, 2), 'utf-8');
   }
 
+  /**
+   * 获取所有笔记
+   * @param includeDeleted 是否包含已删除的笔记
+   * @returns 按更新时间降序排列的笔记数组
+   */
   getAllNotes(includeDeleted = false): Note[] {
     const notes = this.loadNotes();
     const filtered = includeDeleted ? notes : notes.filter(n => !n.deletedAt);
@@ -93,6 +112,10 @@ export class Database {
     return notes.find(n => n.id === id) || null;
   }
 
+  /**
+   * 保存笔记 - 新建或更新
+   * @param note 要保存的笔记
+   */
   saveNote(note: Note): void {
     const notes = this.loadNotes();
     const index = notes.findIndex(n => n.id === note.id);
@@ -139,6 +162,11 @@ export class Database {
     }
   }
 
+  /**
+   * 搜索笔记
+   * @param query 搜索条件
+   * @returns 匹配的笔记数组
+   */
   searchNotes(query: SearchQuery): Note[] {
     let notes = this.loadNotes();
 

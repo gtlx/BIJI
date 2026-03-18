@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import type { Note, AppSettings, EditorMode, MarkdownPreviewMode } from '@shared/types';
+import type { Note, AppSettings } from '@shared/types';
 import './Editor.css';
 
 interface EditorProps {
@@ -7,22 +7,17 @@ interface EditorProps {
   onSave: (note: Note) => void;
   onDelete: (id: string) => void;
   settings: AppSettings | null;
-  syncEnabled: boolean;
 }
 
-export function Editor({ note, onSave, onDelete, settings, syncEnabled }: EditorProps) {
+export function Editor({ note, onSave, onDelete, settings }: EditorProps) {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [editorMode, setEditorMode] = useState<EditorMode>('markdown');
-  const [previewMode, setPreviewMode] = useState<MarkdownPreviewMode>('live');
   const saveTimeoutRef = useRef<NodeJS.Timeout>();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  
-  void syncEnabled;
 
   useEffect(() => {
     if (note) {
@@ -35,15 +30,6 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled }: Editor
       setTags([]);
     }
   }, [note?.id]);
-
-  useEffect(() => {
-    if (settings?.editorMode) {
-      setEditorMode(settings.editorMode);
-    }
-    if (settings?.markdownPreviewMode) {
-      setPreviewMode(settings.markdownPreviewMode);
-    }
-  }, [settings?.editorMode, settings?.markdownPreviewMode]);
 
   const handleSave = useCallback(async () => {
     if (!note) return;
@@ -106,21 +92,6 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled }: Editor
     }
   };
 
-  const renderMarkdownPreview = (text: string) => {
-    let html = text
-      .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-      .replace(/^## (.*$)/gim, '<h2>$1</h2>')
-      .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      .replace(/`([^`]+)`/g, '<code>$1</code>')
-      .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
-      .replace(/^\- (.*$)/gim, '<li>$1</li>')
-      .replace(/^\d+\. (.*$)/gim, '<li>$1</li>')
-      .replace(/\n/g, '<br>');
-    return html;
-  };
-
   if (!note) {
     return (
       <div className="editor-container">
@@ -147,59 +118,6 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled }: Editor
             placeholder="标题"
           />
           <div className="editor-actions">
-            {settings && (
-              <div className="editor-mode-switch">
-                <button
-                  className={`mode-btn ${editorMode === 'rich' ? 'active' : ''}`}
-                  onClick={() => setEditorMode('rich')}
-                  title="富文本模式"
-                >
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                    <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
-                  </svg>
-                </button>
-                <button
-                  className={`mode-btn ${editorMode === 'markdown' ? 'active' : ''}`}
-                  onClick={() => setEditorMode('markdown')}
-                  title="Markdown 模式"
-                >
-                  M
-                </button>
-              </div>
-            )}
-            
-            {editorMode === 'markdown' && (
-              <div className="preview-mode-switch">
-                <button
-                  className={`mode-btn ${previewMode === 'live' ? 'active' : ''}`}
-                  onClick={() => setPreviewMode('live')}
-                  title="实时预览"
-                >
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                    <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
-                  </svg>
-                </button>
-                <button
-                  className={`mode-btn ${previewMode === 'edit' ? 'active' : ''}`}
-                  onClick={() => setPreviewMode('edit')}
-                  title="笔记模式"
-                >
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                    <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/>
-                  </svg>
-                </button>
-                <button
-                  className={`mode-btn ${previewMode === 'preview' ? 'active' : ''}`}
-                  onClick={() => setPreviewMode('preview')}
-                  title="预览模式"
-                >
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                    <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5z"/>
-                  </svg>
-                </button>
-              </div>
-            )}
-
             {isSaving && <span className="saving-indicator">保存中...</span>}
             <button 
               className="btn-icon tooltip" 
@@ -236,41 +154,17 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled }: Editor
           />
         </div>
 
-        {editorMode === 'rich' ? (
-          <textarea
-            ref={textareaRef}
-            className="editor-content"
-            value={content}
-            onChange={e => setContent(e.target.value)}
-            placeholder="开始编写笔记... (富文本模式)"
-            style={{
-              fontFamily: settings?.fontFamily || 'inherit',
-              fontSize: `${settings?.fontSize || 14}px`,
-            }}
-          />
-        ) : (
-          <div className={`markdown-editor markdown-${previewMode}`}>
-            {(previewMode === 'live' || previewMode === 'edit') && (
-              <textarea
-                ref={textareaRef}
-                className="editor-content"
-                value={content}
-                onChange={e => setContent(e.target.value)}
-                placeholder="开始编写笔记... (支持 Markdown)"
-                style={{
-                  fontFamily: settings?.fontFamily || 'inherit',
-                  fontSize: `${settings?.fontSize || 14}px`,
-                }}
-              />
-            )}
-            {(previewMode === 'live' || previewMode === 'preview') && (
-              <div 
-                className="markdown-preview"
-                dangerouslySetInnerHTML={{ __html: renderMarkdownPreview(content) }}
-              />
-            )}
-          </div>
-        )}
+        <textarea
+          ref={textareaRef}
+          className="editor-content"
+          value={content}
+          onChange={e => setContent(e.target.value)}
+          placeholder="开始编写笔记... (支持 Markdown)"
+          style={{
+            fontFamily: settings?.fontFamily || 'inherit',
+            fontSize: `${settings?.fontSize || 14}px`,
+          }}
+        />
       </div>
 
       {showDeleteConfirm && (

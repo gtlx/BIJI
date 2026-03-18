@@ -7,10 +7,10 @@ interface EditorProps {
   onSave: (note: Note) => void;
   onDelete: (id: string) => void;
   settings: AppSettings | null;
-  syncEnabled: boolean;
+  syncEnabled?: boolean;
 }
 
-export function Editor({ note, onSave, onDelete, settings, syncEnabled }: EditorProps) {
+export function Editor({ note, onSave, onDelete, settings, syncEnabled = false }: EditorProps) {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [tags, setTags] = useState<string[]>([]);
@@ -21,8 +21,6 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled }: Editor
   const [previewMode, setPreviewMode] = useState<MarkdownPreviewMode>('live');
   const saveTimeoutRef = useRef<NodeJS.Timeout>();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  
-  void syncEnabled;
 
   useEffect(() => {
     if (note) {

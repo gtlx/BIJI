@@ -1,7 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import * as crypto from 'crypto';
 import log from 'electron-log';
-import type { AppSettings, DEFAULT_SHORTCUTS } from '../../shared/types';
+import type { AppSettings } from '../shared/types';
 
 const defaultSettings: AppSettings = {
   theme: 'system',
@@ -23,6 +24,7 @@ const defaultSettings: AppSettings = {
   storagePath: '',
   template: 'blank',
   customCss: '',
+  zoom: 100,
   shortcuts: {
     newNote: 'Ctrl+N',
     newFolder: 'Ctrl+Shift+N',
@@ -55,7 +57,6 @@ export class SettingsManager {
     }
 
     if (!this.settings.encryptionKey) {
-      const crypto = require('crypto');
       this.settings.encryptionKey = crypto.randomBytes(32).toString('hex');
     }
 

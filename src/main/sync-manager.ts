@@ -1,5 +1,5 @@
 import log from 'electron-log';
-import type { Note } from '../../shared/types';
+import type { Note } from '../shared/types';
 import { Database } from './database';
 import { SettingsManager } from './settings-manager';
 

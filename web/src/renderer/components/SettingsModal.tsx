@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import type { AppSettings, Plugin } from '@shared/types';
 import './SettingsModal.css';
 
@@ -12,10 +12,7 @@ interface SettingsModalProps {
 
 export function SettingsModal({ settings, plugins, onClose, onSave, onTogglePlugin }: SettingsModalProps) {
   const [localSettings, setLocalSettings] = useState<AppSettings>({ ...settings });
-  const [activeTab, setActiveTab] = useState<'general' | 'editor' | 'shortcuts' | 'appearance' | 'plugins' | 'sync'>('general');
-
-  const syncPlugin = plugins.find(p => p.id === 'sync-plugin');
-  const syncEnabled = syncPlugin?.enabled ?? false;
+  const [activeTab, setActiveTab] = useState<'general' | 'editor' | 'sync' | 'shortcuts' | 'appearance' | 'plugins'>('general');
 
   const handleSave = () => {
     onSave(localSettings);
@@ -63,7 +60,7 @@ export function SettingsModal({ settings, plugins, onClose, onSave, onTogglePlug
         <div className="settings-tabs">
           <button className={`tab-btn ${activeTab === 'general' ? 'active' : ''}`} onClick={() => setActiveTab('general')}>通用</button>
           <button className={`tab-btn ${activeTab === 'editor' ? 'active' : ''}`} onClick={() => setActiveTab('editor')}>编辑器</button>
-          {syncEnabled && <button className={`tab-btn ${activeTab === 'sync' ? 'active' : ''}`} onClick={() => setActiveTab('sync')}>同步</button>}
+          <button className={`tab-btn ${activeTab === 'sync' ? 'active' : ''}`} onClick={() => setActiveTab('sync')}>同步</button>
           <button className={`tab-btn ${activeTab === 'shortcuts' ? 'active' : ''}`} onClick={() => setActiveTab('shortcuts')}>快捷键</button>
           <button className={`tab-btn ${activeTab === 'appearance' ? 'active' : ''}`} onClick={() => setActiveTab('appearance')}>外观</button>
           <button className={`tab-btn ${activeTab === 'plugins' ? 'active' : ''}`} onClick={() => setActiveTab('plugins')}>插件</button>
@@ -157,7 +154,7 @@ export function SettingsModal({ settings, plugins, onClose, onSave, onTogglePlug
             </>
           )}
 
-          {activeTab === 'sync' && syncEnabled && (
+          {activeTab === 'sync' && (
             <>
               <div className="settings-section">
                 <h3 className="settings-section-title">同步设置</h3>
@@ -264,14 +261,6 @@ export function SettingsModal({ settings, plugins, onClose, onSave, onTogglePlug
               </div>
 
               <div className="settings-section">
-                <h3 className="settings-section-title">缩放</h3>
-                <div className="settings-item">
-                  <label>界面缩放 (%)</label>
-                  <input type="number" className="input" value={localSettings.zoom || 100} onChange={e => setLocalSettings({ ...localSettings, zoom: parseInt(e.target.value) })} min={50} max={200} step={10} />
-                </div>
-              </div>
-
-              <div className="settings-section">
                 <h3 className="settings-section-title">自定义 CSS</h3>
                 <div className="settings-item">
                   <label>自定义样式</label>
@@ -290,30 +279,13 @@ export function SettingsModal({ settings, plugins, onClose, onSave, onTogglePlug
                 plugins.map(plugin => (
                   <div key={plugin.id} className="plugin-toggle-item">
                     <div className="plugin-info">
-                      <span className="plugin-name">{plugin.name} {plugin.builtIn && <span className="built-in-tag">内置</span>}</span>
+                      <span className="plugin-name">{plugin.name}</span>
                       <span className="plugin-desc">{plugin.description}</span>
                     </div>
-                    <div className="plugin-actions">
-                      <label className="toggle">
-                        <input type="checkbox" checked={plugin.enabled} onChange={e => onTogglePlugin(plugin.id, e.target.checked)} />
-                        <span className="toggle-slider"></span>
-                      </label>
-                      {!plugin.builtIn && (
-                        <button 
-                          className="btn-icon" 
-                          onClick={() => {
-                            if (confirm(`确定要卸载插件"${plugin.name}"吗？`)) {
-                              window.electronAPI.uninstallPlugin(plugin.id);
-                            }
-                          }}
-                          title="卸载插件"
-                        >
-                          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                            <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-                          </svg>
-                        </button>
-                      )}
-                    </div>
+                    <label className="toggle">
+                      <input type="checkbox" checked={plugin.enabled} onChange={e => onTogglePlugin(plugin.id, e.target.checked)} />
+                      <span className="toggle-slider"></span>
+                    </label>
                   </div>
                 ))
               )}

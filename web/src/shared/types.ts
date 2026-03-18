@@ -30,8 +30,6 @@ export interface Plugin {
   permissions: PluginPermission[];
   entryPoint: string;
   provides?: string[];
-  builtIn?: boolean;
-  settingsKey?: string;
 }
 
 export interface PluginPermission {
@@ -75,7 +73,6 @@ export interface AppSettings {
   storagePath: string;
   template: string;
   customCss: string;
-  zoom: number;
   shortcuts: ShortcutSettings;
 }
 

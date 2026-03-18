@@ -2,7 +2,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import log from 'electron-log';
-import type { Plugin, PluginAPI, PluginPermission, Note } from '../../shared/types';
+import type { Plugin, PluginAPI, PluginPermission, Note, SyncStatus, SyncResult, SyncMode } from '../shared/types';
 import { Database } from './database';
 
 interface LoadedPlugin {
@@ -110,7 +110,9 @@ export class PluginManager {
       },
       showNotification: (title: string, body: string) => {
         const { Notification } = require('electron');
-        new Notification({ title, body }).show();
+        if (Notification.isSupported()) {
+          new Notification({ title, body }).show();
+        }
       },
       getSettings: async () => {
         const { app } = require('electron');
@@ -118,8 +120,15 @@ export class PluginManager {
         const store = new Store();
         return store.get('settings', {});
       },
-      setSettings: async (settings: any) => {
+      setSettings: async (settings: Record<string, unknown>) => {
         log.info(`Plugin ${pluginId} updated settings`);
+      },
+      onSyncStatus: (callback: (status: SyncStatus) => void) => {
+        log.info(`Plugin ${pluginId} listening for sync status`);
+      },
+      startSync: async (mode: SyncMode): Promise<SyncResult> => {
+        log.info(`Plugin ${pluginId} started sync in ${mode} mode`);
+        return { success: false, uploaded: 0, downloaded: 0, deleted: 0, conflicts: [] };
       },
     };
   }
