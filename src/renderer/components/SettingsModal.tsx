@@ -10,12 +10,73 @@ interface SettingsModalProps {
   onTogglePlugin: (id: string, enabled: boolean) => void;
 }
 
+interface UIPluginManifest {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  author: string;
+  type: 'ui' | 'system';
+  entry: string;
+  position: string;
+}
+
+interface UIPluginConfig {
+  enabled: boolean;
+  settings?: Record<string, unknown>;
+}
+
 export function SettingsModal({ settings, plugins, onClose, onSave, onTogglePlugin }: SettingsModalProps) {
   const [localSettings, setLocalSettings] = useState<AppSettings>({ ...settings });
   const [activeTab, setActiveTab] = useState<'general' | 'editor' | 'shortcuts' | 'appearance' | 'plugins' | 'sync' | 'git' | 'publish'>('general');
+  const [uiPlugins, setUiPlugins] = useState<UIPluginManifest[]>([]);
+  const [uiPluginConfigs, setUiPluginConfigs] = useState<Record<string, UIPluginConfig>>({});
 
   const syncPlugin = plugins.find(p => p.id === 'sync-plugin');
   const syncEnabled = syncPlugin?.enabled ?? false;
+
+  useEffect(() => {
+    loadUIPlugins();
+  }, []);
+
+  async function loadUIPlugins() {
+    try {
+      const manifests = await window.electronAPI.getUIPlugins();
+      setUiPlugins(manifests);
+      
+      const configs: Record<string, UIPluginConfig> = {};
+      for (const plugin of manifests) {
+        configs[plugin.id] = await window.electronAPI.getUIPluginConfig(plugin.id);
+      }
+      setUiPluginConfigs(configs);
+    } catch (error) {
+      console.error('Failed to load UI plugins:', error);
+    }
+  }
+
+  async function toggleUIPlugin(pluginId: string, enabled: boolean) {
+    const config = uiPluginConfigs[pluginId] || { enabled: false };
+    config.enabled = enabled;
+    await window.electronAPI.setUIPluginConfig(pluginId, config);
+    setUiPluginConfigs(prev => ({ ...prev, [pluginId]: config }));
+  }
+
+  async function installUIPlugin() {
+    const path = await window.electronAPI.selectPluginPath();
+    if (path) {
+      const result = await window.electronAPI.installUIPlugin(path);
+      if (result) {
+        await loadUIPlugins();
+      }
+    }
+  }
+
+  async function uninstallUIPlugin(pluginId: string) {
+    if (confirm('确定要卸载这个插件吗？')) {
+      await window.electronAPI.uninstallUIPlugin(pluginId);
+      await loadUIPlugins();
+    }
+  }
 
   const [gitStatus, setGitStatus] = useState<{ files: string[]; clean: boolean }>({ files: [], clean: true });
   const [commitMessage, setCommitMessage] = useState('');
@@ -374,40 +435,63 @@ export function SettingsModal({ settings, plugins, onClose, onSave, onTogglePlug
 
           {activeTab === 'plugins' && (
             <div className="settings-section">
-              <h3 className="settings-section-title">插件管理</h3>
-              {plugins.length === 0 ? (
-                <p className="empty-text">暂无插件</p>
+              <h3 className="settings-section-title">UI 插件</h3>
+              <p className="settings-desc">UI 插件位于笔记目录的 plugins 文件夹中，支持 Git 版本控制</p>
+              
+              {uiPlugins.length === 0 ? (
+                <p className="empty-text">暂无 UI 插件</p>
               ) : (
-                plugins.map(plugin => (
+                uiPlugins.map(plugin => (
                   <div key={plugin.id} className="plugin-toggle-item">
                     <div className="plugin-info">
-                      <span className="plugin-name">{plugin.name} {plugin.builtIn && <span className="built-in-tag">内置</span>}</span>
+                      <span className="plugin-name">
+                        {plugin.name}
+                        <span className="plugin-version">v{plugin.version}</span>
+                      </span>
                       <span className="plugin-desc">{plugin.description}</span>
                     </div>
                     <div className="plugin-actions">
                       <label className="toggle">
-                        <input type="checkbox" checked={plugin.enabled} onChange={e => onTogglePlugin(plugin.id, e.target.checked)} />
+                        <input 
+                          type="checkbox" 
+                          checked={uiPluginConfigs[plugin.id]?.enabled ?? false} 
+                          onChange={e => toggleUIPlugin(plugin.id, e.target.checked)} 
+                        />
                         <span className="toggle-slider"></span>
                       </label>
-                      {!plugin.builtIn && (
-                        <button 
-                          className="btn-icon" 
-                          onClick={() => {
-                            if (confirm(`确定要卸载插件"${plugin.name}"吗？`)) {
-                              window.electronAPI.uninstallPlugin(plugin.id);
-                            }
-                          }}
-                          title="卸载插件"
-                        >
-                          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                            <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-                          </svg>
-                        </button>
-                      )}
+                      <button 
+                        className="btn-icon" 
+                        onClick={() => uninstallUIPlugin(plugin.id)}
+                        title="卸载插件"
+                      >
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                          <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                        </svg>
+                      </button>
                     </div>
                   </div>
                 ))
               )}
+              
+              <button className="btn btn-secondary" onClick={installUIPlugin} style={{ marginTop: '16px' }}>
+                安装插件
+              </button>
+
+              <h3 className="settings-section-title" style={{ marginTop: '32px' }}>系统插件</h3>
+              {plugins.filter(p => p.builtIn).map(plugin => (
+                <div key={plugin.id} className="plugin-toggle-item">
+                  <div className="plugin-info">
+                    <span className="plugin-name">{plugin.name} <span className="built-in-tag">内置</span></span>
+                    <span className="plugin-desc">{plugin.description}</span>
+                  </div>
+                  <div className="plugin-actions">
+                    <label className="toggle">
+                      <input type="checkbox" checked={plugin.enabled} onChange={e => onTogglePlugin(plugin.id, e.target.checked)} />
+                      <span className="toggle-slider"></span>
+                    </label>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
 

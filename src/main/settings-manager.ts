@@ -41,12 +41,20 @@ const defaultSettings: AppSettings = {
   },
 };
 
+interface UIPluginConfig {
+  enabled: boolean;
+  settings?: Record<string, unknown>;
+}
+
 export class SettingsManager {
   private settingsPath: string;
   private settings: AppSettings;
+  private uiPluginConfigs: Map<string, UIPluginConfig> = new Map();
+  private uiPluginConfigsPath: string;
 
   constructor(userDataPath: string) {
     this.settingsPath = path.join(userDataPath, 'settings.json');
+    this.uiPluginConfigsPath = path.join(userDataPath, 'ui-plugins.json');
     this.settings = { ...defaultSettings };
   }
 
@@ -73,8 +81,33 @@ export class SettingsManager {
       this.settings.encryptionKey = crypto.randomBytes(32).toString('hex');
     }
 
+    if (fs.existsSync(this.uiPluginConfigsPath)) {
+      try {
+        const data = fs.readFileSync(this.uiPluginConfigsPath, 'utf-8');
+        const configs = JSON.parse(data) as Record<string, UIPluginConfig>;
+        this.uiPluginConfigs = new Map(Object.entries(configs));
+      } catch (error) {
+        log.error('Failed to load UI plugin configs:', error);
+      }
+    }
+
     await this.save();
     log.info('Settings manager initialized');
+  }
+
+  getUIPluginConfig(pluginId: string): UIPluginConfig {
+    return this.uiPluginConfigs.get(pluginId) || { enabled: false, settings: {} };
+  }
+
+  async setUIPluginConfig(pluginId: string, config: UIPluginConfig): Promise<void> {
+    this.uiPluginConfigs.set(pluginId, config);
+    await this.saveUIPluginConfigs();
+    log.info(`UI plugin config updated: ${pluginId}`);
+  }
+
+  private async saveUIPluginConfigs(): Promise<void> {
+    const configs = Object.fromEntries(this.uiPluginConfigs);
+    fs.writeFileSync(this.uiPluginConfigsPath, JSON.stringify(configs, null, 2));
   }
 
   getSettings(): AppSettings {

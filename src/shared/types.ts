@@ -204,3 +204,43 @@ export interface GraphEdge {
   source: string;
   target: string;
 }
+
+export interface UIPluginManifest {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  author: string;
+  type: 'ui' | 'system';
+  entry: string;
+  styles?: string;
+  position: 'right-panel' | 'toolbar' | 'sidebar' | 'modal' | 'statusbar';
+  permissions: PluginPermission[];
+  data?: Record<string, unknown>;
+  minAppVersion?: string;
+}
+
+export interface UIPluginConfig {
+  enabled: boolean;
+  settings?: Record<string, unknown>;
+}
+
+export interface UIPlugin {
+  manifest: UIPluginManifest;
+  component: React.ComponentType<any> | null;
+  settings: Record<string, unknown>;
+}
+
+export interface UIPluginAPI {
+  register: (component: React.ComponentType<any>, options?: Record<string, unknown>) => void;
+  getNotes: () => Promise<Note[]>;
+  getNote: (id: string) => Promise<Note | null>;
+  saveNote: (note: Note) => Promise<void>;
+  deleteNote: (id: string) => Promise<void>;
+  getSettings: () => Promise<AppSettings>;
+  setSettings: (settings: Partial<AppSettings>) => Promise<void>;
+  getPluginSettings: (pluginId: string) => Promise<UIPluginConfig>;
+  setPluginSettings: (pluginId: string, config: UIPluginConfig) => Promise<void>;
+  showNotification: (message: string, type?: 'success' | 'error' | 'info') => void;
+  t: (key: string) => string;
+}

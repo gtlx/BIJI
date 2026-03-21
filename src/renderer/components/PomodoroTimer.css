@@ -194,3 +194,43 @@
   font-weight: 600;
   color: var(--accent-color);
 }
+
+.pomodoro-modal.compact {
+  width: 100%;
+  padding: 16px;
+  background: transparent;
+  box-shadow: none;
+}
+
+.pomodoro-modal.compact .pomodoro-timer {
+  width: 160px;
+  height: 160px;
+  margin: 0 auto 16px;
+}
+
+.pomodoro-modal.compact .timer-time {
+  font-size: 32px;
+}
+
+.pomodoro-modal.compact .pomodoro-modes {
+  margin-bottom: 16px;
+}
+
+.pomodoro-modal.compact .mode-btn {
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.pomodoro-modal.compact .pomodoro-stats {
+  padding: 8px 12px;
+}
+
+.pomodoro-modal.compact .control-btn {
+  width: 44px;
+  height: 44px;
+}
+
+.pomodoro-modal.compact .control-btn.reset {
+  width: 36px;
+  height: 36px;
+}

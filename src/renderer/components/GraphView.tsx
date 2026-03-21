@@ -35,10 +35,10 @@ export function GraphView({ onSelectNote, currentNoteId, onRefresh }: GraphViewP
   const [stats, setStats] = useState({ nodes: 0, edges: 0, totalChars: 0 });
   const [showControls, setShowControls] = useState(true);
   const [forceConfig, setForceConfig] = useState<ForceConfig>({
-    centerForce: 0.05,
-    chargeForce: -300,
-    linkForce: 0.5,
-    linkDistance: 80,
+    centerForce: 0.1,
+    chargeForce: -400,
+    linkForce: 0.7,
+    linkDistance: 100,
   });
 
   const updateSimulation = useCallback(() => {
@@ -57,7 +57,7 @@ export function GraphView({ onSelectNote, currentNoteId, onRefresh }: GraphViewP
         .strength(forceConfig.linkForce)
       );
 
-    simulationRef.current.alpha(0.5).restart();
+    simulationRef.current.alpha(1).restart();
   }, [forceConfig]);
 
   const handleConfigChange = (key: keyof ForceConfig, value: number) => {
@@ -285,8 +285,8 @@ export function GraphView({ onSelectNote, currentNoteId, onRefresh }: GraphViewP
               <input
                 type="range"
                 min="0"
-                max="0.2"
-                step="0.01"
+                max="1"
+                step="0.05"
                 value={forceConfig.centerForce}
                 onChange={(e) => handleConfigChange('centerForce', Number(e.target.value))}
               />
@@ -299,9 +299,9 @@ export function GraphView({ onSelectNote, currentNoteId, onRefresh }: GraphViewP
               <span>排斥力</span>
               <input
                 type="range"
-                min="-800"
+                min="-2000"
                 max="-50"
-                step="10"
+                step="50"
                 value={forceConfig.chargeForce}
                 onChange={(e) => handleConfigChange('chargeForce', Number(e.target.value))}
               />
@@ -315,12 +315,12 @@ export function GraphView({ onSelectNote, currentNoteId, onRefresh }: GraphViewP
               <input
                 type="range"
                 min="0"
-                max="1"
-                step="0.05"
+                max="2"
+                step="0.1"
                 value={forceConfig.linkForce}
                 onChange={(e) => handleConfigChange('linkForce', Number(e.target.value))}
               />
-              <span className="control-value">{forceConfig.linkForce.toFixed(2)}</span>
+              <span className="control-value">{forceConfig.linkForce.toFixed(1)}</span>
             </label>
           </div>
 
@@ -329,15 +329,25 @@ export function GraphView({ onSelectNote, currentNoteId, onRefresh }: GraphViewP
               <span>连线长度</span>
               <input
                 type="range"
-                min="30"
-                max="200"
-                step="5"
+                min="20"
+                max="500"
+                step="10"
                 value={forceConfig.linkDistance}
                 onChange={(e) => handleConfigChange('linkDistance', Number(e.target.value))}
               />
               <span className="control-value">{forceConfig.linkDistance}</span>
             </label>
           </div>
+
+          <button 
+            className="graph-reset-btn"
+            onClick={() => {
+              const defaults = { centerForce: 0.1, chargeForce: -400, linkForce: 0.7, linkDistance: 100 };
+              setForceConfig(defaults);
+            }}
+          >
+            重置
+          </button>
         </div>
       )}
     </div>

@@ -11,10 +11,39 @@ interface LoadedPlugin {
   api: PluginAPI;
 }
 
+const BUILT_IN_PLUGINS: Plugin[] = [
+  {
+    id: 'pomodoro-plugin',
+    name: '番茄钟',
+    version: '1.0.0',
+    description: '专注计时器，帮助您保持专注和高效',
+    author: 'Biji Note',
+    enabled: true,
+    permissions: [],
+    entryPoint: '',
+    builtIn: true,
+  },
+  {
+    id: 'sync-plugin',
+    name: '云同步',
+    version: '1.0.0',
+    description: '将笔记同步到云端或本地文件夹',
+    author: 'Biji Note',
+    enabled: false,
+    permissions: [
+      { type: 'storage', allowed: true },
+      { type: 'network', allowed: true },
+    ],
+    entryPoint: '',
+    builtIn: true,
+  },
+];
+
 export class PluginManager {
   private pluginsDir: string;
   private plugins: Map<string, LoadedPlugin> = new Map();
   private database: SqliteDatabase;
+  private builtInPlugins: Plugin[] = [];
 
   constructor(userDataPath: string, database: SqliteDatabase) {
     this.pluginsDir = path.join(userDataPath, 'plugins');
@@ -26,8 +55,21 @@ export class PluginManager {
       fs.mkdirSync(this.pluginsDir, { recursive: true });
     }
 
+    this.loadBuiltInPlugins();
     await this.loadInstalledPlugins();
     log.info('Plugin manager initialized');
+  }
+
+  private loadBuiltInPlugins(): void {
+    this.builtInPlugins = BUILT_IN_PLUGINS;
+    for (const plugin of this.builtInPlugins) {
+      this.plugins.set(plugin.id, {
+        manifest: { ...plugin },
+        instance: null,
+        api: this.createPluginAPI(plugin.id),
+      });
+    }
+    log.info(`Loaded ${this.builtInPlugins.length} built-in plugins`);
   }
 
   private async loadInstalledPlugins(): Promise<void> {
@@ -147,7 +189,7 @@ export class PluginManager {
   }
 
   getPlugins(): Plugin[] {
-    return Array.from(this.plugins.values()).map(p => p.manifest);
+    return Array.from(this.plugins.values()).map(p => ({ ...p.manifest }));
   }
 
   togglePlugin(id: string, enabled: boolean): void {

@@ -123,6 +123,14 @@ export function Sidebar({
     setCollapsed(!collapsed);
   };
 
+  const handleButtonClick = (buttonId: string) => {
+    if (buttonId === 'files') {
+      onSelectFolder(null);
+    } else {
+      onToggleButton(buttonId);
+    }
+  };
+
   return (
     <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
       <div className="sidebar-header">
@@ -159,7 +167,7 @@ export function Sidebar({
                   className="sidebar-btn"
                   onClick={() => {
                     if (!editingButtons) {
-                      onToggleButton(button.id);
+                      handleButtonClick(button.id);
                     }
                   }}
                   title={button.label}

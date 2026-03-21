@@ -277,3 +277,20 @@
   color: var(--text-tertiary);
   font-variant-numeric: tabular-nums;
 }
+
+.graph-reset-btn {
+  width: 100%;
+  padding: 8px 16px;
+  margin-top: 16px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.graph-reset-btn:hover {
+  background: var(--border-color);
+}

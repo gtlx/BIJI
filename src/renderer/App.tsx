@@ -11,7 +11,6 @@ import { ToastContainer } from './components/Toast';
 import { RightPanel } from './components/RightPanel';
 import { GitPanel } from './components/GitPanel';
 import { PublishPanel } from './components/PublishPanel';
-import { PomodoroTimer } from './components/PomodoroTimer';
 import { DEFAULT_TEMPLATES } from '@shared/types';
 import type { Note, Folder, AppSettings, SearchQuery, Plugin } from '@shared/types';
 import './App.css';
@@ -68,6 +67,13 @@ declare global {
       gitAddAll: () => Promise<boolean>;
       publishCheck: (generator: string) => Promise<{ available: boolean; version?: string }>;
       publishSite: (config: { outputPath: string; generator: string; siteName?: string; baseUrl?: string }) => Promise<{ success: boolean; outputPath?: string; error?: string }>;
+      getUIPlugins: () => Promise<import('@shared/types').UIPluginManifest[]>;
+      getUIPluginConfig: (pluginId: string) => Promise<import('@shared/types').UIPluginConfig>;
+      setUIPluginConfig: (pluginId: string, config: import('@shared/types').UIPluginConfig) => Promise<void>;
+      installUIPlugin: (path: string) => Promise<import('@shared/types').UIPluginManifest | null>;
+      uninstallUIPlugin: (pluginId: string) => Promise<boolean>;
+      selectPluginPath: () => Promise<string | null>;
+      loadUIPluginCode: (pluginId: string) => Promise<string | null>;
     };
   }
 }
@@ -84,7 +90,6 @@ export default function App() {
   const [showGraph, setShowGraph] = useState(true);
   const [showGitPanel, setShowGitPanel] = useState(false);
   const [showPublishPanel, setShowPublishPanel] = useState(false);
-  const [showPomodoro, setShowPomodoro] = useState(false);
   const [scrollToHeading, setScrollToHeading] = useState<string | null>(null);
   const [editorMode, setEditorMode] = useState<'markdown' | 'rich'>('markdown');
   const [previewMode, setPreviewMode] = useState<'live' | 'edit' | 'preview'>('live');
@@ -97,7 +102,6 @@ export default function App() {
     { id: 'graph', icon: 'graph', label: '图谱' },
     { id: 'git', icon: 'git', label: 'Git' },
     { id: 'publish', icon: 'publish', label: '发布' },
-    { id: 'pomodoro', icon: 'pomodoro', label: '番茄钟' },
   ]);
 
 
@@ -462,7 +466,6 @@ export default function App() {
           onHeadingClick={(heading, level) => level > 0 ? setScrollToHeading(heading) : null}
           onToggle={() => {}}
           onPropertiesClick={() => showToast('属性面板开发中', 'info')}
-          onPomodoroClick={() => setShowPomodoro(true)}
         />
       )}
 
@@ -491,18 +494,12 @@ export default function App() {
             setShowGitPanel(false);
           }
         }}
-        onPomodoroClick={() => setShowPomodoro(!showPomodoro)}
         isGraphActive={showGraph}
         isGitActive={showGitPanel}
         isPublishActive={showPublishPanel}
-        isPomodoroActive={showPomodoro}
       />
 
       <ToastContainer toasts={toasts} onRemove={removeToast} />
-
-      {showPomodoro && (
-        <PomodoroTimer onClose={() => setShowPomodoro(false)} />
-      )}
 
       {showSettings && settings && (
         <SettingsModal

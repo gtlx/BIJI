@@ -108,3 +108,17 @@
 .outline-level-4 { padding-left: 44px; font-size: 12px; color: var(--text-tertiary); }
 .outline-level-5 { padding-left: 56px; font-size: 11px; color: var(--text-tertiary); }
 .outline-level-6 { padding-left: 68px; font-size: 11px; color: var(--text-tertiary); }
+
+.properties-empty {
+  padding: 16px;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+
+.plugin-loading {
+  padding: 16px;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 13px;
+}

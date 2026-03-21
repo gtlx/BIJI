@@ -38,8 +38,105 @@ let settingsManager: SettingsManager;
 let encryptionService: EncryptionService;
 let gitService: GitService;
 let publishService: PublishService;
+let uiPluginsPath: string;
 
 const isDev = !app.isPackaged;
+
+interface UIPluginManifest {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  author: string;
+  type: 'ui' | 'system';
+  entry: string;
+  styles?: string;
+  position: string;
+  permissions: { type: string; allowed: boolean }[];
+  data?: Record<string, unknown>;
+}
+
+function getPluginsPath(): string {
+  return uiPluginsPath;
+}
+
+function loadUIPluginManifests(pluginsPath: string): UIPluginManifest[] {
+  const manifests: UIPluginManifest[] = [];
+  
+  if (!fs.existsSync(pluginsPath)) {
+    fs.mkdirSync(pluginsPath, { recursive: true });
+    return manifests;
+  }
+  
+  const dirs = fs.readdirSync(pluginsPath).filter(f => {
+    return fs.statSync(path.join(pluginsPath, f)).isDirectory();
+  });
+  
+  for (const dir of dirs) {
+    const manifestPath = path.join(pluginsPath, dir, 'manifest.json');
+    if (fs.existsSync(manifestPath)) {
+      try {
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) as UIPluginManifest;
+        manifests.push(manifest);
+      } catch (error) {
+        log.error(`Failed to parse manifest for ${dir}:`, error);
+      }
+    }
+  }
+  
+  return manifests;
+}
+
+async function installUIPlugin(sourcePath: string, pluginsPath: string): Promise<UIPluginManifest | null> {
+  try {
+    const manifestPath = path.join(sourcePath, 'manifest.json');
+    if (!fs.existsSync(manifestPath)) {
+      throw new Error('Invalid plugin: manifest.json not found');
+    }
+    
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) as UIPluginManifest;
+    const destPath = path.join(pluginsPath, manifest.id);
+    
+    if (fs.existsSync(destPath)) {
+      fs.rmSync(destPath, { recursive: true });
+    }
+    
+    fs.mkdirSync(destPath, { recursive: true });
+    
+    const items = fs.readdirSync(sourcePath);
+    for (const item of items) {
+      const srcItem = path.join(sourcePath, item);
+      const destItem = path.join(destPath, item);
+      
+      if (fs.statSync(srcItem).isDirectory()) {
+        fs.cpSync(srcItem, destItem, { recursive: true });
+      } else {
+        fs.copyFileSync(srcItem, destItem);
+      }
+    }
+    
+    log.info(`[UIPlugin] Installed plugin: ${manifest.name}`);
+    return manifest;
+  } catch (error) {
+    log.error('[UIPlugin] Failed to install plugin:', error);
+    return null;
+  }
+}
+
+function uninstallUIPlugin(pluginId: string, pluginsPath: string): boolean {
+  try {
+    const pluginPath = path.join(pluginsPath, pluginId);
+    if (fs.existsSync(pluginPath)) {
+      fs.rmSync(pluginPath, { recursive: true });
+      log.info(`[UIPlugin] Uninstalled plugin: ${pluginId}`);
+      return true;
+    }
+    return false;
+  } catch (error) {
+    log.error(`[UIPlugin] Failed to uninstall plugin ${pluginId}:`, error);
+    return false;
+  }
+}
 
 /**
  * 创建应用主窗口
@@ -524,6 +621,56 @@ function setupIPC() {
     publishService.checkGenerator(generator as any));
   ipcMain.handle('publish:site', async (_, config: any) => 
     publishService.publish(config));
+
+  ipcMain.handle('uiplugin:getAll', async () => {
+    const pluginsPath = getPluginsPath();
+    return loadUIPluginManifests(pluginsPath);
+  });
+  
+  ipcMain.handle('uiplugin:getConfig', async (_, pluginId: string) => {
+    return settingsManager.getUIPluginConfig(pluginId);
+  });
+  
+  ipcMain.handle('uiplugin:setConfig', async (_, pluginId: string, config: any) => {
+    await settingsManager.setUIPluginConfig(pluginId, config);
+  });
+  
+  ipcMain.handle('uiplugin:install', async (_, sourcePath: string) => {
+    const pluginsPath = getPluginsPath();
+    return installUIPlugin(sourcePath, pluginsPath);
+  });
+  
+  ipcMain.handle('uiplugin:uninstall', async (_, pluginId: string) => {
+    const pluginsPath = getPluginsPath();
+    return uninstallUIPlugin(pluginId, pluginsPath);
+  });
+  
+  ipcMain.handle('uiplugin:loadCode', async (_, pluginId: string) => {
+    const pluginsPath = getPluginsPath();
+    const mainJsPath = path.join(pluginsPath, pluginId, 'main.js');
+    const distJsPath = path.join(pluginsPath, pluginId, 'dist', 'main.js');
+    
+    let code: string | null = null;
+    
+    if (fs.existsSync(distJsPath)) {
+      code = fs.readFileSync(distJsPath, 'utf-8');
+    } else if (fs.existsSync(mainJsPath)) {
+      code = fs.readFileSync(mainJsPath, 'utf-8');
+    }
+    
+    return code;
+  });
+  
+  ipcMain.handle('uiplugin:selectPath', async () => {
+    const result = await dialog.showOpenDialog(mainWindow!, {
+      properties: ['openDirectory'],
+      title: '选择插件文件夹',
+    });
+    if (!result.canceled && result.filePaths[0]) {
+      return result.filePaths[0];
+    }
+    return null;
+  });
 }
 
 app.whenReady().then(async () => {
@@ -546,6 +693,8 @@ app.whenReady().then(async () => {
   await syncManager.init();
 
   const notesPath = settingsManager.getSettings().storagePath || userDataPath;
+  uiPluginsPath = path.join(notesPath, 'plugins');
+  
   gitService = new GitService(notesPath);
   publishService = new PublishService(notesPath);
 

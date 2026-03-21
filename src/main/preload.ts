@@ -103,6 +103,32 @@ const electronAPI = {
     ipcRenderer.invoke('publish:check', generator),
   publishSite: (config: { outputPath: string; generator: string; siteName?: string; baseUrl?: string }): Promise<{ success: boolean; outputPath?: string; error?: string }> => 
     ipcRenderer.invoke('publish:site', config),
+
+  getUIPlugins: (): Promise<Array<{
+    id: string;
+    name: string;
+    version: string;
+    description: string;
+    author: string;
+    type: 'ui' | 'system';
+    entry: string;
+    styles?: string;
+    position: string;
+    permissions: { type: string; allowed: boolean }[];
+    data?: Record<string, unknown>;
+  }>> => ipcRenderer.invoke('uiplugin:getAll'),
+  getUIPluginConfig: (pluginId: string): Promise<{ enabled: boolean; settings?: Record<string, unknown> }> => 
+    ipcRenderer.invoke('uiplugin:getConfig', pluginId),
+  setUIPluginConfig: (pluginId: string, config: { enabled: boolean; settings?: Record<string, unknown> }): Promise<void> => 
+    ipcRenderer.invoke('uiplugin:setConfig', pluginId, config),
+  installUIPlugin: (path: string): Promise<{ id: string; name: string; version: string; description: string; author: string } | null> => 
+    ipcRenderer.invoke('uiplugin:install', path),
+  uninstallUIPlugin: (pluginId: string): Promise<boolean> => 
+    ipcRenderer.invoke('uiplugin:uninstall', pluginId),
+  selectPluginPath: (): Promise<string | null> => 
+    ipcRenderer.invoke('uiplugin:selectPath'),
+  loadUIPluginCode: (pluginId: string): Promise<string | null> => 
+    ipcRenderer.invoke('uiplugin:loadCode', pluginId),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);
