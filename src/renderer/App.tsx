@@ -53,6 +53,8 @@ declare global {
       onToggleTheme: (callback: (dark: boolean) => void) => () => void;
       onOpenSettings: (callback: () => void) => () => void;
       onFeedback: (callback: () => void) => () => void;
+      onGit: (callback: () => void) => () => void;
+      onPublish: (callback: () => void) => () => void;
       selectExportPath: () => Promise<string | null>;
       exportToMarkdown: (path: string) => Promise<{ success: boolean; count: number; error?: string }>;
       selectImportPath: () => Promise<string | null>;
@@ -93,11 +95,7 @@ export default function App() {
     { id: 'search', icon: 'search', label: '搜索', visible: true },
     { id: 'tags', icon: 'tags', label: '标签', visible: false },
   ]);
-  const [rightPanelButtons, setRightPanelButtons] = useState<SidebarButton[]>([
-    { id: 'outline', icon: 'outline', label: '大纲', visible: true },
-    { id: 'git', icon: 'git', label: '版本控制', visible: true },
-    { id: 'publish', icon: 'publish', label: '发布', visible: true },
-  ]);
+
 
   useEffect(() => {
     if (scrollToHeading) {
@@ -176,6 +174,8 @@ export default function App() {
         document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
       }),
       window.electronAPI.onOpenSettings(() => setShowSettings(true)),
+      window.electronAPI.onGit(() => setShowGitPanel(true)),
+      window.electronAPI.onPublish(() => setShowPublishPanel(true)),
       window.electronAPI.onImported((count) => {
         showToast(`已导入 ${count} 篇笔记`);
         loadData();
@@ -320,25 +320,6 @@ export default function App() {
     }
   };
 
-  const handleMoveToRight = (button: SidebarButton) => {
-    setSidebarButtons(prev => prev.filter(b => b.id !== button.id));
-    setRightPanelButtons(prev => [...prev, button]);
-  };
-
-  const handleRightPanelButtonClick = (buttonId: string) => {
-    switch (buttonId) {
-      case 'outline':
-        setShowOutline(prev => !prev);
-        break;
-      case 'git':
-        setShowGitPanel(prev => !prev);
-        break;
-      case 'publish':
-        setShowPublishPanel(prev => !prev);
-        break;
-    }
-  };
-
   const handleSaveNote = async (note: Note) => {
     const updatedNote = { ...note, updatedAt: Date.now(), syncStatus: 'pending' as const };
     await window.electronAPI.saveNote(updatedNote);
@@ -445,7 +426,6 @@ export default function App() {
         buttons={sidebarButtons}
         onButtonsChange={handleSidebarButtonsChange}
         onToggleButton={handleToggleSidebarButton}
-        onMoveToRight={handleMoveToRight}
       />
       <NoteList
         notes={notes.filter(n => !selectedFolderId || n.folderId === selectedFolderId)}
@@ -494,8 +474,6 @@ export default function App() {
           onHeadingClick={(heading, level) => level > 0 ? setScrollToHeading(heading) : null}
           isCollapsed={outlineCollapsed}
           onToggle={() => setOutlineCollapsed(!outlineCollapsed)}
-          buttons={rightPanelButtons}
-          onButtonClick={handleRightPanelButtonClick}
         />
       )}
 

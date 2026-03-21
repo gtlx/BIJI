@@ -76,6 +76,14 @@ const electronAPI = {
     ipcRenderer.on('menu:open-settings', callback);
     return () => ipcRenderer.removeListener('menu:open-settings', callback);
   },
+  onGit: (callback: () => void) => {
+    ipcRenderer.on('menu:git', callback);
+    return () => ipcRenderer.removeListener('menu:git', callback);
+  },
+  onPublish: (callback: () => void) => {
+    ipcRenderer.on('menu:publish', callback);
+    return () => ipcRenderer.removeListener('menu:publish', callback);
+  },
 
   onImported: (callback: (count: number) => void) => {
     ipcRenderer.on('file:imported', (_, count) => callback(count));

@@ -19,7 +19,6 @@ interface SidebarProps {
   buttons: SidebarButton[];
   onButtonsChange: (buttons: SidebarButton[]) => void;
   onToggleButton: (id: string) => void;
-  onMoveToRight?: (button: SidebarButton) => void;
 }
 
 interface BreadcrumbItem {
@@ -48,14 +47,13 @@ export function Sidebar({
   onNewFolder,
   buttons,
   onButtonsChange,
-  onToggleButton,
-  onMoveToRight
+  onToggleButton
 }: SidebarProps) {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [collapsed, setCollapsed] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [editingButtons, setEditingButtons] = useState(false);
-  const draggedItemRef = useRef<number | null>(null);
+  const draggedItemRef = useRef<string | null>(null);
 
   const buildBreadcrumb = (folderId: string | null): BreadcrumbItem[] => {
     const items: BreadcrumbItem[] = [{ id: null, name: '所有笔记' }];
@@ -88,20 +86,31 @@ export function Sidebar({
     });
   };
 
-  const handleDragStart = (index: number) => {
-    draggedItemRef.current = index;
+  const handleDragStart = (e: React.DragEvent, buttonId: string) => {
+    draggedItemRef.current = buttonId;
     setIsDragging(true);
+    e.dataTransfer.effectAllowed = 'move';
   };
 
-  const handleDragOver = (e: React.DragEvent, index: number) => {
+  const handleDragOver = (e: React.DragEvent, targetId: string) => {
     e.preventDefault();
-    if (draggedItemRef.current === null || draggedItemRef.current === index) return;
+    if (draggedItemRef.current === null || draggedItemRef.current === targetId) return;
+
+    const visibleButtons = buttons.filter(b => b.visible);
+    const draggedIdx = visibleButtons.findIndex(b => b.id === draggedItemRef.current);
+    const targetIdx = visibleButtons.findIndex(b => b.id === targetId);
+    
+    if (draggedIdx === -1 || targetIdx === -1) return;
 
     const newButtons = [...buttons];
-    const draggedItem = newButtons[draggedItemRef.current];
-    newButtons.splice(draggedItemRef.current, 1);
-    newButtons.splice(index, 0, draggedItem);
-    draggedItemRef.current = index;
+    const draggedItem = newButtons.find(b => b.id === draggedItemRef.current);
+    if (!draggedItem) return;
+    
+    newButtons.splice(newButtons.findIndex(b => b.id === draggedItemRef.current), 1);
+    const insertIdx = newButtons.findIndex(b => b.id === targetId);
+    newButtons.splice(insertIdx, 0, draggedItem);
+    
+    draggedItemRef.current = targetId;
     onButtonsChange(newButtons);
   };
 
@@ -136,13 +145,13 @@ export function Sidebar({
       {!collapsed && (
         <>
           <div className="sidebar-buttons">
-            {buttons.filter(b => b.visible).map((button, index) => (
+            {buttons.filter(b => b.visible).map((button) => (
               <div
                 key={button.id}
                 className={`sidebar-btn-wrapper ${isDragging ? 'dragging' : ''}`}
                 draggable={editingButtons}
-                onDragStart={() => handleDragStart(index)}
-                onDragOver={(e) => handleDragOver(e, index)}
+                onDragStart={(e) => handleDragStart(e, button.id)}
+                onDragOver={(e) => handleDragOver(e, button.id)}
                 onDragEnd={handleDragEnd}
               >
                 <button
@@ -187,13 +196,6 @@ export function Sidebar({
                     onChange={() => onToggleButton(button.id)}
                   />
                   <span>{button.label}</span>
-                  <button
-                    className="move-right-btn"
-                    onClick={() => onMoveToRight?.(button)}
-                    title="移动到右侧"
-                  >
-                    →
-                  </button>
                 </label>
               ))}
             </div>
