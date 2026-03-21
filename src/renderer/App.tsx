@@ -54,6 +54,7 @@ declare global {
       onToggleTheme: (callback: (dark: boolean) => void) => () => void;
       onOpenSettings: (callback: () => void) => () => void;
       onFeedback: (callback: () => void) => () => void;
+      onPluginManager: (callback: () => void) => () => void;
       selectExportPath: () => Promise<string | null>;
       exportToMarkdown: (path: string) => Promise<{ success: boolean; count: number; error?: string }>;
       selectImportPath: () => Promise<string | null>;
@@ -191,6 +192,7 @@ export default function App() {
         document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
       }),
       window.electronAPI.onOpenSettings(() => setShowSettings(true)),
+      window.electronAPI.onPluginManager(() => setShowPluginManager(true)),
       window.electronAPI.onImported((count) => {
         showToast(`已导入 ${count} 篇笔记`);
         loadData();
@@ -422,6 +424,15 @@ export default function App() {
   const handlePluginClick = (pluginId: string) => {
     if (pluginId === 'plugins') {
       setShowPluginManager(true);
+    }
+  };
+
+  const handleBuiltInPluginClick = (pluginId: string) => {
+    if (pluginId === 'pomodoro-plugin') {
+      setRightSidebarCollapsed(false);
+      showToast('番茄钟已打开', 'info');
+    } else if (pluginId === 'sync-plugin') {
+      setShowPluginManager(true);
     } else {
       showToast(`插件 ${pluginId} 功能开发中`);
     }
@@ -543,6 +554,7 @@ export default function App() {
         buttons={toolbarButtons}
         onButtonOrderChange={setToolbarButtons}
         onPluginClick={handlePluginClick}
+        onBuiltInPluginClick={handleBuiltInPluginClick}
         onGraphClick={() => {
           setShowGraph(!showGraph);
           if (!showGraph) {
@@ -569,6 +581,7 @@ export default function App() {
         isPublishActive={showPublishPanel}
         collapsed={toolbarCollapsed}
         onToggleCollapse={() => setToolbarCollapsed(prev => !prev)}
+        builtInPlugins={plugins.filter(p => p.builtIn)}
       />
 
       <ToastContainer toasts={toasts} onRemove={removeToast} />

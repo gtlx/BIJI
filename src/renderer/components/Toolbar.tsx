@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { DraggableToggle } from './DraggableToggle';
+import type { Plugin } from '@shared/types';
 import './Toolbar.css';
 
 export interface ToolbarButton {
@@ -13,6 +14,7 @@ interface ToolbarProps {
   buttons: ToolbarButton[];
   onButtonOrderChange: (buttons: ToolbarButton[]) => void;
   onPluginClick: (pluginId: string) => void;
+  onBuiltInPluginClick: (pluginId: string) => void;
   onGraphClick: () => void;
   onGitClick: () => void;
   onPublishClick: () => void;
@@ -21,6 +23,7 @@ interface ToolbarProps {
   isPublishActive?: boolean;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
+  builtInPlugins?: Plugin[];
 }
 
 const ICON_PATHS: Record<string, string> = {
@@ -29,9 +32,24 @@ const ICON_PATHS: Record<string, string> = {
   publish: 'M19 8l-4 4h3c0 3.31-2.69 6-6 6-1.01 0-1.97-.25-2.8-.7l-1.46 1.46C8.97 19.54 10.43 20 12 20c4.41 0 8-3.59 8-8h3l-4-4zM6 12c0-3.31 2.69-6 6-6 1.01 0 1.97.25 2.8.7l1.46-1.46C15.03 4.46 13.57 4 12 4c-4.41 0-8 3.59-8 8H1l4 4 4-4H6z',
   pomodoro: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z',
   plugin: 'M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5C13 2.12 11.88 1 10.5 1S8 2.12 8 3.5V5H4c-1.1 0-2 .9-2 2v3.8h1.5c1.49 0 2.7 1.21 2.7 2.7s-1.21 2.7-2.7 2.7H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.49 1.21-2.7 2.7-2.7 1.49 0 2.7 1.21 2.7 2.7V22H17c1.1 0 2-.9 2-2v-4h1.5c1.38 0 2.5-1.12 2.5-2.5S21.88 11 20.5 11z',
+  sync: 'M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z',
 };
 
-export function Toolbar({ buttons, onButtonOrderChange, onPluginClick, onGraphClick, onGitClick, onPublishClick, isGraphActive, isGitActive, isPublishActive, collapsed = false, onToggleCollapse }: ToolbarProps) {
+export function Toolbar({ 
+  buttons, 
+  onButtonOrderChange, 
+  onPluginClick, 
+  onBuiltInPluginClick,
+  onGraphClick, 
+  onGitClick, 
+  onPublishClick, 
+  isGraphActive, 
+  isGitActive, 
+  isPublishActive, 
+  collapsed = false, 
+  onToggleCollapse,
+  builtInPlugins = [] 
+}: ToolbarProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [editingButtons, setEditingButtons] = useState(false);
   const draggedItemRef = useRef<string | null>(null);
@@ -75,6 +93,12 @@ export function Toolbar({ buttons, onButtonOrderChange, onPluginClick, onGraphCl
     if (button.id === 'git') return isGitActive;
     if (button.id === 'publish') return isPublishActive;
     return false;
+  };
+
+  const getPluginIcon = (pluginId: string): string => {
+    if (pluginId === 'pomodoro-plugin') return ICON_PATHS.pomodoro;
+    if (pluginId === 'sync-plugin') return ICON_PATHS.sync;
+    return ICON_PATHS.plugin;
   };
 
   return (
@@ -138,6 +162,28 @@ export function Toolbar({ buttons, onButtonOrderChange, onPluginClick, onGraphCl
               </div>
             ))}
           </div>
+          {builtInPlugins.length > 0 && (
+            <div className="toolbar-builtin-plugins">
+              <div className="toolbar-builtin-divider"></div>
+              {builtInPlugins.map((plugin) => (
+                <div
+                  key={plugin.id}
+                  className="toolbar-btn-wrapper"
+                >
+                  <button
+                    className={`toolbar-btn ${plugin.enabled ? 'active' : ''}`}
+                    onClick={() => onBuiltInPluginClick(plugin.id)}
+                    title={plugin.name}
+                  >
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                      <path d={getPluginIcon(plugin.id)} />
+                    </svg>
+                    <span>{plugin.name}</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </>

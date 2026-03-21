@@ -118,3 +118,21 @@
   font-size: 11px;
   white-space: nowrap;
 }
+
+.toolbar-builtin-plugins {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  padding: 8px;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-color);
+  margin-top: 4px;
+}
+
+.toolbar-builtin-divider {
+  height: 1px;
+  background: var(--border-color);
+  margin: 4px 0;
+}
