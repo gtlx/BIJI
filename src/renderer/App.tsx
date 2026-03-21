@@ -73,6 +73,7 @@ export default function App() {
   const [showSearch, setShowSearch] = useState(false);
   const [showGraph, setShowGraph] = useState(true);
   const [showOutline, setShowOutline] = useState(true);
+  const [outlineCollapsed, setOutlineCollapsed] = useState(false);
   const [scrollToHeading, setScrollToHeading] = useState<string | null>(null);
 
   useEffect(() => {
@@ -396,10 +397,12 @@ export default function App() {
         />
       </div>
 
-      {showOutline && !showGraph && selectedNote && (
+      {showOutline && !showGraph && (
         <Outline 
-          content={selectedNote.content} 
-          onHeadingClick={(heading) => setScrollToHeading(heading)} 
+          content={selectedNote?.content || ''} 
+          onHeadingClick={(heading) => setScrollToHeading(heading)}
+          isCollapsed={outlineCollapsed}
+          onToggle={() => setOutlineCollapsed(!outlineCollapsed)}
         />
       )}
 
