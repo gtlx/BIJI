@@ -491,10 +491,8 @@ export default function App() {
         plugins={plugins}
         onPluginClick={handlePluginClick}
         onGraphClick={() => setShowGraph(!showGraph)}
-        onOutlineClick={() => setShowOutline(!showOutline)}
         onExportClick={handleExport}
         isGraphActive={showGraph}
-        isOutlineActive={showOutline}
       />
 
       <ToastContainer toasts={toasts} onRemove={removeToast} />

@@ -92,6 +92,17 @@ const electronAPI = {
   selectImportPath: (): Promise<string | null> => ipcRenderer.invoke('dialog:selectImportPath'),
   importFromMarkdown: (importPath: string): Promise<{ success: boolean; count: number; error?: string }> => 
     ipcRenderer.invoke('import:markdown', importPath),
+
+  gitInit: (): Promise<boolean> => ipcRenderer.invoke('git:init'),
+  gitStatus: (): Promise<{ files: string[]; clean: boolean }> => ipcRenderer.invoke('git:status'),
+  gitCommit: (message: string): Promise<{ success: boolean; hash?: string }> => ipcRenderer.invoke('git:commit', message),
+  gitLog: (count?: number): Promise<Array<{ hash: string; message: string; date: string }>> => ipcRenderer.invoke('git:log', count),
+  gitDiff: (file?: string): Promise<string> => ipcRenderer.invoke('git:diff', file),
+
+  publishCheck: (generator: string): Promise<{ available: boolean; version?: string }> => 
+    ipcRenderer.invoke('publish:check', generator),
+  publishSite: (config: { outputPath: string; generator: string; siteName?: string; baseUrl?: string }): Promise<{ success: boolean; outputPath?: string; error?: string }> => 
+    ipcRenderer.invoke('publish:site', config),
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

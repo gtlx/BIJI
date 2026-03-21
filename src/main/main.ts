@@ -7,6 +7,8 @@ import { PluginManager } from './plugin-manager';
 import { SyncManager } from './sync-manager';
 import { SettingsManager } from './settings-manager';
 import { EncryptionService } from './encryption';
+import { GitService } from './git-service';
+import { PublishService } from './publish-service';
 import type { Note, Folder } from '../shared/types';
 
 log.initialize();
@@ -34,6 +36,8 @@ let pluginManager: PluginManager;
 let syncManager: SyncManager;
 let settingsManager: SettingsManager;
 let encryptionService: EncryptionService;
+let gitService: GitService;
+let publishService: PublishService;
 
 const isDev = !app.isPackaged;
 
@@ -509,6 +513,17 @@ function setupIPC() {
   ipcMain.handle('encryption:decrypt', async (_, text: string) => encryptionService.decrypt(text));
 
   ipcMain.handle('app:getVersion', () => app.getVersion());
+
+  ipcMain.handle('git:init', async () => gitService.init());
+  ipcMain.handle('git:status', async () => gitService.getStatus());
+  ipcMain.handle('git:commit', async (_, message: string) => gitService.commit(message));
+  ipcMain.handle('git:log', async (_, count?: number) => gitService.getLog(count));
+  ipcMain.handle('git:diff', async (_, file?: string) => gitService.getDiff(file));
+
+  ipcMain.handle('publish:check', async (_, generator: string) => 
+    publishService.checkGenerator(generator as any));
+  ipcMain.handle('publish:site', async (_, config: any) => 
+    publishService.publish(config));
 }
 
 app.whenReady().then(async () => {
@@ -529,6 +544,10 @@ app.whenReady().then(async () => {
 
   syncManager = new SyncManager(database, settingsManager);
   await syncManager.init();
+
+  const notesPath = settingsManager.getSettings().storagePath || userDataPath;
+  gitService = new GitService(notesPath);
+  publishService = new PublishService(notesPath);
 
   createWindow();
   createTray();
