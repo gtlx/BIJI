@@ -17,7 +17,9 @@ export function PluginManagerModal({ onClose, onPluginChange }: PluginManagerMod
 
   const loadPlugins = async () => {
     try {
+      console.log('Loading plugins...');
       const data = await window.electronAPI.getPlugins();
+      console.log('Plugins loaded:', data);
       setPlugins(data);
     } catch (error) {
       console.error('Failed to load plugins:', error);

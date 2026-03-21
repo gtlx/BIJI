@@ -18,7 +18,7 @@
   --radius-lg: 12px;
   --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --sidebar-width: 260px;
-  --editor-width: 600px;
+  --editor-width: 900px;
 }
 
 [data-theme='dark'] {

@@ -384,8 +384,12 @@ export function SettingsModal({ settings, plugins, onClose, onSave, onTogglePlug
                 <input type="text" className="input" value={localSettings.shortcuts?.sync || 'Ctrl+Shift+S'} onChange={e => setLocalSettings({ ...localSettings, shortcuts: { ...localSettings.shortcuts!, sync: e.target.value } })} />
               </div>
               <div className="settings-item">
-                <label>切换侧边栏</label>
-                <input type="text" className="input" value={localSettings.shortcuts?.toggleSidebar || 'Ctrl+B'} onChange={e => setLocalSettings({ ...localSettings, shortcuts: { ...localSettings.shortcuts!, toggleSidebar: e.target.value } })} />
+                <label>折叠/展开左侧边栏</label>
+                <input type="text" className="input" value={localSettings.shortcuts?.toggleLeftSidebar || 'Ctrl+['} onChange={e => setLocalSettings({ ...localSettings, shortcuts: { ...localSettings.shortcuts!, toggleLeftSidebar: e.target.value } })} />
+              </div>
+              <div className="settings-item">
+                <label>折叠/展开右侧边栏</label>
+                <input type="text" className="input" value={localSettings.shortcuts?.toggleRightSidebar || 'Ctrl+]'} onChange={e => setLocalSettings({ ...localSettings, shortcuts: { ...localSettings.shortcuts!, toggleRightSidebar: e.target.value } })} />
               </div>
               <div className="settings-item">
                 <label>切换图谱</label>

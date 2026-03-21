@@ -116,7 +116,6 @@ export interface ShortcutSettings {
   toggleTheme: string;
   openSettings: string;
   sync: string;
-  toggleSidebar: string;
   toggleLeftSidebar: string;
   toggleRightSidebar: string;
   toggleGraph: string;
@@ -183,7 +182,6 @@ export const DEFAULT_SHORTCUTS: ShortcutSettings = {
   toggleTheme: 'Ctrl+Alt+T',
   openSettings: 'Ctrl+,',
   sync: 'Ctrl+Shift+S',
-  toggleSidebar: 'Ctrl+B',
   toggleLeftSidebar: 'Ctrl+[',
   toggleRightSidebar: 'Ctrl+]',
   toggleGraph: 'Ctrl+G',

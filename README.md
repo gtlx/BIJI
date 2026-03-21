@@ -9,11 +9,11 @@
 - **知识图谱** - 可视化展示笔记间的关联关系
 - **SQLite 数据库** - 高效、可靠的本地数据存储
 - **Markdown 编辑** - 实时预览、编辑、预览三种模式
+- **内置番茄钟** - 专注计时器，嵌入右侧边栏
 
 ### 编辑器
-- 模式切换：富文本 / Markdown
 - Markdown 预览模式：实时预览 / 编辑模式 / 预览模式
-- 笔记模板：空白笔记，会议记录、每日日志、待办清单
+- 笔记模板：空白笔记、会议记录、每日日志、待办清单
 - 自动保存
 - #tag 标签支持
 - YAML Frontmatter 元数据
@@ -25,27 +25,29 @@
 │  文件  编辑  视图  插件  帮助                                         │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
-│  ┌────┐  ┌──────────┬────────────────────────────────┐  ┌───────┐ │
-│  │工具 │  │ 文件夹   │                                │  │ 属性  │ │
-│  │栏  │  │ 导航    │                                │  ├───────┤ │
-│  │    │  ├──────────┤        编辑器 / 图谱           │  │番茄钟│ │
-│  │图谱│  │          │                                │  ├───────┤ │
-│  │    │  │ 笔记列表 │     ┌──────────────────┐     │  │ 大纲  │ │
-│  │Git │  │          │     │   Markdown 编辑器 │     │  │       │ │
-│  │    │  │ - 笔记1 │     │   标题            │     │  │ ## 标题│ │
-│  │发布│  │ - 笔记2 │     │   内容...         │     │  │ # 标签 │ │
-│  │    │  │ - 笔记3 │     └──────────────────┘     │  └───────┘ │
-│  └────┘  └──────────┴────────────────────────────────┘            │
-│                   状态栏                                          │
+│  ┌────┐  ┌──────────┬──────────────────────────┐  ┌──────────────┐  │
+│  │工具 │  │ 文件夹   │                          │  │ 属性  │番茄钟│  │
+│  │栏  │  │ 导航    │                          │  │──────│──────│  │
+│  │    │  ├──────────┤                          │  │ 大纲  │      │  │
+│  │图谱│  │          │                          │  │      │      │  │
+│  │    │  │ 笔记列表 │    ┌────────────────┐   │  │      │      │  │
+│  │Git │  │          │    │  圆角矩形区域  │   │  └──────┘      │  │
+│  │    │  │ - 笔记1 │    │  (编辑器/图谱) │   │                 │  │
+│  │发布│  │ - 笔记2 │    └────────────────┘   │                 │  │
+│  │    │  │ - 笔记3 │                          │                 │  │
+│  │插件│  └──────────┴──────────────────────────┘                 │  │
+│  └────┘                              状态栏                       │  │
+│   │                                                          │     │
+│   └── 可拖动折叠按钮 ◄──────────────────────────────────────► │     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
 **组件说明**：
 - **顶部菜单栏**：应用原生菜单，包含文件、编辑、视图、插件、帮助
-- **左侧边栏**：可折叠（Ctrl+B），包含工具栏、文件夹导航、笔记列表
-- **工具栏**：屏幕左侧浮动垂直工具栏，包含图谱、Git、发布按钮
-- **中间区域**：编辑器或知识图谱视图
-- **右侧边栏**：可折叠，标签页切换（属性/番茄钟/大纲）
+- **左侧边栏**：可折叠（Ctrl+[），包含文件夹导航、笔记列表
+- **左侧浮动工具栏**：垂直浮动工具栏，包含图谱、Git、发布、插件按钮，支持拖拽排序
+- **中间区域**：圆角矩形设计（四周留有间距），支持自定义 CSS 样式，编辑器或知识图谱视图
+- **右侧边栏**：可折叠（Ctrl+]），标签页切换（属性/番茄钟/大纲），折叠后显示可拖动按钮
 - **状态栏**：底部，显示同步状态、字数统计等
 
 ### 番茄钟
@@ -80,12 +82,44 @@
 - 查看提交历史
 - 恢复历史版本
 
+## 云同步
+
+支持多种同步方式：
+
+### WebDAV 同步
+
+支持 Nextcloud、坚果云等 WebDAV 兼容服务。
+
+**配置步骤**：
+1. 设置 → 同步 → 启用云同步
+2. 选择「WebDAV 同步」
+3. 填写 WebDAV 地址、用户名、密码
+4. 点击同步
+
+**示例配置**：
+- Nextcloud: `https://your-nextcloud.com/remote.php/dav/files/username/`
+- 坚果云: `https://dav.jianguoyun.com/dav/`
+
+### 本地同步
+
+将笔记同步到本地文件夹。
+
 ## 插件系统
 
-Biji Note 支持外部插件，采用**预编译插件包**方案。
+Biji Note 支持插件系统，分为**内置插件**和**外部插件**。
 
-### 目录结构
+### 内置插件
 
+通过顶部工具栏的「插件」按钮打开插件管理面板进行管理：
+
+| 插件 | 描述 |
+|------|------|
+| 番茄钟 | 专注计时器，位于右侧边栏 |
+| 云同步 | WebDAV/本地同步功能 |
+
+### 外部插件
+
+**目录结构**：
 ```
 笔记目录/
 ├── notes/              # 笔记文件夹
@@ -96,8 +130,7 @@ Biji Note 支持外部插件，采用**预编译插件包**方案。
 └── biji.db            # SQLite 数据库（仅存笔记）
 ```
 
-### 插件清单 (manifest.json)
-
+**manifest.json 格式**：
 ```json
 {
   "id": "my-plugin",
@@ -107,8 +140,7 @@ Biji Note 支持外部插件，采用**预编译插件包**方案。
   "author": "作者",
   "type": "ui",
   "entry": "main.js",
-  "position": "right-panel",
-  "permissions": []
+  "position": "right-panel"
 }
 ```
 
@@ -121,8 +153,7 @@ Biji Note 支持外部插件，采用**预编译插件包**方案。
 
 ### 开发外部插件
 
-**1. 创建插件项目结构**
-
+**1. 创建插件项目结构**：
 ```
 my-plugin/
 ├── manifest.json
@@ -132,53 +163,7 @@ my-plugin/
     └── index.tsx
 ```
 
-**2. vite.config.ts**
-
-```typescript
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import * as path from 'path';
-
-export default defineConfig({
-  plugins: [react()],
-  build: {
-    lib: {
-      entry: path.resolve(__dirname, 'src/index.tsx'),
-      name: 'MyPlugin',
-      formats: ['iife'],
-      fileName: () => 'main.js',
-    },
-    rollupOptions: {
-      external: [],
-      output: {
-        inlineDynamicImports: true,
-        globals: { react: 'React' },
-      },
-    },
-    outDir: path.resolve(__dirname, 'dist'),
-  },
-});
-```
-
-**3. tsconfig.json**
-
-```json
-{
-  "compilerOptions": {
-    "target": "ES2020",
-    "lib": ["ES2020", "DOM"],
-    "module": "ESNext",
-    "jsx": "react-jsx",
-    "strict": true,
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true
-  },
-  "include": ["src"]
-}
-```
-
-**4. 插件入口 (src/index.tsx)**
-
+**2. 插件入口 (src/index.tsx)**：
 ```tsx
 import React from 'react';
 
@@ -201,27 +186,14 @@ function registerPlugin(api: { register: (comp: any, opts?: any) => void }) {
 
 **注意**：使用 `React.createElement` 而非 JSX，避免编译问题。
 
-**5. 编译插件**
-
+**3. 编译并安装**：
 ```bash
-cd my-plugin
+# 编译插件
 npx vite build
+
+# 复制到插件目录
+cp -r dist/* 笔记目录/plugins/my-plugin/
 ```
-
-输出：`my-plugin/dist/main.js`
-
-**6. 安装插件**
-
-1. 创建插件清单 `manifest.json`
-2. 将 `manifest.json` 和 `main.js` 放入 `笔记目录/plugins/插件ID/`
-3. 设置 → 插件 → 启用
-
-### 内置插件
-
-| 插件 | 位置 | 描述 |
-|------|------|------|
-| 番茄钟 | right-panel | 专注计时器 |
-| 云同步 | system | 笔记同步（开发中） |
 
 ## 笔记属性 (Frontmatter)
 
@@ -246,6 +218,60 @@ updated: 2024-01-15
 - **Hugo** - 快速、灵活的静态网站生成器
 - **Astro** - 现代静态站点构建工具
 - **VitePress** - Vue 驱动的静态网站生成器
+
+## 自定义
+
+### 界面自定义 CSS
+
+**设置 → 外观 → 界面自定义**，可单独设置以下区域的 CSS：
+
+| 区域 | CSS 类名 | 说明 |
+|------|----------|------|
+| 主内容区 | `.main-content` | 圆角矩形容器，包含编辑器和状态栏 |
+| 左侧边栏 | `.sidebar` | 可折叠，包含导航和笔记列表 |
+| 右侧边栏 | `.right-panel` | 标签页式设计（属性/番茄钟/大纲） |
+| 编辑器 | `.editor` | Markdown 编辑器区域 |
+| 笔记列表 | `.note-list` | 左侧边栏内的笔记列表 |
+| 浮动工具栏 | `.toolbar` | 左侧垂直浮动工具栏 |
+| 右侧折叠按钮 | `.right-sidebar-toggle` | 右侧边栏折叠后的展开按钮 |
+
+**示例**：
+```css
+/* 主内容区 - 圆角矩形 */
+.main-content {
+  background: #f5f5f5;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  margin: 16px;
+}
+
+/* 左侧边栏 */
+.sidebar {
+  width: 280px;
+  background: #e8e8e8;
+}
+
+/* 右侧边栏 */
+.right-panel {
+  background: #fafafa;
+  border-left: 1px solid #ddd;
+}
+
+/* 浮动工具栏按钮 */
+.toolbar-btn {
+  border-radius: 8px;
+}
+```
+
+### 编辑器宽度
+
+编辑器的默认最大宽度可以通过 CSS 变量设置：
+
+```css
+:root {
+  --editor-width: 900px;  /* 默认 900px */
+}
+```
 
 ## 技术栈
 
@@ -296,9 +322,10 @@ biji/
 │   │   ├── sqlite-database.ts  # SQLite 数据库
 │   │   ├── plugin-manager.ts   # 系统插件管理
 │   │   ├── sync-manager.ts     # 同步管理
-│   │   ├── settings-manager.ts  # 设置管理
+│   │   ├── webdav-service.ts   # WebDAV 服务
+│   │   ├── settings-manager.ts # 设置管理
 │   │   ├── git-service.ts      # Git 服务
-│   │   └── publish-service.ts   # 发布服务
+│   │   └── publish-service.ts  # 发布服务
 │   ├── renderer/          # React 前端
 │   │   ├── App.tsx        # 主应用组件
 │   │   ├── components/    # UI 组件
@@ -307,16 +334,17 @@ biji/
 │   │   │   ├── Editor.tsx        # Markdown 编辑器
 │   │   │   ├── GraphView.tsx     # 知识图谱
 │   │   │   ├── RightPanel.tsx    # 右侧边栏
-│   │   │   ├── Toolbar.tsx       # 工具栏
+│   │   │   ├── Toolbar.tsx       # 左侧浮动工具栏
 │   │   │   ├── PomodoroTimer.tsx # 番茄钟
 │   │   │   ├── Toast.tsx         # 通知提示
-│   │   │   ├── SettingsModal.tsx # 设置弹窗
+│   │   │   ├── SettingsModal.tsx  # 设置弹窗
 │   │   │   ├── SearchModal.tsx    # 搜索弹窗
 │   │   │   ├── GitPanel.tsx      # Git 面板
-│   │   │   ├── PublishPanel.tsx  # 发布面板
-│   │   │   └── StatusBar.tsx     # 状态栏
+│   │   │   ├── PublishPanel.tsx   # 发布面板
+│   │   │   ├── StatusBar.tsx     # 状态栏
+│   │   │   └── PluginManagerModal.tsx # 插件管理
 │   │   └── plugins/        # 内置插件
-│   │       └── BuiltInPomodoro.ts
+│   │       └── BuiltInPomodoro.tsx
 │   └── shared/            # 共享类型
 │       └── types.ts       # TypeScript 类型定义
 ├── build/                 # 构建资源
@@ -335,7 +363,8 @@ biji/
 | 切换主题 | Ctrl+Alt+T |
 | 打开设置 | Ctrl+, |
 | 同步 | Ctrl+Shift+S |
-| 切换侧边栏 | Ctrl+B |
+| 折叠/展开左侧边栏 | Ctrl+[ |
+| 折叠/展开右侧边栏 | Ctrl+] |
 | 切换图谱 | Ctrl+G |
 | 切换大纲 | Ctrl+O |
 | 切换预览模式 | Ctrl+P |
@@ -355,9 +384,12 @@ biji/
 | 数据存储 | SQLite | Markdown | Markdown | Markdown |
 | 双向链接 | ✅ | ✅ | ✅ | ❌ |
 | 图谱视图 | ✅ | ✅ | ✅ | ❌ |
-| 插件系统 | ✅ | ✅ 1000+ | ✅ | ✅ |
+| WebDAV 同步 | ✅ | ⚠️ 插件 | ⚠️ 插件 | ✅ |
+| 插件系统 | ✅ 内置+外部 | ✅ 1000+ | ✅ | ✅ |
 | 中文友好 | ✅ 原生 | ⚠️ 需配置 | ⚠️ 需配置 | ⚠️ 需配置 |
 | 三栏布局 | ✅ | ✅ | ⚠️ | ❌ |
+| 番茄钟内置 | ✅ | ⚠️ 插件 | ⚠️ 插件 | ❌ |
+| 可拖拽工具栏 | ✅ | ❌ | ❌ | ❌ |
 
 ## 许可证
 

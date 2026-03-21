@@ -8,7 +8,6 @@ interface EditorProps {
   onDelete: (id: string) => void;
   settings: AppSettings | null;
   syncEnabled: boolean;
-  onOpenGraph?: () => void;
   onLinkClick?: (noteTitle: string) => void;
   scrollToHeading?: string | null;
   externalEditorMode?: EditorMode;
@@ -17,13 +16,12 @@ interface EditorProps {
   onPreviewModeChange?: (mode: MarkdownPreviewMode) => void;
 }
 
-export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGraph, onLinkClick, scrollToHeading, externalEditorMode, externalPreviewMode, onEditorModeChange, onPreviewModeChange }: EditorProps) {
+export function Editor({ note, onSave, onDelete, settings, syncEnabled, onLinkClick, scrollToHeading, externalEditorMode, externalPreviewMode, onEditorModeChange, onPreviewModeChange }: EditorProps) {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [editorMode, setEditorMode] = useState<EditorMode>('markdown');
   const [previewMode, setPreviewMode] = useState<MarkdownPreviewMode>('live');
   const [frontmatter, setFrontmatter] = useState<NoteFrontmatter>({});
@@ -210,8 +208,6 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
 
     saveTimeoutRef.current = setTimeout(() => {
       handleSave();
-      setIsSaving(true);
-      setTimeout(() => setIsSaving(false), 300);
     }, settings.autoSaveInterval || 3000);
   }, [note, settings?.autoSave, settings?.autoSaveInterval, handleSave]);
 
@@ -294,8 +290,6 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
         clearTimeout(saveTimeoutRef.current);
       }
       handleSave();
-      setIsSaving(true);
-      setTimeout(() => setIsSaving(false), 300);
     }
   };
 
@@ -376,16 +370,16 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
                   onClick={() => handlePreviewModeChange('live')}
                   title="实时预览"
                 >
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                  <svg viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
                   </svg>
                 </button>
                 <button
                   className={`mode-btn ${previewMode === 'edit' ? 'active' : ''}`}
                   onClick={() => handlePreviewModeChange('edit')}
-                  title="笔记模式"
+                  title="编辑模式"
                 >
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                  <svg viewBox="0 0 24 24" fill="currentColor">
                     <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z"/>
                   </svg>
                 </button>
@@ -394,57 +388,12 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
                   onClick={() => handlePreviewModeChange('preview')}
                   title="预览模式"
                 >
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                  <svg viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5z"/>
                   </svg>
                 </button>
               </div>
             )}
-
-            {onOpenGraph && (
-              <button
-                className="btn-icon tooltip"
-                onClick={onOpenGraph}
-                title="知识图谱"
-              >
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
-                </svg>
-              </button>
-            )}
-
-            <button
-              className="btn-icon tooltip"
-              title="属性"
-            >
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                <path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/>
-              </svg>
-            </button>
-
-            {isSaving && <span className="saving-indicator">保存中...</span>}
-            <button 
-              className="btn-icon tooltip" 
-              data-tooltip="删除笔记"
-              onClick={() => setShowDeleteConfirm(true)}
-            >
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-              </svg>
-            </button>
-            <button 
-              className="btn btn-primary"
-              onClick={() => {
-                if (saveTimeoutRef.current) {
-                  clearTimeout(saveTimeoutRef.current);
-                }
-                handleSave();
-                setIsSaving(true);
-                setTimeout(() => setIsSaving(false), 300);
-              }}
-            >
-              保存
-            </button>
           </div>
         </div>
 

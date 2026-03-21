@@ -42,7 +42,6 @@ const defaultSettings: AppSettings = {
     toggleTheme: 'Ctrl+Alt+T',
     openSettings: 'Ctrl+,',
     sync: 'Ctrl+Shift+S',
-    toggleSidebar: 'Ctrl+B',
     toggleLeftSidebar: 'Ctrl+[',
     toggleRightSidebar: 'Ctrl+]',
     toggleGraph: 'Ctrl+G',

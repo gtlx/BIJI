@@ -33,12 +33,7 @@
 .editor-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
-}
-
-.saving-indicator {
-  font-size: 12px;
-  color: var(--text-tertiary);
+  gap: 8px;
 }
 
 .editor-tags {
@@ -130,24 +125,32 @@
 
 .preview-mode-switch {
   display: flex;
-  gap: 4px;
-  padding: 4px;
+  gap: 2px;
+  padding: 3px;
   background-color: var(--bg-tertiary);
-  border-radius: var(--radius-sm);
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
 }
 
 .mode-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-sm);
+  width: 40px;
+  height: 36px;
+  border-radius: 4px;
   font-size: 12px;
   font-weight: 600;
   color: var(--text-secondary);
   background: transparent;
+  border: none;
+  cursor: pointer;
   transition: all 0.15s ease;
+}
+
+.mode-btn svg {
+  width: 20px;
+  height: 20px;
 }
 
 .mode-btn:hover {
@@ -158,6 +161,7 @@
 .mode-btn.active {
   background-color: var(--accent-color);
   color: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .markdown-editor {

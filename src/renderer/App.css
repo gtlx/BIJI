@@ -29,7 +29,6 @@
 .right-sidebar-toggle {
   position: fixed;
   right: 0;
-  top: 80px;
   padding: 8px 4px;
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
@@ -44,4 +43,9 @@
 .right-sidebar-toggle:hover {
   background: var(--bg-tertiary);
   color: var(--text-primary);
+}
+
+.right-sidebar-toggle.dragging {
+  cursor: grabbing;
+  opacity: 0.8;
 }

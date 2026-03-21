@@ -8,8 +8,24 @@
 
 .toolbar-header {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 4px;
+}
+
+.toolbar-collapse-btn {
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.toolbar-collapse-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 
 .toolbar-edit-btn {

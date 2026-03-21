@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { DraggableToggle } from './DraggableToggle';
 import './Toolbar.css';
 
 export interface ToolbarButton {
@@ -18,6 +19,8 @@ interface ToolbarProps {
   isGraphActive?: boolean;
   isGitActive?: boolean;
   isPublishActive?: boolean;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 const ICON_PATHS: Record<string, string> = {
@@ -28,7 +31,7 @@ const ICON_PATHS: Record<string, string> = {
   plugin: 'M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5C13 2.12 11.88 1 10.5 1S8 2.12 8 3.5V5H4c-1.1 0-2 .9-2 2v3.8h1.5c1.49 0 2.7 1.21 2.7 2.7s-1.21 2.7-2.7 2.7H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.49 1.21-2.7 2.7-2.7 1.49 0 2.7 1.21 2.7 2.7V22H17c1.1 0 2-.9 2-2v-4h1.5c1.38 0 2.5-1.12 2.5-2.5S21.88 11 20.5 11z',
 };
 
-export function Toolbar({ buttons, onButtonOrderChange, onPluginClick, onGraphClick, onGitClick, onPublishClick, isGraphActive, isGitActive, isPublishActive }: ToolbarProps) {
+export function Toolbar({ buttons, onButtonOrderChange, onPluginClick, onGraphClick, onGitClick, onPublishClick, isGraphActive, isGitActive, isPublishActive, collapsed = false, onToggleCollapse }: ToolbarProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [editingButtons, setEditingButtons] = useState(false);
   const draggedItemRef = useRef<string | null>(null);
@@ -64,7 +67,7 @@ export function Toolbar({ buttons, onButtonOrderChange, onPluginClick, onGraphCl
     if (button.id === 'graph') onGraphClick();
     else if (button.id === 'git') onGitClick();
     else if (button.id === 'publish') onPublishClick();
-    else if (button.id === 'plugin' && button.pluginId) onPluginClick(button.pluginId);
+    else if (button.id === 'plugins') onPluginClick('plugins');
   };
 
   const isButtonActive = (button: ToolbarButton) => {
@@ -75,49 +78,68 @@ export function Toolbar({ buttons, onButtonOrderChange, onPluginClick, onGraphCl
   };
 
   return (
-    <div className="toolbar">
-      <div className="toolbar-header">
-        <button
-          className="toolbar-edit-btn"
-          onClick={() => setEditingButtons(!editingButtons)}
-          title={editingButtons ? '完成编辑' : '编辑按钮'}
-        >
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-            {editingButtons ? (
-              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-            ) : (
-              <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
-            )}
-          </svg>
-        </button>
-      </div>
-      <div className="toolbar-items">
-        {buttons.map((button) => (
-          <div
-            key={button.id}
-            className={`toolbar-btn-wrapper ${isDragging ? 'dragging' : ''}`}
-            draggable={editingButtons}
-            onDragStart={(e) => handleDragStart(e, button.id)}
-            onDragOver={(e) => handleDragOver(e, button.id)}
-            onDragEnd={handleDragEnd}
-          >
+    <>
+      {collapsed && onToggleCollapse && (
+        <DraggableToggle
+          direction="left"
+          onToggle={onToggleCollapse}
+        />
+      )}
+      {!collapsed && (
+        <div className="toolbar">
+          <div className="toolbar-header">
             <button
-              className={`toolbar-btn ${isButtonActive(button) ? 'active' : ''}`}
-              onClick={() => !editingButtons && handleButtonClick(button)}
-              title={button.label}
-              style={{ cursor: editingButtons ? 'grab' : 'pointer' }}
+              className="toolbar-collapse-btn"
+              onClick={onToggleCollapse}
+              title="折叠工具栏"
             >
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                <path d={ICON_PATHS[button.icon] || ICON_PATHS.plugin} />
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/>
               </svg>
-              <span>{button.label}</span>
             </button>
-            {editingButtons && (
-              <span className="drag-handle">⋮⋮</span>
-            )}
+            <button
+              className="toolbar-edit-btn"
+              onClick={() => setEditingButtons(!editingButtons)}
+              title={editingButtons ? '完成编辑' : '编辑按钮'}
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                {editingButtons ? (
+                  <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                ) : (
+                  <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                )}
+              </svg>
+            </button>
           </div>
-        ))}
-      </div>
-    </div>
+          <div className="toolbar-items">
+            {buttons.map((button) => (
+              <div
+                key={button.id}
+                className={`toolbar-btn-wrapper ${isDragging ? 'dragging' : ''}`}
+                draggable={editingButtons}
+                onDragStart={(e) => handleDragStart(e, button.id)}
+                onDragOver={(e) => handleDragOver(e, button.id)}
+                onDragEnd={handleDragEnd}
+              >
+                <button
+                  className={`toolbar-btn ${isButtonActive(button) ? 'active' : ''}`}
+                  onClick={() => !editingButtons && handleButtonClick(button)}
+                  title={button.label}
+                  style={{ cursor: editingButtons ? 'grab' : 'pointer' }}
+                >
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                    <path d={ICON_PATHS[button.icon] || ICON_PATHS.plugin} />
+                  </svg>
+                  <span>{button.label}</span>
+                </button>
+                {editingButtons && (
+                  <span className="drag-handle">⋮⋮</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
   );
 }

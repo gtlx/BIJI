@@ -4,6 +4,7 @@ import { Editor } from './components/Editor';
 import { NoteList } from './components/NoteList';
 import { SettingsModal } from './components/SettingsModal';
 import { SearchModal } from './components/SearchModal';
+import { PluginManagerModal } from './components/PluginManagerModal';
 import { StatusBar } from './components/StatusBar';
 import { GraphView } from './components/GraphView';
 import { Toolbar } from './components/Toolbar';
@@ -87,6 +88,7 @@ export default function App() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
+  const [showPluginManager, setShowPluginManager] = useState(false);
   const [showGraph, setShowGraph] = useState(true);
   const [showGitPanel, setShowGitPanel] = useState(false);
   const [showPublishPanel, setShowPublishPanel] = useState(false);
@@ -95,6 +97,9 @@ export default function App() {
   const [previewMode, setPreviewMode] = useState<'live' | 'edit' | 'preview'>('live');
   const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
   const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false);
+  const [toolbarCollapsed, setToolbarCollapsed] = useState(false);
+  const [rightTogglePos, setRightTogglePos] = useState({ x: 0, y: 80 });
+  const [isDraggingToggle, setIsDraggingToggle] = useState(false);
   const [sidebarButtons, setSidebarButtons] = useState<SidebarButton[]>([
     { id: 'files', icon: 'files', label: '文件', visible: true },
     { id: 'search', icon: 'search', label: '搜索', visible: true },
@@ -104,6 +109,7 @@ export default function App() {
     { id: 'graph', icon: 'graph', label: '图谱' },
     { id: 'git', icon: 'git', label: 'Git' },
     { id: 'publish', icon: 'publish', label: '发布' },
+    { id: 'plugins', icon: 'plugin', label: '插件' },
   ]);
 
 
@@ -228,12 +234,10 @@ export default function App() {
       } else if (pressed === shortcuts.sync && isPluginEnabled('sync-plugin')) {
         e.preventDefault();
         window.electronAPI.syncStart();
-      } else if (pressed === shortcuts.toggleSidebar) {
-        e.preventDefault();
-      } else if (pressed === 'Ctrl+[') {
+      } else if (pressed === shortcuts.toggleLeftSidebar) {
         e.preventDefault();
         setLeftSidebarCollapsed(prev => !prev);
-      } else if (pressed === 'Ctrl+]') {
+      } else if (pressed === shortcuts.toggleRightSidebar) {
         e.preventDefault();
         setRightSidebarCollapsed(prev => !prev);
       } else if (pressed === shortcuts.toggleGraph) {
@@ -416,7 +420,11 @@ export default function App() {
   };
 
   const handlePluginClick = (pluginId: string) => {
-    showToast(`插件 ${pluginId} 功能开发中`);
+    if (pluginId === 'plugins') {
+      setShowPluginManager(true);
+    } else {
+      showToast(`插件 ${pluginId} 功能开发中`);
+    }
   };
 
   const handleLinkClick = (noteTitle: string) => {
@@ -495,25 +503,40 @@ export default function App() {
         />
       </div>
 
-      {!rightSidebarCollapsed && selectedNote && !showGraph && !showGitPanel && !showPublishPanel && (
-        <RightPanel 
-          content={selectedNote?.content || ''} 
-          onHeadingClick={(heading, level) => level > 0 ? setScrollToHeading(heading) : null}
-          onToggle={() => setRightSidebarCollapsed(true)}
-          onPropertiesClick={() => showToast('属性面板开发中', 'info')}
-        />
-      )}
-
-      {rightSidebarCollapsed && selectedNote && !showGraph && (
-        <button 
-          className="right-sidebar-toggle"
-          onClick={() => setRightSidebarCollapsed(false)}
-          title="展开右侧边栏 (Ctrl+])"
-        >
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-            <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
-          </svg>
-        </button>
+      {selectedNote && !showGraph && !showGitPanel && !showPublishPanel && (
+        <>
+          {!rightSidebarCollapsed && (
+            <RightPanel 
+              content={selectedNote?.content || ''} 
+              onHeadingClick={(heading, level) => level > 0 ? setScrollToHeading(heading) : null}
+              onToggle={() => setRightSidebarCollapsed(true)}
+              onPropertiesClick={() => showToast('属性面板开发中', 'info')}
+            />
+          )}
+          {rightSidebarCollapsed && (
+            <button 
+              className={`right-sidebar-toggle ${isDraggingToggle ? 'dragging' : ''}`}
+              style={{ top: rightTogglePos.y }}
+              draggable
+              onDragStart={(e) => {
+                setIsDraggingToggle(true);
+                e.dataTransfer.effectAllowed = 'move';
+              }}
+              onDrag={(e) => {
+                if (e.clientY > 0) {
+                  setRightTogglePos(prev => ({ ...prev, y: Math.max(50, Math.min(window.innerHeight - 50, e.clientY)) }));
+                }
+              }}
+              onDragEnd={() => setIsDraggingToggle(false)}
+              onClick={() => setRightSidebarCollapsed(false)}
+              title="展开右侧边栏 (Ctrl+])"
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
+              </svg>
+            </button>
+          )}
+        </>
       )}
 
       <Toolbar
@@ -544,6 +567,8 @@ export default function App() {
         isGraphActive={showGraph}
         isGitActive={showGitPanel}
         isPublishActive={showPublishPanel}
+        collapsed={toolbarCollapsed}
+        onToggleCollapse={() => setToolbarCollapsed(prev => !prev)}
       />
 
       <ToastContainer toasts={toasts} onRemove={removeToast} />
@@ -566,6 +591,13 @@ export default function App() {
             setSelectedNote(note);
             setShowSearch(false);
           }}
+        />
+      )}
+
+      {showPluginManager && (
+        <PluginManagerModal
+          onClose={() => setShowPluginManager(false)}
+          onPluginChange={setPlugins}
         />
       )}
     </div>
