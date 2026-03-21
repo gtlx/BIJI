@@ -93,6 +93,8 @@ export default function App() {
   const [scrollToHeading, setScrollToHeading] = useState<string | null>(null);
   const [editorMode, setEditorMode] = useState<'markdown' | 'rich'>('markdown');
   const [previewMode, setPreviewMode] = useState<'live' | 'edit' | 'preview'>('live');
+  const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
+  const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false);
   const [sidebarButtons, setSidebarButtons] = useState<SidebarButton[]>([
     { id: 'files', icon: 'files', label: '文件', visible: true },
     { id: 'search', icon: 'search', label: '搜索', visible: true },
@@ -227,6 +229,12 @@ export default function App() {
         window.electronAPI.syncStart();
       } else if (pressed === shortcuts.toggleSidebar) {
         e.preventDefault();
+      } else if (pressed === 'Ctrl+[') {
+        e.preventDefault();
+        setLeftSidebarCollapsed(prev => !prev);
+      } else if (pressed === 'Ctrl+]') {
+        e.preventDefault();
+        setRightSidebarCollapsed(prev => !prev);
       } else if (pressed === shortcuts.toggleGraph) {
         e.preventDefault();
         setShowGraph(prev => !prev);
@@ -414,6 +422,8 @@ export default function App() {
         buttons={sidebarButtons}
         onButtonsChange={handleSidebarButtonsChange}
         onToggleButton={handleToggleSidebarButton}
+        collapsed={leftSidebarCollapsed}
+        onToggleCollapse={() => setLeftSidebarCollapsed(prev => !prev)}
       />
       <NoteList
         notes={notes.filter(n => !selectedFolderId || n.folderId === selectedFolderId)}
@@ -460,13 +470,25 @@ export default function App() {
         />
       </div>
 
-      {selectedNote && !showGraph && !showGitPanel && !showPublishPanel && (
+      {!rightSidebarCollapsed && selectedNote && !showGraph && !showGitPanel && !showPublishPanel && (
         <RightPanel 
           content={selectedNote?.content || ''} 
           onHeadingClick={(heading, level) => level > 0 ? setScrollToHeading(heading) : null}
-          onToggle={() => {}}
+          onToggle={() => setRightSidebarCollapsed(true)}
           onPropertiesClick={() => showToast('属性面板开发中', 'info')}
         />
+      )}
+
+      {rightSidebarCollapsed && selectedNote && !showGraph && (
+        <button 
+          className="right-sidebar-toggle"
+          onClick={() => setRightSidebarCollapsed(false)}
+          title="展开右侧边栏 (Ctrl+])"
+        >
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
+          </svg>
+        </button>
       )}
 
       <Toolbar

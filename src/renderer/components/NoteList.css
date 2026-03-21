@@ -1,11 +1,14 @@
 .note-list {
   width: 300px;
+  min-width: 200px;
+  max-width: 400px;
   height: 100%;
   background-color: var(--bg-secondary);
   border-right: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  overflow: hidden;
 }
 
 .note-list-header {

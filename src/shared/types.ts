@@ -106,6 +106,8 @@ export interface ShortcutSettings {
   openSettings: string;
   sync: string;
   toggleSidebar: string;
+  toggleLeftSidebar: string;
+  toggleRightSidebar: string;
   toggleGraph: string;
   toggleOutline: string;
   togglePreviewMode: string;
@@ -171,6 +173,8 @@ export const DEFAULT_SHORTCUTS: ShortcutSettings = {
   openSettings: 'Ctrl+,',
   sync: 'Ctrl+Shift+S',
   toggleSidebar: 'Ctrl+B',
+  toggleLeftSidebar: 'Ctrl+[',
+  toggleRightSidebar: 'Ctrl+]',
   toggleGraph: 'Ctrl+G',
   toggleOutline: 'Ctrl+O',
   togglePreviewMode: 'Ctrl+P',

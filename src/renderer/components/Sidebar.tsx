@@ -19,6 +19,8 @@ interface SidebarProps {
   buttons: SidebarButton[];
   onButtonsChange: (buttons: SidebarButton[]) => void;
   onToggleButton: (id: string) => void;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 interface BreadcrumbItem {
@@ -47,10 +49,11 @@ export function Sidebar({
   onNewFolder,
   buttons,
   onButtonsChange,
-  onToggleButton
+  onToggleButton,
+  collapsed = false,
+  onToggleCollapse
 }: SidebarProps) {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
-  const [collapsed, setCollapsed] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [editingButtons, setEditingButtons] = useState(false);
   const draggedItemRef = useRef<string | null>(null);
@@ -120,7 +123,7 @@ export function Sidebar({
   };
 
   const toggleCollapse = () => {
-    setCollapsed(!collapsed);
+    onToggleCollapse?.();
   };
 
   const handleButtonClick = (buttonId: string) => {

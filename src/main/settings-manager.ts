@@ -34,6 +34,8 @@ const defaultSettings: AppSettings = {
     openSettings: 'Ctrl+,',
     sync: 'Ctrl+Shift+S',
     toggleSidebar: 'Ctrl+B',
+    toggleLeftSidebar: 'Ctrl+[',
+    toggleRightSidebar: 'Ctrl+]',
     toggleGraph: 'Ctrl+G',
     toggleOutline: 'Ctrl+O',
     togglePreviewMode: 'Ctrl+P',
