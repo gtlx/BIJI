@@ -77,6 +77,7 @@
   padding: 12px 16px;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
+  gap: 16px;
 }
 
 .graph-header h3 {
@@ -91,6 +92,45 @@
   gap: 16px;
   font-size: 12px;
   color: var(--text-secondary);
+}
+
+.graph-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.graph-controls button {
+  padding: 6px 12px;
+  background: var(--bg-tertiary);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.graph-controls button:hover {
+  background: var(--border-color);
+}
+
+.density-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.density-control input[type="range"] {
+  width: 80px;
+  cursor: pointer;
+}
+
+.graph-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .graph-actions button {

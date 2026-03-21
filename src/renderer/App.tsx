@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Sidebar } from './components/Sidebar';
+import { Sidebar, type SidebarButton } from './components/Sidebar';
 import { Editor } from './components/Editor';
 import { NoteList } from './components/NoteList';
 import { SettingsModal } from './components/SettingsModal';
@@ -75,6 +75,14 @@ export default function App() {
   const [showOutline, setShowOutline] = useState(true);
   const [outlineCollapsed, setOutlineCollapsed] = useState(false);
   const [scrollToHeading, setScrollToHeading] = useState<string | null>(null);
+  const [editorMode, setEditorMode] = useState<'markdown' | 'rich'>('markdown');
+  const [previewMode, setPreviewMode] = useState<'live' | 'edit' | 'preview'>('live');
+  const [sidebarButtons, setSidebarButtons] = useState<SidebarButton[]>([
+    { id: 'files', icon: 'files', label: '文件', visible: true },
+    { id: 'search', icon: 'search', label: '搜索', visible: true },
+    { id: 'tags', icon: 'tags', label: '标签', visible: true },
+    { id: 'backlinks', icon: 'backlinks', label: '反向链接', visible: true },
+  ]);
 
   useEffect(() => {
     if (scrollToHeading) {
@@ -173,7 +181,7 @@ export default function App() {
       if (!settings?.shortcuts) return;
       
       const { shortcuts } = settings;
-      const key = [];
+      const key: string[] = [];
       if (e.ctrlKey) key.push('Ctrl');
       if (e.shiftKey) key.push('Shift');
       if (e.altKey) key.push('Alt');
@@ -198,6 +206,24 @@ export default function App() {
       } else if (pressed === shortcuts.sync && isPluginEnabled('sync-plugin')) {
         e.preventDefault();
         window.electronAPI.syncStart();
+      } else if (pressed === shortcuts.toggleSidebar) {
+        e.preventDefault();
+      } else if (pressed === shortcuts.toggleGraph) {
+        e.preventDefault();
+        setShowGraph(prev => !prev);
+      } else if (pressed === shortcuts.toggleOutline) {
+        e.preventDefault();
+        setShowOutline(prev => !prev);
+      } else if (pressed === shortcuts.togglePreviewMode) {
+        e.preventDefault();
+        setPreviewMode(prev => {
+          const modes: ('live' | 'edit' | 'preview')[] = ['live', 'edit', 'preview'];
+          const idx = modes.indexOf(prev);
+          return modes[(idx + 1) % modes.length];
+        });
+      } else if (pressed === shortcuts.toggleEditorMode) {
+        e.preventDefault();
+        setEditorMode(prev => prev === 'markdown' ? 'rich' : 'markdown');
       }
     };
 
@@ -247,6 +273,35 @@ export default function App() {
     window.electronAPI.saveFolder(newFolder);
     setFolders(prev => [...prev, newFolder]);
     showToast('已创建新文件夹');
+  };
+
+  const handleSidebarButtonsChange = (newButtons: SidebarButton[]) => {
+    setSidebarButtons(newButtons);
+  };
+
+  const handleToggleSidebarButton = (buttonId: string) => {
+    const button = sidebarButtons.find(b => b.id === buttonId);
+    if (!button) return;
+
+    switch (buttonId) {
+      case 'search':
+        setShowSearch(true);
+        break;
+      case 'files':
+        break;
+      case 'tags':
+        break;
+      case 'backlinks':
+        break;
+      case 'outline':
+        setShowOutline(prev => !prev);
+        break;
+      case 'graph':
+        setShowGraph(prev => !prev);
+        break;
+      default:
+        showToast(`${button.label} 功能开发中`);
+    }
   };
 
   const handleSaveNote = async (note: Note) => {
@@ -357,6 +412,9 @@ export default function App() {
         onOpenSettings={() => setShowSettings(true)}
         onNewNote={handleNewNote}
         onNewFolder={handleNewFolder}
+        buttons={sidebarButtons}
+        onButtonsChange={handleSidebarButtonsChange}
+        onToggleButton={handleToggleSidebarButton}
       />
       <NoteList
         notes={notes.filter(n => !selectedFolderId || n.folderId === selectedFolderId)}
@@ -388,6 +446,10 @@ export default function App() {
             syncEnabled={isPluginEnabled('sync-plugin')}
             onLinkClick={handleLinkClick}
             scrollToHeading={scrollToHeading}
+            externalEditorMode={editorMode}
+            externalPreviewMode={previewMode}
+            onEditorModeChange={setEditorMode}
+            onPreviewModeChange={setPreviewMode}
           />
         )}
         <StatusBar

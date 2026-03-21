@@ -11,9 +11,13 @@ interface EditorProps {
   onOpenGraph?: () => void;
   onLinkClick?: (noteTitle: string) => void;
   scrollToHeading?: string | null;
+  externalEditorMode?: EditorMode;
+  externalPreviewMode?: MarkdownPreviewMode;
+  onEditorModeChange?: (mode: EditorMode) => void;
+  onPreviewModeChange?: (mode: MarkdownPreviewMode) => void;
 }
 
-export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGraph, onLinkClick, scrollToHeading }: EditorProps) {
+export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGraph, onLinkClick, scrollToHeading, externalEditorMode, externalPreviewMode, onEditorModeChange, onPreviewModeChange }: EditorProps) {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [tags, setTags] = useState<string[]>([]);
@@ -29,6 +33,28 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
   void syncEnabled;
 
   useEffect(() => {
+    if (externalEditorMode && externalEditorMode !== editorMode) {
+      setEditorMode(externalEditorMode);
+    }
+  }, [externalEditorMode]);
+
+  useEffect(() => {
+    if (externalPreviewMode && externalPreviewMode !== previewMode) {
+      setPreviewMode(externalPreviewMode);
+    }
+  }, [externalPreviewMode]);
+
+  const handleEditorModeChange = (mode: EditorMode) => {
+    setEditorMode(mode);
+    onEditorModeChange?.(mode);
+  };
+
+  const handlePreviewModeChange = (mode: MarkdownPreviewMode) => {
+    setPreviewMode(mode);
+    onPreviewModeChange?.(mode);
+  };
+
+  useEffect(() => {
     if (note) {
       setTitle(note.title);
       setContent(note.content);
@@ -42,10 +68,10 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
 
   useEffect(() => {
     if (settings?.editorMode) {
-      setEditorMode(settings.editorMode);
+      handleEditorModeChange(settings.editorMode);
     }
     if (settings?.markdownPreviewMode) {
-      setPreviewMode(settings.markdownPreviewMode);
+      handlePreviewModeChange(settings.markdownPreviewMode);
     }
   }, [settings?.editorMode, settings?.markdownPreviewMode]);
 
@@ -224,7 +250,7 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
               <div className="editor-mode-switch">
                 <button
                   className={`mode-btn ${editorMode === 'rich' ? 'active' : ''}`}
-                  onClick={() => setEditorMode('rich')}
+                  onClick={() => handleEditorModeChange('rich')}
                   title="富文本模式"
                 >
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
@@ -233,7 +259,7 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
                 </button>
                 <button
                   className={`mode-btn ${editorMode === 'markdown' ? 'active' : ''}`}
-                  onClick={() => setEditorMode('markdown')}
+                  onClick={() => handleEditorModeChange('markdown')}
                   title="Markdown 模式"
                 >
                   M
@@ -245,7 +271,7 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
               <div className="preview-mode-switch">
                 <button
                   className={`mode-btn ${previewMode === 'live' ? 'active' : ''}`}
-                  onClick={() => setPreviewMode('live')}
+                  onClick={() => handlePreviewModeChange('live')}
                   title="实时预览"
                 >
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
@@ -254,7 +280,7 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
                 </button>
                 <button
                   className={`mode-btn ${previewMode === 'edit' ? 'active' : ''}`}
-                  onClick={() => setPreviewMode('edit')}
+                  onClick={() => handlePreviewModeChange('edit')}
                   title="笔记模式"
                 >
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
@@ -263,7 +289,7 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
                 </button>
                 <button
                   className={`mode-btn ${previewMode === 'preview' ? 'active' : ''}`}
-                  onClick={() => setPreviewMode('preview')}
+                  onClick={() => handlePreviewModeChange('preview')}
                   title="预览模式"
                 >
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">

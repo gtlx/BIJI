@@ -92,6 +92,11 @@ export interface ShortcutSettings {
   toggleTheme: string;
   openSettings: string;
   sync: string;
+  toggleSidebar: string;
+  toggleGraph: string;
+  toggleOutline: string;
+  togglePreviewMode: string;
+  toggleEditorMode: string;
   [key: string]: string;
 }
 
@@ -152,6 +157,11 @@ export const DEFAULT_SHORTCUTS: ShortcutSettings = {
   toggleTheme: 'Ctrl+Alt+T',
   openSettings: 'Ctrl+,',
   sync: 'Ctrl+Shift+S',
+  toggleSidebar: 'Ctrl+B',
+  toggleGraph: 'Ctrl+G',
+  toggleOutline: 'Ctrl+O',
+  togglePreviewMode: 'Ctrl+P',
+  toggleEditorMode: 'Ctrl+E',
 };
 
 export const DEFAULT_TEMPLATES: NoteTemplate[] = [
