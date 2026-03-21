@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { Note, AppSettings, EditorMode, MarkdownPreviewMode } from '@shared/types';
+import type { Note, AppSettings, EditorMode, MarkdownPreviewMode, NoteFrontmatter } from '@shared/types';
 import './Editor.css';
 
 interface EditorProps {
@@ -26,11 +26,90 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
   const [isSaving, setIsSaving] = useState(false);
   const [editorMode, setEditorMode] = useState<EditorMode>('markdown');
   const [previewMode, setPreviewMode] = useState<MarkdownPreviewMode>('live');
+  const [frontmatter, setFrontmatter] = useState<NoteFrontmatter>({});
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isComposingRef = useRef(false);
   
   void syncEnabled;
+
+  const parseFrontmatter = useCallback((text: string): { frontmatter: NoteFrontmatter; content: string } => {
+    const fmMatch = text.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+    if (!fmMatch) {
+      return { frontmatter: {}, content: text };
+    }
+
+    const fmText = fmMatch[1];
+    const content = fmMatch[2];
+    const fm: NoteFrontmatter = {};
+
+    const lines = fmText.split('\n');
+    for (const line of lines) {
+      const colonIndex = line.indexOf(':');
+      if (colonIndex === -1) continue;
+
+      const key = line.slice(0, colonIndex).trim();
+      let value: unknown = line.slice(colonIndex + 1).trim();
+
+      if (value === '') {
+        fm[key] = '';
+      } else if (value === 'true') {
+        fm[key] = true;
+      } else if (value === 'false') {
+        fm[key] = false;
+      } else if (typeof value === 'string' && value.startsWith('[') && value.endsWith(']')) {
+        const items = value.slice(1, -1).split(',').map((s: string) => s.trim().replace(/^['"]|['"]$/g, ''));
+        fm[key] = items.filter(Boolean);
+      } else if (typeof value === 'string' && !isNaN(Number(value))) {
+        fm[key] = Number(value);
+      } else {
+        fm[key] = value as string;
+      }
+    }
+
+    return { frontmatter: fm, content };
+  }, []);
+
+  const generateFrontmatter = useCallback((fm: NoteFrontmatter, existingContent: string): string => {
+    const fmLines: string[] = ['---'];
+    
+    if (fm.title) fmLines.push(`title: ${fm.title}`);
+    if (fm.aliases && fm.aliases.length > 0) {
+      fmLines.push(`aliases:`);
+      fm.aliases.forEach(alias => fmLines.push(`  - ${alias}`));
+    }
+    if (fm.tags && fm.tags.length > 0) {
+      fmLines.push(`tags:`);
+      fm.tags.forEach(tag => fmLines.push(`  - ${tag}`));
+    }
+    if (fm.created) fmLines.push(`created: ${fm.created}`);
+    if (fm.updated) fmLines.push(`updated: ${fm.updated}`);
+    if (fm.completed !== undefined) fmLines.push(`completed: ${fm.completed}`);
+    
+    for (const [key, value] of Object.entries(fm)) {
+      if (!['title', 'aliases', 'tags', 'created', 'updated', 'completed'].includes(key)) {
+        if (typeof value === 'string') {
+          fmLines.push(`${key}: ${value}`);
+        } else if (typeof value === 'boolean') {
+          fmLines.push(`${key}: ${value}`);
+        } else if (typeof value === 'number') {
+          fmLines.push(`${key}: ${value}`);
+        }
+      }
+    }
+    
+    fmLines.push('---');
+
+    const hasFrontmatter = existingContent.startsWith('---');
+    if (hasFrontmatter) {
+      const match = existingContent.match(/^---\n[\s\S]*?\n---\n?/);
+      if (match) {
+        return existingContent.slice(match[0].length);
+      }
+    }
+    
+    return fmLines.join('\n') + '\n\n' + existingContent;
+  }, []);
 
   useEffect(() => {
     if (externalEditorMode && externalEditorMode !== editorMode) {
@@ -57,14 +136,19 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
   useEffect(() => {
     if (note) {
       setTitle(note.title);
-      setContent(note.content);
-      setTags(note.tags);
+      const { frontmatter: fm, content: noteContent } = parseFrontmatter(note.content);
+      setContent(noteContent);
+      setFrontmatter(fm);
+      
+      const mergedTags = [...new Set([...(fm.tags || []), ...note.tags])];
+      setTags(mergedTags);
     } else {
       setTitle('');
       setContent('');
+      setFrontmatter({});
       setTags([]);
     }
-  }, [note?.id]);
+  }, [note?.id, parseFrontmatter]);
 
   useEffect(() => {
     if (settings?.editorMode) {
@@ -94,10 +178,19 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
   const handleSave = useCallback(() => {
     if (!note) return;
     
+    const updatedFrontmatter: NoteFrontmatter = {
+      ...frontmatter,
+      title,
+      tags,
+      updated: new Date().toISOString().split('T')[0],
+    };
+    
+    const contentWithFm = generateFrontmatter(updatedFrontmatter, content);
+    
     const updatedNote: Note = {
       id: note.id,
       title,
-      content,
+      content: contentWithFm,
       tags,
       folderId: note.folderId,
       createdAt: note.createdAt,
@@ -106,7 +199,7 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
       syncStatus: 'pending',
     };
     onSave(updatedNote);
-  }, [note, title, content, tags, onSave]);
+  }, [note, title, content, tags, frontmatter, onSave, generateFrontmatter]);
 
   const scheduleAutoSave = useCallback(() => {
     if (!note || !settings?.autoSave) return;
@@ -340,6 +433,15 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
                 </svg>
               </button>
             )}
+
+            <button
+              className="btn-icon tooltip"
+              title="属性"
+            >
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                <path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/>
+              </svg>
+            </button>
 
             {isSaving && <span className="saving-indicator">保存中...</span>}
             <button 

@@ -227,6 +227,28 @@
 - 标签筛选（#标签）
 - 快速跳转到搜索结果
 
+### 笔记属性 (Frontmatter)
+支持 Obsidian 风格的 YAML frontmatter：
+
+```yaml
+---
+title: 标题
+aliases:
+  - 别名1
+  - 别名2
+tags:
+  - 开源
+  - Docker
+created: 2024-01-01
+updated: 2024-01-15
+completed: false
+---
+```
+
+- 自动解析和生成 frontmatter
+- 支持自定义属性扩展
+- 与标签系统集成
+
 ### 静态网站发布
 支持多种静态网站生成器：
 - **Hugo** - 快速、灵活的静态网站生成器

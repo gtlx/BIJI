@@ -9,6 +9,17 @@ export interface Note {
   isEncrypted: boolean;
   syncStatus: 'synced' | 'pending' | 'conflict';
   deletedAt?: number;
+  frontmatter?: NoteFrontmatter;
+}
+
+export interface NoteFrontmatter {
+  title?: string;
+  aliases?: string[];
+  tags?: string[];
+  created?: string;
+  updated?: string;
+  completed?: boolean;
+  [key: string]: unknown;
 }
 
 export interface Folder {
