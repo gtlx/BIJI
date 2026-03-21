@@ -81,8 +81,10 @@ export default function App() {
     { id: 'files', icon: 'files', label: '文件', visible: true },
     { id: 'search', icon: 'search', label: '搜索', visible: true },
     { id: 'tags', icon: 'tags', label: '标签', visible: false },
-    { id: 'graph', icon: 'graph', label: '图谱', visible: true },
+  ]);
+  const [rightPanelButtons, setRightPanelButtons] = useState<SidebarButton[]>([
     { id: 'outline', icon: 'outline', label: '大纲', visible: true },
+    { id: 'backlinks', icon: 'backlinks', label: '反向链接', visible: false },
   ]);
 
   useEffect(() => {
@@ -305,6 +307,18 @@ export default function App() {
     }
   };
 
+  const handleMoveToRight = (button: SidebarButton) => {
+    setSidebarButtons(prev => prev.filter(b => b.id !== button.id));
+    setRightPanelButtons(prev => [...prev, button]);
+  };
+
+  const handleMoveToLeft = (buttonId: string) => {
+    const button = rightPanelButtons.find(b => b.id === buttonId);
+    if (!button) return;
+    setRightPanelButtons(prev => prev.filter(b => b.id !== buttonId));
+    setSidebarButtons(prev => [...prev, button]);
+  };
+
   const handleSaveNote = async (note: Note) => {
     const updatedNote = { ...note, updatedAt: Date.now(), syncStatus: 'pending' as const };
     await window.electronAPI.saveNote(updatedNote);
@@ -416,6 +430,7 @@ export default function App() {
         buttons={sidebarButtons}
         onButtonsChange={handleSidebarButtonsChange}
         onToggleButton={handleToggleSidebarButton}
+        onMoveToRight={handleMoveToRight}
       />
       <NoteList
         notes={notes.filter(n => !selectedFolderId || n.folderId === selectedFolderId)}
@@ -463,9 +478,12 @@ export default function App() {
       {showOutline && !showGraph && (
         <Outline 
           content={selectedNote?.content || ''} 
-          onHeadingClick={(heading) => setScrollToHeading(heading)}
+          onHeadingClick={(heading, level) => level > 0 ? setScrollToHeading(heading) : null}
           isCollapsed={outlineCollapsed}
           onToggle={() => setOutlineCollapsed(!outlineCollapsed)}
+          buttons={rightPanelButtons}
+          onButtonsChange={setRightPanelButtons}
+          onMoveToLeft={handleMoveToLeft}
         />
       )}
 

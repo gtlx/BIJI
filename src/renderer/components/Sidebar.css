@@ -161,6 +161,31 @@
   cursor: pointer;
 }
 
+.button-editor-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.button-editor-item span {
+  flex: 1;
+}
+
+.move-right-btn {
+  padding: 2px 8px;
+  background: var(--bg-secondary);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.move-right-btn:hover {
+  background: var(--accent-color);
+  color: white;
+}
+
 .sidebar-nav {
   flex: 1;
   overflow-y: auto;

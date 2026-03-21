@@ -19,6 +19,7 @@ interface SidebarProps {
   buttons: SidebarButton[];
   onButtonsChange: (buttons: SidebarButton[]) => void;
   onToggleButton: (id: string) => void;
+  onMoveToRight?: (button: SidebarButton) => void;
 }
 
 interface BreadcrumbItem {
@@ -45,7 +46,8 @@ export function Sidebar({
   onNewFolder,
   buttons,
   onButtonsChange,
-  onToggleButton
+  onToggleButton,
+  onMoveToRight
 }: SidebarProps) {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [collapsed, setCollapsed] = useState(false);
@@ -178,6 +180,13 @@ export function Sidebar({
                     onChange={() => onToggleButton(button.id)}
                   />
                   <span>{button.label}</span>
+                  <button
+                    className="move-right-btn"
+                    onClick={() => onMoveToRight?.(button)}
+                    title="移动到右侧"
+                  >
+                    →
+                  </button>
                 </label>
               ))}
             </div>
