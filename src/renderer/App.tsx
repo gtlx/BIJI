@@ -82,11 +82,9 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showGraph, setShowGraph] = useState(true);
-  const [showOutline, setShowOutline] = useState(true);
   const [showGitPanel, setShowGitPanel] = useState(false);
   const [showPublishPanel, setShowPublishPanel] = useState(false);
   const [showPomodoro, setShowPomodoro] = useState(false);
-  const [outlineCollapsed, setOutlineCollapsed] = useState(false);
   const [scrollToHeading, setScrollToHeading] = useState<string | null>(null);
   const [editorMode, setEditorMode] = useState<'markdown' | 'rich'>('markdown');
   const [previewMode, setPreviewMode] = useState<'live' | 'edit' | 'preview'>('live');
@@ -100,9 +98,6 @@ export default function App() {
     { id: 'git', icon: 'git', label: 'Git' },
     { id: 'publish', icon: 'publish', label: '发布' },
     { id: 'pomodoro', icon: 'pomodoro', label: '番茄钟' },
-  ]);
-  const [rightPanelButtons, setRightPanelButtons] = useState<SidebarButton[]>([
-    { id: 'outline', icon: 'outline', label: '大纲', visible: true },
   ]);
 
 
@@ -231,9 +226,6 @@ export default function App() {
       } else if (pressed === shortcuts.toggleGraph) {
         e.preventDefault();
         setShowGraph(prev => !prev);
-      } else if (pressed === shortcuts.toggleOutline) {
-        e.preventDefault();
-        setShowOutline(prev => !prev);
       } else if (pressed === shortcuts.togglePreviewMode) {
         e.preventDefault();
         setPreviewMode(prev => {
@@ -309,9 +301,6 @@ export default function App() {
       case 'tags':
         break;
       case 'backlinks':
-        break;
-      case 'outline':
-        setShowOutline(prev => !prev);
         break;
       case 'graph':
         setShowGraph(prev => !prev);
@@ -467,19 +456,13 @@ export default function App() {
         />
       </div>
 
-      {showOutline && !showGraph && (
+      {selectedNote && !showGraph && !showGitPanel && !showPublishPanel && (
         <RightPanel 
           content={selectedNote?.content || ''} 
           onHeadingClick={(heading, level) => level > 0 ? setScrollToHeading(heading) : null}
-          isCollapsed={outlineCollapsed}
-          onToggle={() => setOutlineCollapsed(!outlineCollapsed)}
-          buttons={rightPanelButtons}
-          onButtonsChange={setRightPanelButtons}
-          onButtonClick={(buttonId) => {
-            if (buttonId === 'outline') {
-              setShowOutline(prev => !prev);
-            }
-          }}
+          onToggle={() => {}}
+          onPropertiesClick={() => showToast('属性面板开发中', 'info')}
+          onPomodoroClick={() => setShowPomodoro(true)}
         />
       )}
 
