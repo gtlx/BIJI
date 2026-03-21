@@ -54,10 +54,15 @@
   align-items: center;
   gap: 4px;
   padding: 4px 10px;
-  background-color: var(--bg-tertiary);
+  background-color: rgba(155, 89, 182, 0.1);
   border-radius: 12px;
   font-size: 12px;
-  color: var(--text-secondary);
+  color: #9b59b6;
+}
+
+.tag::before {
+  content: '#';
+  opacity: 0.7;
 }
 
 .tag-remove {
@@ -281,6 +286,30 @@
 
 [data-theme='dark'] .markdown-preview .wikilink:hover {
   background-color: rgba(74, 144, 217, 0.25);
+}
+
+.markdown-preview .md-tag {
+  color: #9b59b6;
+  background-color: rgba(155, 89, 182, 0.1);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-weight: 500;
+}
+
+.markdown-preview .md-tag:hover {
+  background-color: rgba(155, 89, 182, 0.2);
+}
+
+[data-theme='dark'] .markdown-preview .md-tag {
+  background-color: rgba(155, 89, 182, 0.15);
+  color: #bb8fce;
+}
+
+[data-theme='dark'] .markdown-preview .md-tag:hover {
+  background-color: rgba(155, 89, 182, 0.25);
 }
 
 .editor-content .wikilink-inline {

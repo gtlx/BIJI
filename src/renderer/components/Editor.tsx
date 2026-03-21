@@ -137,8 +137,26 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
 
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     if (isComposingRef.current) return;
-    setContent(e.target.value);
+    const newContent = e.target.value;
+    setContent(newContent);
+    
+    const extractedTags = extractTags(newContent);
+    const mergedTags = [...new Set([...tags, ...extractedTags])];
+    if (mergedTags.length !== tags.length) {
+      setTags(mergedTags);
+    }
+    
     scheduleAutoSave();
+  };
+
+  const extractTags = (text: string): string[] => {
+    const tagRegex = /#([a-zA-Z\u4e00-\u9fa5][a-zA-Z0-9\u4e00-\u9fa5_-]*)/g;
+    const matches = text.matchAll(tagRegex);
+    const tags = new Set<string>();
+    for (const match of matches) {
+      tags.add(match[1].toLowerCase());
+    }
+    return Array.from(tags);
   };
 
   const handleCompositionStart = () => {
@@ -197,10 +215,18 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
         onLinkClick(noteTitle);
       }
     }
+    if (target.classList.contains('md-tag')) {
+      e.preventDefault();
+      const tag = target.getAttribute('data-tag');
+      if (tag) {
+        handleTagClick(tag);
+      }
+    }
   };
 
   const renderMarkdownPreview = (text: string) => {
     let html = text
+      .replace(/#([a-zA-Z\u4e00-\u9fa5][a-zA-Z0-9\u4e00-\u9fa5_-]*)/g, '<span class="md-tag" data-tag="$1">#$1</span>')
       .replace(/\[\[([^\]]+)\]\]/g, '<span class="wikilink" data-note="$1">$1</span>')
       .replace(/^### (.*$)/gim, '<h3>$1</h3>')
       .replace(/^## (.*$)/gim, '<h2>$1</h2>')
@@ -219,6 +245,10 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
     html = html.replace(/<\/ul><br>/g, '</ul>');
     
     return html;
+  };
+
+  const handleTagClick = (tag: string) => {
+    setTagInput(`#${tag}`);
   };
 
   if (!note) {
