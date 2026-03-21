@@ -9,6 +9,8 @@ import { GraphView } from './components/GraphView';
 import { Toolbar } from './components/Toolbar';
 import { ToastContainer } from './components/Toast';
 import { Outline } from './components/Outline';
+import { GitPanel } from './components/GitPanel';
+import { PublishPanel } from './components/PublishPanel';
 import { DEFAULT_TEMPLATES } from '@shared/types';
 import type { Note, Folder, AppSettings, SearchQuery, Plugin } from '@shared/types';
 import './App.css';
@@ -57,6 +59,14 @@ declare global {
       importFromMarkdown: (path: string) => Promise<{ success: boolean; count: number; error?: string }>;
       onImported: (callback: (count: number) => void) => () => void;
       onImportError: (callback: (error: string) => void) => () => void;
+      gitInit: () => Promise<boolean>;
+      gitStatus: () => Promise<{ files: string[]; clean: boolean }>;
+      gitCommit: (message: string) => Promise<{ success: boolean; hash?: string }>;
+      gitLog: (count?: number) => Promise<Array<{ hash: string; message: string; date: string }>>;
+      gitDiff: (file?: string) => Promise<string>;
+      gitAddAll: () => Promise<boolean>;
+      publishCheck: (generator: string) => Promise<{ available: boolean; version?: string }>;
+      publishSite: (config: { outputPath: string; generator: string; siteName?: string; baseUrl?: string }) => Promise<{ success: boolean; outputPath?: string; error?: string }>;
     };
   }
 }
@@ -73,6 +83,8 @@ export default function App() {
   const [showSearch, setShowSearch] = useState(false);
   const [showGraph, setShowGraph] = useState(true);
   const [showOutline, setShowOutline] = useState(true);
+  const [showGitPanel, setShowGitPanel] = useState(false);
+  const [showPublishPanel, setShowPublishPanel] = useState(false);
   const [outlineCollapsed, setOutlineCollapsed] = useState(false);
   const [scrollToHeading, setScrollToHeading] = useState<string | null>(null);
   const [editorMode, setEditorMode] = useState<'markdown' | 'rich'>('markdown');
@@ -84,7 +96,8 @@ export default function App() {
   ]);
   const [rightPanelButtons, setRightPanelButtons] = useState<SidebarButton[]>([
     { id: 'outline', icon: 'outline', label: '大纲', visible: true },
-    { id: 'backlinks', icon: 'backlinks', label: '反向链接', visible: false },
+    { id: 'git', icon: 'git', label: '版本控制', visible: true },
+    { id: 'publish', icon: 'publish', label: '发布', visible: true },
   ]);
 
   useEffect(() => {
@@ -283,9 +296,6 @@ export default function App() {
   };
 
   const handleToggleSidebarButton = (buttonId: string) => {
-    const button = sidebarButtons.find(b => b.id === buttonId);
-    if (!button) return;
-
     switch (buttonId) {
       case 'search':
         setShowSearch(true);
@@ -302,8 +312,14 @@ export default function App() {
       case 'graph':
         setShowGraph(prev => !prev);
         break;
+      case 'git':
+        setShowGitPanel(prev => !prev);
+        break;
+      case 'publish':
+        setShowPublishPanel(prev => !prev);
+        break;
       default:
-        showToast(`${button.label} 功能开发中`);
+        break;
     }
   };
 
@@ -494,6 +510,14 @@ export default function App() {
         onExportClick={handleExport}
         isGraphActive={showGraph}
       />
+
+      {showGitPanel && (
+        <GitPanel onClose={() => setShowGitPanel(false)} />
+      )}
+
+      {showPublishPanel && (
+        <PublishPanel onClose={() => setShowPublishPanel(false)} />
+      )}
 
       <ToastContainer toasts={toasts} onRemove={removeToast} />
 
