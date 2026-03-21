@@ -10,9 +10,10 @@ interface EditorProps {
   syncEnabled: boolean;
   onOpenGraph?: () => void;
   onLinkClick?: (noteTitle: string) => void;
+  scrollToHeading?: string | null;
 }
 
-export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGraph, onLinkClick }: EditorProps) {
+export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGraph, onLinkClick, scrollToHeading }: EditorProps) {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [tags, setTags] = useState<string[]>([]);
@@ -47,6 +48,22 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
       setPreviewMode(settings.markdownPreviewMode);
     }
   }, [settings?.editorMode, settings?.markdownPreviewMode]);
+
+  useEffect(() => {
+    if (scrollToHeading && textareaRef.current) {
+      const textarea = textareaRef.current;
+      const lines = content.split('\n');
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].includes(scrollToHeading)) {
+          const pos = lines.slice(0, i).join('\n').length;
+          textarea.setSelectionRange(pos, pos + scrollToHeading.length);
+          textarea.focus();
+          textarea.scrollTop = i * 24 - 100;
+          break;
+        }
+      }
+    }
+  }, [scrollToHeading, content]);
 
   const handleSave = useCallback(() => {
     if (!note) return;

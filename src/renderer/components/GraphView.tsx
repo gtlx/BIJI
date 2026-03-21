@@ -25,8 +25,22 @@ export function GraphView({ onSelectNote, currentNoteId, onRefresh }: GraphViewP
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState({ nodes: 0, edges: 0 });
+  const [containerReady, setContainerReady] = useState(false);
 
   useEffect(() => {
+    const checkContainer = () => {
+      if (containerRef.current && containerRef.current.clientWidth > 0) {
+        setContainerReady(true);
+      } else {
+        setTimeout(checkContainer, 100);
+      }
+    };
+    checkContainer();
+  }, []);
+
+  useEffect(() => {
+    if (!containerReady) return;
+
     let mounted = true;
 
     async function loadAndRender() {
@@ -45,7 +59,11 @@ export function GraphView({ onSelectNote, currentNoteId, onRefresh }: GraphViewP
           return;
         }
 
-        renderGraph(data.nodes, data.edges);
+        requestAnimationFrame(() => {
+          if (mounted) {
+            renderGraph(data.nodes, data.edges);
+          }
+        });
       } catch (err) {
         console.error('[GraphView] Error loading graph:', err);
         if (!mounted) return;
@@ -59,22 +77,22 @@ export function GraphView({ onSelectNote, currentNoteId, onRefresh }: GraphViewP
     return () => {
       mounted = false;
     };
-  }, [onSelectNote, currentNoteId]);
+  }, [onSelectNote, currentNoteId, containerReady]);
 
   function renderGraph(nodes: GraphNode[], edges: GraphEdge[]) {
-    requestAnimationFrame(() => {
-      const svgElement = svgRef.current;
-      const container = containerRef.current;
-      if (!container || !svgElement) {
-        console.error('[GraphView] SVG or container not found');
-        return;
-      }
+    const svgElement = svgRef.current;
+    const container = containerRef.current;
+    if (!container || !svgElement || container.clientWidth === 0 || !containerReady) {
+      console.warn('[GraphView] Not ready, will retry...');
+      setTimeout(() => renderGraph(nodes, edges), 100);
+      return;
+    }
 
-      const width = container.clientWidth;
-      const height = container.clientHeight;
-      console.log('[GraphView] Rendering graph:', { nodes: nodes.length, edges: edges.length, width, height });
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    console.log('[GraphView] Rendering graph:', { nodes: nodes.length, edges: edges.length, width, height });
 
-      const svg = d3.select(svgElement);
+    const svg = d3.select(svgElement);
       svg.selectAll('*').remove();
       svg.attr('width', width).attr('height', height);
 
@@ -173,7 +191,6 @@ export function GraphView({ onSelectNote, currentNoteId, onRefresh }: GraphViewP
       });
 
       console.log('[GraphView] Graph rendered successfully');
-    });
   }
 
   function truncateTitle(title: string, maxLength: number): string {

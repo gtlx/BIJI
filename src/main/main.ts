@@ -57,7 +57,16 @@ function createWindow() {
 
   mainWindow.once('ready-to-show', () => {
     mainWindow?.show();
+    mainWindow?.focus();
     log.info('Main window ready');
+  });
+
+  mainWindow.webContents.on('did-finish-load', () => {
+    log.info('Page loaded successfully');
+  });
+
+  mainWindow.webContents.on('did-fail-load', (_, errorCode, errorDesc) => {
+    log.error(`Failed to load: ${errorCode} - ${errorDesc}`);
   });
 
   if (isDev) {

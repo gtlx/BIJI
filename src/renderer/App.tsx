@@ -8,6 +8,7 @@ import { StatusBar } from './components/StatusBar';
 import { GraphView } from './components/GraphView';
 import { Toolbar } from './components/Toolbar';
 import { ToastContainer } from './components/Toast';
+import { Outline } from './components/Outline';
 import { DEFAULT_TEMPLATES } from '@shared/types';
 import type { Note, Folder, AppSettings, SearchQuery, Plugin } from '@shared/types';
 import './App.css';
@@ -71,6 +72,16 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showGraph, setShowGraph] = useState(true);
+  const [showOutline, setShowOutline] = useState(true);
+  const [scrollToHeading, setScrollToHeading] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (scrollToHeading) {
+      const timer = setTimeout(() => setScrollToHeading(null), 100);
+      return () => clearTimeout(timer);
+    }
+  }, [scrollToHeading]);
+
   const [isLoading, setIsLoading] = useState(true);
   const [zoom, setZoom] = useState(100);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
@@ -375,6 +386,7 @@ export default function App() {
             settings={settings}
             syncEnabled={isPluginEnabled('sync-plugin')}
             onLinkClick={handleLinkClick}
+            scrollToHeading={scrollToHeading}
           />
         )}
         <StatusBar
@@ -384,12 +396,21 @@ export default function App() {
         />
       </div>
 
+      {showOutline && !showGraph && selectedNote && (
+        <Outline 
+          content={selectedNote.content} 
+          onHeadingClick={(heading) => setScrollToHeading(heading)} 
+        />
+      )}
+
       <Toolbar
         plugins={plugins}
         onPluginClick={handlePluginClick}
         onGraphClick={() => setShowGraph(!showGraph)}
+        onOutlineClick={() => setShowOutline(!showOutline)}
         onExportClick={handleExport}
         isGraphActive={showGraph}
+        isOutlineActive={showOutline}
       />
 
       <ToastContainer toasts={toasts} onRemove={removeToast} />
