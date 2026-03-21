@@ -246,6 +246,26 @@ export function SettingsModal({ settings, plugins, onClose, onSave, onTogglePlug
                 <label>同步</label>
                 <input type="text" className="input" value={localSettings.shortcuts?.sync || 'Ctrl+Shift+S'} onChange={e => setLocalSettings({ ...localSettings, shortcuts: { ...localSettings.shortcuts!, sync: e.target.value } })} />
               </div>
+              <div className="settings-item">
+                <label>切换侧边栏</label>
+                <input type="text" className="input" value={localSettings.shortcuts?.toggleSidebar || 'Ctrl+B'} onChange={e => setLocalSettings({ ...localSettings, shortcuts: { ...localSettings.shortcuts!, toggleSidebar: e.target.value } })} />
+              </div>
+              <div className="settings-item">
+                <label>切换图谱</label>
+                <input type="text" className="input" value={localSettings.shortcuts?.toggleGraph || 'Ctrl+G'} onChange={e => setLocalSettings({ ...localSettings, shortcuts: { ...localSettings.shortcuts!, toggleGraph: e.target.value } })} />
+              </div>
+              <div className="settings-item">
+                <label>切换大纲</label>
+                <input type="text" className="input" value={localSettings.shortcuts?.toggleOutline || 'Ctrl+O'} onChange={e => setLocalSettings({ ...localSettings, shortcuts: { ...localSettings.shortcuts!, toggleOutline: e.target.value } })} />
+              </div>
+              <div className="settings-item">
+                <label>切换预览模式</label>
+                <input type="text" className="input" value={localSettings.shortcuts?.togglePreviewMode || 'Ctrl+P'} onChange={e => setLocalSettings({ ...localSettings, shortcuts: { ...localSettings.shortcuts!, togglePreviewMode: e.target.value } })} />
+              </div>
+              <div className="settings-item">
+                <label>切换编辑模式</label>
+                <input type="text" className="input" value={localSettings.shortcuts?.toggleEditorMode || 'Ctrl+E'} onChange={e => setLocalSettings({ ...localSettings, shortcuts: { ...localSettings.shortcuts!, toggleEditorMode: e.target.value } })} />
+              </div>
             </div>
           )}
 

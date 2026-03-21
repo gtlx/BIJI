@@ -80,8 +80,9 @@ export default function App() {
   const [sidebarButtons, setSidebarButtons] = useState<SidebarButton[]>([
     { id: 'files', icon: 'files', label: '文件', visible: true },
     { id: 'search', icon: 'search', label: '搜索', visible: true },
-    { id: 'tags', icon: 'tags', label: '标签', visible: true },
-    { id: 'backlinks', icon: 'backlinks', label: '反向链接', visible: true },
+    { id: 'tags', icon: 'tags', label: '标签', visible: false },
+    { id: 'graph', icon: 'graph', label: '图谱', visible: true },
+    { id: 'outline', icon: 'outline', label: '大纲', visible: true },
   ]);
 
   useEffect(() => {

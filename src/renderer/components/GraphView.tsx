@@ -111,8 +111,8 @@ export function GraphView({ onSelectNote, currentNoteId, onRefresh }: GraphViewP
       });
     svg.call(zoom);
 
-    const chargeStrength = -100 - (100 - density) * 3;
-    const linkDistance = 50 + density * 1.5;
+    const chargeStrength = -600 + density * 5;
+    const linkDistance = 20 + density * 0.6;
 
     const simulation = d3.forceSimulation(nodes)
       .force('link', d3.forceLink<GraphNode, GraphEdge>(edges).id(d => d.id).distance(linkDistance).strength(0.5))
@@ -238,12 +238,12 @@ export function GraphView({ onSelectNote, currentNoteId, onRefresh }: GraphViewP
             <span>疏密</span>
             <input
               type="range"
-              min="10"
+              min="0"
               max="100"
               value={density}
               onChange={(e) => setDensity(Number(e.target.value))}
             />
-            <span>{density}%</span>
+            <span>{density}</span>
           </label>
           <button onClick={handleCenter}>居中</button>
           <button onClick={handleRefresh}>刷新</button>

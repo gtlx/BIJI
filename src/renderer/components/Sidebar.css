@@ -56,23 +56,25 @@
 
 .sidebar-buttons {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  justify-content: center;
   padding: 8px;
   gap: 4px;
   border-bottom: 1px solid var(--border-color);
+  flex-wrap: wrap;
 }
 
 .sidebar-btn {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
   background: transparent;
   border: none;
   cursor: pointer;
-  text-align: left;
   transition: all 0.15s ease;
   position: relative;
 }
@@ -93,31 +95,37 @@
 }
 
 .sidebar-btn-label {
-  flex: 1;
-  font-size: 13px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.sidebar.collapsed .sidebar-btn-label {
   display: none;
 }
 
-.drag-handle {
-  font-size: 12px;
-  color: var(--text-tertiary);
-  cursor: grab;
+.sidebar-btn:hover .sidebar-btn-label {
+  display: none;
 }
 
-.drag-handle:active {
-  cursor: grabbing;
+.sidebar-btn[title]:hover::after {
+  content: attr(title);
+  position: absolute;
+  bottom: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  white-space: nowrap;
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.drag-handle {
+  display: none;
 }
 
 .sidebar-btn.add-btn {
-  border-top: 1px dashed var(--border-color);
-  margin-top: 4px;
-  padding-top: 12px;
+  border-top: none;
+  margin-top: 0;
+  padding-top: 0;
 }
 
 .button-editor {
