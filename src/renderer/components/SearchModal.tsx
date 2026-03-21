@@ -37,12 +37,19 @@ export function SearchModal({ onClose, onSelectNote, notes }: SearchModalProps) 
         if (titleMatch) {
           matchText = note.title;
           highlightIndex = note.title.toLowerCase().indexOf(query);
-        } else {
+        }
+        
+        if (contentMatch) {
           const index = note.content.toLowerCase().indexOf(query);
           const start = Math.max(0, index - 20);
-          const end = Math.min(note.content.length, index + query.length + 20);
-          matchText = (start > 0 ? '...' : '') + note.content.slice(start, end) + (end < note.content.length ? '...' : '');
-          highlightIndex = index - start + (start > 0 ? 3 : 0);
+          const end = Math.min(note.content.length, index + query.length + 50);
+          const contentPreview = (start > 0 ? '...' : '') + note.content.slice(start, end) + (end < note.content.length ? '...' : '');
+          if (matchText) {
+            matchText = matchText + '\n' + contentPreview;
+          } else {
+            matchText = contentPreview;
+            highlightIndex = index - start + (start > 0 ? 3 : 0);
+          }
         }
         
         found.push({
