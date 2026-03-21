@@ -8,9 +8,10 @@ import { StatusBar } from './components/StatusBar';
 import { GraphView } from './components/GraphView';
 import { Toolbar } from './components/Toolbar';
 import { ToastContainer } from './components/Toast';
-import { Outline } from './components/Outline';
+import { RightPanel } from './components/RightPanel';
 import { GitPanel } from './components/GitPanel';
 import { PublishPanel } from './components/PublishPanel';
+import { PomodoroTimer } from './components/PomodoroTimer';
 import { DEFAULT_TEMPLATES } from '@shared/types';
 import type { Note, Folder, AppSettings, SearchQuery, Plugin } from '@shared/types';
 import './App.css';
@@ -84,6 +85,7 @@ export default function App() {
   const [showOutline, setShowOutline] = useState(true);
   const [showGitPanel, setShowGitPanel] = useState(false);
   const [showPublishPanel, setShowPublishPanel] = useState(false);
+  const [showPomodoro, setShowPomodoro] = useState(false);
   const [outlineCollapsed, setOutlineCollapsed] = useState(false);
   const [scrollToHeading, setScrollToHeading] = useState<string | null>(null);
   const [editorMode, setEditorMode] = useState<'markdown' | 'rich'>('markdown');
@@ -97,6 +99,10 @@ export default function App() {
     { id: 'graph', icon: 'graph', label: '图谱' },
     { id: 'git', icon: 'git', label: 'Git' },
     { id: 'publish', icon: 'publish', label: '发布' },
+    { id: 'pomodoro', icon: 'pomodoro', label: '番茄钟' },
+  ]);
+  const [rightPanelButtons, setRightPanelButtons] = useState<SidebarButton[]>([
+    { id: 'outline', icon: 'outline', label: '大纲', visible: true },
   ]);
 
 
@@ -462,11 +468,18 @@ export default function App() {
       </div>
 
       {showOutline && !showGraph && (
-        <Outline 
+        <RightPanel 
           content={selectedNote?.content || ''} 
           onHeadingClick={(heading, level) => level > 0 ? setScrollToHeading(heading) : null}
           isCollapsed={outlineCollapsed}
           onToggle={() => setOutlineCollapsed(!outlineCollapsed)}
+          buttons={rightPanelButtons}
+          onButtonsChange={setRightPanelButtons}
+          onButtonClick={(buttonId) => {
+            if (buttonId === 'outline') {
+              setShowOutline(prev => !prev);
+            }
+          }}
         />
       )}
 
@@ -495,12 +508,18 @@ export default function App() {
             setShowGitPanel(false);
           }
         }}
+        onPomodoroClick={() => setShowPomodoro(!showPomodoro)}
         isGraphActive={showGraph}
         isGitActive={showGitPanel}
         isPublishActive={showPublishPanel}
+        isPomodoroActive={showPomodoro}
       />
 
       <ToastContainer toasts={toasts} onRemove={removeToast} />
+
+      {showPomodoro && (
+        <PomodoroTimer onClose={() => setShowPomodoro(false)} />
+      )}
 
       {showSettings && settings && (
         <SettingsModal
@@ -514,8 +533,12 @@ export default function App() {
 
       {showSearch && (
         <SearchModal
+          notes={notes}
           onClose={() => setShowSearch(false)}
-          onSearch={handleSearch}
+          onSelectNote={(note) => {
+            setSelectedNote(note);
+            setShowSearch(false);
+          }}
         />
       )}
     </div>
