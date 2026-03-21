@@ -54,7 +54,15 @@ export class SettingsManager {
     if (fs.existsSync(this.settingsPath)) {
       try {
         const data = fs.readFileSync(this.settingsPath, 'utf-8');
-        this.settings = { ...defaultSettings, ...JSON.parse(data) };
+        const loadedSettings = JSON.parse(data);
+        this.settings = { 
+          ...defaultSettings, 
+          ...loadedSettings,
+          shortcuts: {
+            ...defaultSettings.shortcuts,
+            ...(loadedSettings.shortcuts || {}),
+          }
+        };
       } catch (error) {
         log.error('Failed to load settings:', error);
         this.settings = { ...defaultSettings };

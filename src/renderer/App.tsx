@@ -53,8 +53,6 @@ declare global {
       onToggleTheme: (callback: (dark: boolean) => void) => () => void;
       onOpenSettings: (callback: () => void) => () => void;
       onFeedback: (callback: () => void) => () => void;
-      onGit: (callback: () => void) => () => void;
-      onPublish: (callback: () => void) => () => void;
       selectExportPath: () => Promise<string | null>;
       exportToMarkdown: (path: string) => Promise<{ success: boolean; count: number; error?: string }>;
       selectImportPath: () => Promise<string | null>;
@@ -94,6 +92,11 @@ export default function App() {
     { id: 'files', icon: 'files', label: '文件', visible: true },
     { id: 'search', icon: 'search', label: '搜索', visible: true },
     { id: 'tags', icon: 'tags', label: '标签', visible: false },
+  ]);
+  const [toolbarButtons, setToolbarButtons] = useState<import('./components/Toolbar').ToolbarButton[]>([
+    { id: 'graph', icon: 'graph', label: '图谱' },
+    { id: 'git', icon: 'git', label: 'Git' },
+    { id: 'publish', icon: 'publish', label: '发布' },
   ]);
 
 
@@ -174,8 +177,6 @@ export default function App() {
         document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
       }),
       window.electronAPI.onOpenSettings(() => setShowSettings(true)),
-      window.electronAPI.onGit(() => setShowGitPanel(true)),
-      window.electronAPI.onPublish(() => setShowPublishPanel(true)),
       window.electronAPI.onImported((count) => {
         showToast(`已导入 ${count} 篇笔记`);
         loadData();
@@ -470,7 +471,8 @@ export default function App() {
       )}
 
       <Toolbar
-        plugins={plugins}
+        buttons={toolbarButtons}
+        onButtonOrderChange={setToolbarButtons}
         onPluginClick={handlePluginClick}
         onGraphClick={() => {
           setShowGraph(!showGraph);
