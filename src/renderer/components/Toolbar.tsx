@@ -5,11 +5,14 @@ interface ToolbarProps {
   plugins: Plugin[];
   onPluginClick: (pluginId: string) => void;
   onGraphClick: () => void;
-  onExportClick: () => void;
+  onGitClick: () => void;
+  onPublishClick: () => void;
   isGraphActive?: boolean;
+  isGitActive?: boolean;
+  isPublishActive?: boolean;
 }
 
-export function Toolbar({ plugins, onPluginClick, onGraphClick, onExportClick, isGraphActive }: ToolbarProps) {
+export function Toolbar({ plugins, onPluginClick, onGraphClick, onGitClick, onPublishClick, isGraphActive, isGitActive, isPublishActive }: ToolbarProps) {
   const enabledPlugins = plugins.filter(p => p.enabled && !p.builtIn);
 
   return (
@@ -27,14 +30,25 @@ export function Toolbar({ plugins, onPluginClick, onGraphClick, onExportClick, i
         </button>
 
         <button
-          className="toolbar-btn"
-          onClick={onExportClick}
-          title="导出为 Markdown"
+          className={`toolbar-btn ${isGitActive ? 'active' : ''}`}
+          onClick={onGitClick}
+          title="版本控制"
         >
           <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-            <path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2v9.67z"/>
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM12 20c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
           </svg>
-          <span>导出</span>
+          <span>Git</span>
+        </button>
+
+        <button
+          className={`toolbar-btn ${isPublishActive ? 'active' : ''}`}
+          onClick={onPublishClick}
+          title="发布网站"
+        >
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path d="M19 8l-4 4h3c0 3.31-2.69 6-6 6-1.01 0-1.97-.25-2.8-.7l-1.46 1.46C8.97 19.54 10.43 20 12 20c4.41 0 8-3.59 8-8h3l-4-4zM6 12c0-3.31 2.69-6 6-6 1.01 0 1.97.25 2.8.7l1.46-1.46C15.03 4.46 13.57 4 12 4c-4.41 0-8 3.59-8 8H1l4 4 4-4H6z"/>
+          </svg>
+          <span>发布</span>
         </button>
 
         {enabledPlugins.map(plugin => (

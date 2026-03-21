@@ -130,7 +130,19 @@
 }
 
 .drag-handle {
-  display: none;
+  display: inline-block;
+  cursor: grab;
+  color: var(--text-tertiary);
+  font-size: 14px;
+  padding: 0 4px;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.sidebar-btn-wrapper:has(.drag-handle):hover .drag-handle {
+  color: var(--text-primary);
 }
 
 .sidebar-btn.add-btn {

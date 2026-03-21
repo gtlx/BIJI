@@ -398,18 +398,6 @@ export default function App() {
     }
   };
 
-  const handleExport = async () => {
-    const exportPath = await window.electronAPI.selectExportPath();
-    if (exportPath) {
-      const result = await window.electronAPI.exportToMarkdown(exportPath);
-      if (result.success) {
-        showToast(`已导出 ${result.count} 篇笔记`);
-      } else {
-        showToast(`导出失败: ${result.error}`, 'error');
-      }
-    }
-  };
-
   if (isLoading) {
     return <div className="loading">加载中...</div>;
   }
@@ -448,6 +436,10 @@ export default function App() {
             currentNoteId={selectedNote?.id}
             onRefresh={() => setGraphKey(k => k + 1)}
           />
+        ) : showGitPanel ? (
+          <GitPanel onClose={() => setShowGitPanel(false)} />
+        ) : showPublishPanel ? (
+          <PublishPanel onClose={() => setShowPublishPanel(false)} />
         ) : (
           <Editor
             note={selectedNote}
@@ -480,18 +472,31 @@ export default function App() {
       <Toolbar
         plugins={plugins}
         onPluginClick={handlePluginClick}
-        onGraphClick={() => setShowGraph(!showGraph)}
-        onExportClick={handleExport}
+        onGraphClick={() => {
+          setShowGraph(!showGraph);
+          if (!showGraph) {
+            setShowGitPanel(false);
+            setShowPublishPanel(false);
+          }
+        }}
+        onGitClick={() => {
+          setShowGitPanel(!showGitPanel);
+          if (!showGitPanel) {
+            setShowGraph(false);
+            setShowPublishPanel(false);
+          }
+        }}
+        onPublishClick={() => {
+          setShowPublishPanel(!showPublishPanel);
+          if (!showPublishPanel) {
+            setShowGraph(false);
+            setShowGitPanel(false);
+          }
+        }}
         isGraphActive={showGraph}
+        isGitActive={showGitPanel}
+        isPublishActive={showPublishPanel}
       />
-
-      {showGitPanel && (
-        <GitPanel onClose={() => setShowGitPanel(false)} />
-      )}
-
-      {showPublishPanel && (
-        <PublishPanel onClose={() => setShowPublishPanel(false)} />
-      )}
 
       <ToastContainer toasts={toasts} onRemove={removeToast} />
 

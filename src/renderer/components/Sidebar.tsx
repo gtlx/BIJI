@@ -153,10 +153,15 @@ export function Sidebar({
                 onDragStart={(e) => handleDragStart(e, button.id)}
                 onDragOver={(e) => handleDragOver(e, button.id)}
                 onDragEnd={handleDragEnd}
+                onClick={(e) => editingButtons && e.stopPropagation()}
               >
                 <button
                   className="sidebar-btn"
-                  onClick={() => !editingButtons && onToggleButton(button.id)}
+                  onClick={() => {
+                    if (!editingButtons) {
+                      onToggleButton(button.id);
+                    }
+                  }}
                   title={button.label}
                   style={{ cursor: editingButtons ? 'grab' : 'pointer' }}
                 >
