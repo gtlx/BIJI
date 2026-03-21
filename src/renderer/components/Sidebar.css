@@ -64,6 +64,22 @@
   flex-wrap: wrap;
 }
 
+.sidebar-btn-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: var(--radius-sm);
+  transition: all 0.15s ease;
+}
+
+.sidebar-btn-wrapper.dragging {
+  opacity: 0.5;
+}
+
+.sidebar-btn-wrapper:hover {
+  background: var(--bg-primary);
+}
+
 .sidebar-btn {
   display: flex;
   align-items: center;
@@ -87,11 +103,6 @@
 .sidebar-btn.active {
   background: var(--accent-color);
   color: white;
-}
-
-.sidebar-btn.dragging {
-  opacity: 0.5;
-  background: var(--accent-color);
 }
 
 .sidebar-btn-label {

@@ -137,24 +137,29 @@ export function Sidebar({
         <>
           <div className="sidebar-buttons">
             {buttons.filter(b => b.visible).map((button, index) => (
-              <button
+              <div
                 key={button.id}
-                className={`sidebar-btn ${isDragging ? 'dragging' : ''}`}
+                className={`sidebar-btn-wrapper ${isDragging ? 'dragging' : ''}`}
                 draggable={editingButtons}
                 onDragStart={() => handleDragStart(index)}
                 onDragOver={(e) => handleDragOver(e, index)}
                 onDragEnd={handleDragEnd}
-                onClick={() => onToggleButton(button.id)}
-                title={button.label}
               >
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                  <path d={ICON_PATHS[button.icon] || ICON_PATHS.files} />
-                </svg>
-                <span className="sidebar-btn-label">{button.label}</span>
+                <button
+                  className="sidebar-btn"
+                  onClick={() => !editingButtons && onToggleButton(button.id)}
+                  title={button.label}
+                  style={{ cursor: editingButtons ? 'grab' : 'pointer' }}
+                >
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                    <path d={ICON_PATHS[button.icon] || ICON_PATHS.files} />
+                  </svg>
+                  <span className="sidebar-btn-label">{button.label}</span>
+                </button>
                 {editingButtons && (
                   <span className="drag-handle">⋮⋮</span>
                 )}
-              </button>
+              </div>
             ))}
             <button
               className="sidebar-btn add-btn"

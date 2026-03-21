@@ -78,7 +78,6 @@ export default function App() {
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
   const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [storagePath, setStoragePath] = useState<string>('');
   const [showSettings, setShowSettings] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showGraph, setShowGraph] = useState(true);
@@ -128,18 +127,16 @@ export default function App() {
 
   const loadData = useCallback(async () => {
     try {
-      const [notesData, foldersData, settingsData, pluginsData, path] = await Promise.all([
+      const [notesData, foldersData, settingsData, pluginsData] = await Promise.all([
         window.electronAPI.getNotes(),
         window.electronAPI.getFolders(),
         window.electronAPI.getSettings(),
         window.electronAPI.getPlugins(),
-        window.electronAPI.getStoragePath(),
       ]);
       setNotes(notesData);
       setFolders(foldersData);
       setSettings(settingsData);
       setPlugins(pluginsData);
-      setStoragePath(path);
       applyTheme(settingsData.theme);
       setZoom(settingsData.zoom);
     } catch (error) {
@@ -328,11 +325,18 @@ export default function App() {
     setRightPanelButtons(prev => [...prev, button]);
   };
 
-  const handleMoveToLeft = (buttonId: string) => {
-    const button = rightPanelButtons.find(b => b.id === buttonId);
-    if (!button) return;
-    setRightPanelButtons(prev => prev.filter(b => b.id !== buttonId));
-    setSidebarButtons(prev => [...prev, button]);
+  const handleRightPanelButtonClick = (buttonId: string) => {
+    switch (buttonId) {
+      case 'outline':
+        setShowOutline(prev => !prev);
+        break;
+      case 'git':
+        setShowGitPanel(prev => !prev);
+        break;
+      case 'publish':
+        setShowPublishPanel(prev => !prev);
+        break;
+    }
   };
 
   const handleSaveNote = async (note: Note) => {
@@ -392,11 +396,6 @@ export default function App() {
       document.head.appendChild(styleEl);
     }
     styleEl.textContent = css;
-  };
-
-  const handleStoragePathChange = async (newPath: string) => {
-    await window.electronAPI.setStoragePath(newPath);
-    setStoragePath(newPath);
   };
 
   const handlePluginToggle = async (id: string, enabled: boolean) => {
@@ -485,9 +484,7 @@ export default function App() {
           />
         )}
         <StatusBar
-          storagePath={storagePath}
           syncEnabled={isPluginEnabled('sync-plugin')}
-          onChangeStoragePath={handleStoragePathChange}
         />
       </div>
 
@@ -498,8 +495,7 @@ export default function App() {
           isCollapsed={outlineCollapsed}
           onToggle={() => setOutlineCollapsed(!outlineCollapsed)}
           buttons={rightPanelButtons}
-          onButtonsChange={setRightPanelButtons}
-          onMoveToLeft={handleMoveToLeft}
+          onButtonClick={handleRightPanelButtonClick}
         />
       )}
 

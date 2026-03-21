@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { AppSettings, Plugin } from '@shared/types';
 import './SettingsModal.css';
 
@@ -12,10 +12,79 @@ interface SettingsModalProps {
 
 export function SettingsModal({ settings, plugins, onClose, onSave, onTogglePlugin }: SettingsModalProps) {
   const [localSettings, setLocalSettings] = useState<AppSettings>({ ...settings });
-  const [activeTab, setActiveTab] = useState<'general' | 'editor' | 'shortcuts' | 'appearance' | 'plugins' | 'sync'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'editor' | 'shortcuts' | 'appearance' | 'plugins' | 'sync' | 'git' | 'publish'>('general');
 
   const syncPlugin = plugins.find(p => p.id === 'sync-plugin');
   const syncEnabled = syncPlugin?.enabled ?? false;
+
+  const [gitStatus, setGitStatus] = useState<{ files: string[]; clean: boolean }>({ files: [], clean: true });
+  const [commitMessage, setCommitMessage] = useState('');
+  const [isCommitting, setIsCommitting] = useState(false);
+
+  const [publishGenerator, setPublishGenerator] = useState('hugo');
+  const [publishSiteName, setPublishSiteName] = useState('我的笔记');
+  const [publishOutputPath, setPublishOutputPath] = useState('');
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [publishResult, setPublishResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  useEffect(() => {
+    loadGitStatus();
+  }, []);
+
+  async function loadGitStatus() {
+    try {
+      const status = await window.electronAPI.gitStatus();
+      setGitStatus(status);
+    } catch (error) {
+      console.error('Failed to load git status:', error);
+    }
+  }
+
+  async function handleGitCommit() {
+    if (!commitMessage.trim()) return;
+    setIsCommitting(true);
+    try {
+      await window.electronAPI.gitAddAll();
+      const result = await window.electronAPI.gitCommit(commitMessage);
+      if (result.success) {
+        setCommitMessage('');
+        await loadGitStatus();
+      }
+    } catch (error) {
+      console.error('Failed to commit:', error);
+    }
+    setIsCommitting(false);
+  }
+
+  async function handleSelectPublishPath() {
+    const path = await window.electronAPI.selectPath();
+    if (path) {
+      setPublishOutputPath(path);
+    }
+  }
+
+  async function handlePublish() {
+    if (!publishOutputPath) {
+      setPublishResult({ success: false, message: '请选择输出路径' });
+      return;
+    }
+    setIsPublishing(true);
+    setPublishResult(null);
+    try {
+      const result = await window.electronAPI.publishSite({
+        outputPath: publishOutputPath,
+        generator: publishGenerator,
+        siteName: publishSiteName,
+      });
+      setPublishResult({
+        success: result.success,
+        message: result.success ? `发布成功: ${result.outputPath}` : (result.error || '发布失败')
+      });
+    } catch (error) {
+      setPublishResult({ success: false, message: String(error) });
+    }
+    setIsPublishing(false);
+  }
 
   const handleSave = () => {
     onSave(localSettings);
@@ -67,6 +136,8 @@ export function SettingsModal({ settings, plugins, onClose, onSave, onTogglePlug
           <button className={`tab-btn ${activeTab === 'shortcuts' ? 'active' : ''}`} onClick={() => setActiveTab('shortcuts')}>快捷键</button>
           <button className={`tab-btn ${activeTab === 'appearance' ? 'active' : ''}`} onClick={() => setActiveTab('appearance')}>外观</button>
           <button className={`tab-btn ${activeTab === 'plugins' ? 'active' : ''}`} onClick={() => setActiveTab('plugins')}>插件</button>
+          <button className={`tab-btn ${activeTab === 'git' ? 'active' : ''}`} onClick={() => setActiveTab('git')}>版本控制</button>
+          <button className={`tab-btn ${activeTab === 'publish' ? 'active' : ''}`} onClick={() => setActiveTab('publish')}>发布</button>
         </div>
 
         <div className="modal-body settings-tabs-content">
@@ -337,6 +408,100 @@ export function SettingsModal({ settings, plugins, onClose, onSave, onTogglePlug
                   </div>
                 ))
               )}
+            </div>
+          )}
+
+          {activeTab === 'git' && (
+            <div className="settings-section">
+              <h3 className="settings-section-title">版本控制 (Git)</h3>
+              {!gitStatus.clean ? (
+                <>
+                  <div className="settings-item">
+                    <label>修改的文件</label>
+                    <div className="git-files-list">
+                      {gitStatus.files.map((file, i) => (
+                        <div key={i} className="git-file-item">{file}</div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="settings-item">
+                    <label>提交信息</label>
+                    <textarea
+                      className="input"
+                      value={commitMessage}
+                      onChange={(e) => setCommitMessage(e.target.value)}
+                      placeholder="输入提交信息..."
+                      rows={3}
+                    />
+                  </div>
+                  <button
+                    className="btn btn-primary"
+                    onClick={handleGitCommit}
+                    disabled={isCommitting || !commitMessage.trim()}
+                  >
+                    {isCommitting ? '提交中...' : '提交更改'}
+                  </button>
+                </>
+              ) : (
+                <div className="settings-item">
+                  <p>没有待提交的更改</p>
+                  <button className="btn btn-secondary" onClick={loadGitStatus}>刷新状态</button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'publish' && (
+            <div className="settings-section">
+              <h3 className="settings-section-title">静态网站发布</h3>
+              <div className="settings-item">
+                <label>生成器</label>
+                <select
+                  className="input"
+                  value={publishGenerator}
+                  onChange={(e) => setPublishGenerator(e.target.value)}
+                >
+                  <option value="hugo">Hugo</option>
+                  <option value="astro">Astro</option>
+                  <option value="vitepress">VitePress</option>
+                </select>
+              </div>
+              <div className="settings-item">
+                <label>站点名称</label>
+                <input
+                  type="text"
+                  className="input"
+                  value={publishSiteName}
+                  onChange={(e) => setPublishSiteName(e.target.value)}
+                  placeholder="我的笔记"
+                />
+              </div>
+              <div className="settings-item">
+                <label>输出路径</label>
+                <div className="path-input">
+                  <input
+                    type="text"
+                    className="input"
+                    value={publishOutputPath}
+                    onChange={(e) => setPublishOutputPath(e.target.value)}
+                    placeholder="选择输出目录..."
+                    readOnly
+                  />
+                  <button className="btn btn-secondary" onClick={handleSelectPublishPath}>选择</button>
+                </div>
+              </div>
+              {publishResult && (
+                <div className={`publish-result ${publishResult.success ? 'success' : 'error'}`}>
+                  {publishResult.message}
+                </div>
+              )}
+              <button
+                className="btn btn-primary"
+                onClick={handlePublish}
+                disabled={isPublishing || !publishOutputPath}
+              >
+                {isPublishing ? '发布中...' : '发布网站'}
+              </button>
             </div>
           )}
         </div>

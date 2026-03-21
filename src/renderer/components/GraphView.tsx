@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import * as d3 from 'd3';
 import './GraphView.css';
 
@@ -27,6 +27,23 @@ export function GraphView({ onSelectNote, currentNoteId, onRefresh }: GraphViewP
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState({ nodes: 0, edges: 0, totalChars: 0 });
   const [density, setDensity] = useState(50);
+  const pendingDensityRef = useRef<number | null>(null);
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  const updateDensity = useCallback((newDensity: number) => {
+    pendingDensityRef.current = newDensity;
+    
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+    
+    debounceRef.current = setTimeout(() => {
+      if (pendingDensityRef.current !== null) {
+        setDensity(pendingDensityRef.current);
+        pendingDensityRef.current = null;
+      }
+    }, 100);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -70,6 +87,9 @@ export function GraphView({ onSelectNote, currentNoteId, onRefresh }: GraphViewP
       mounted = false;
       if (simulationRef.current) {
         simulationRef.current.stop();
+      }
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
       }
     };
   }, []);
@@ -241,7 +261,7 @@ export function GraphView({ onSelectNote, currentNoteId, onRefresh }: GraphViewP
               min="0"
               max="100"
               value={density}
-              onChange={(e) => setDensity(Number(e.target.value))}
+              onChange={(e) => updateDensity(Number(e.target.value))}
             />
             <span>{density}</span>
           </label>

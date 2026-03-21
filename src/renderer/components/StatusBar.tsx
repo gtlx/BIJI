@@ -1,30 +1,12 @@
 import './StatusBar.css';
 
 interface StatusBarProps {
-  storagePath: string;
   syncEnabled: boolean;
-  onChangeStoragePath: (path: string) => void;
 }
 
-export function StatusBar({ storagePath, syncEnabled, onChangeStoragePath }: StatusBarProps) {
-  const handleSelectPath = async () => {
-    if (window.electronAPI?.selectPath) {
-      const path = await window.electronAPI.selectPath();
-      if (path) {
-        onChangeStoragePath(path);
-      }
-    }
-  };
-
+export function StatusBar({ syncEnabled }: StatusBarProps) {
   return (
     <div className="status-bar">
-      <div className="status-item storage-path" onClick={handleSelectPath} title="点击更改存储路径">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-          <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
-        </svg>
-        <span>{storagePath || '默认存储位置'}</span>
-      </div>
-      
       {syncEnabled && (
         <div className="status-item sync-status">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
