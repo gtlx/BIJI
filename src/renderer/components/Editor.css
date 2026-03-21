@@ -3,8 +3,9 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 24px 40px;
+  padding: 24px;
   overflow: hidden;
+  background: var(--bg-primary);
 }
 
 .editor-header {
@@ -12,6 +13,7 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: 16px;
+  max-width: 100%;
 }
 
 .editor-title {
@@ -97,12 +99,14 @@
 .editor-content {
   flex: 1;
   width: 100%;
+  max-width: 100%;
   border: none;
   outline: none;
   background: transparent;
   color: var(--text-primary);
   resize: none;
   line-height: 1.8;
+  padding: 0;
 }
 
 .editor-content::placeholder {
@@ -123,7 +127,7 @@
   color: var(--text-tertiary);
 }
 
-.editor-mode-switch,
+
 .preview-mode-switch {
   display: flex;
   gap: 4px;

@@ -67,36 +67,69 @@ export function PluginManagerModal({ onClose, onPluginChange }: PluginManagerMod
             </div>
           ) : (
             <div className="plugin-list">
-              {plugins.map(plugin => (
-                <div key={plugin.id} className="plugin-item">
-                  <div className="plugin-info">
-                    <h3 className="plugin-name">{plugin.name}</h3>
-                    <p className="plugin-description">{plugin.description}</p>
-                    <div className="plugin-meta">
-                      <span>v{plugin.version}</span>
-                      <span>by {plugin.author}</span>
+              {plugins.filter(p => p.builtIn).length > 0 && (
+                <div className="plugin-section">
+                  <h3 className="plugin-section-title">内置插件</h3>
+                  {plugins.filter(p => p.builtIn).map(plugin => (
+                    <div key={plugin.id} className="plugin-item">
+                      <div className="plugin-info">
+                        <h3 className="plugin-name">{plugin.name}</h3>
+                        <p className="plugin-description">{plugin.description}</p>
+                        <div className="plugin-meta">
+                          <span>v{plugin.version}</span>
+                          <span>by {plugin.author}</span>
+                          <span className="built-in-tag">内置</span>
+                        </div>
+                      </div>
+                      <div className="plugin-actions">
+                        <label className="toggle">
+                          <input
+                            type="checkbox"
+                            checked={plugin.enabled}
+                            onChange={e => handleToggle(plugin.id, e.target.checked)}
+                          />
+                          <span className="toggle-slider"></span>
+                        </label>
+                      </div>
                     </div>
-                  </div>
-                  <div className="plugin-actions">
-                    <label className="toggle">
-                      <input
-                        type="checkbox"
-                        checked={plugin.enabled}
-                        onChange={e => handleToggle(plugin.id, e.target.checked)}
-                      />
-                      <span className="toggle-slider"></span>
-                    </label>
-                    <button 
-                      className="btn-icon"
-                      onClick={() => handleUninstall(plugin.id)}
-                    >
-                      <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
-                      </svg>
-                    </button>
-                  </div>
+                  ))}
                 </div>
-              ))}
+              )}
+              {plugins.filter(p => !p.builtIn).length > 0 && (
+                <div className="plugin-section">
+                  <h3 className="plugin-section-title">已安装插件</h3>
+                  {plugins.filter(p => !p.builtIn).map(plugin => (
+                    <div key={plugin.id} className="plugin-item">
+                      <div className="plugin-info">
+                        <h3 className="plugin-name">{plugin.name}</h3>
+                        <p className="plugin-description">{plugin.description}</p>
+                        <div className="plugin-meta">
+                          <span>v{plugin.version}</span>
+                          <span>by {plugin.author}</span>
+                        </div>
+                      </div>
+                      <div className="plugin-actions">
+                        <label className="toggle">
+                          <input
+                            type="checkbox"
+                            checked={plugin.enabled}
+                            onChange={e => handleToggle(plugin.id, e.target.checked)}
+                          />
+                          <span className="toggle-slider"></span>
+                        </label>
+                        <button 
+                          className="btn-icon"
+                          onClick={() => handleUninstall(plugin.id)}
+                        >
+                          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                            <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

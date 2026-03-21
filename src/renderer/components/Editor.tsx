@@ -369,27 +369,6 @@ export function Editor({ note, onSave, onDelete, settings, syncEnabled, onOpenGr
             placeholder="标题"
           />
           <div className="editor-actions">
-            {settings && (
-              <div className="editor-mode-switch">
-                <button
-                  className={`mode-btn ${editorMode === 'rich' ? 'active' : ''}`}
-                  onClick={() => handleEditorModeChange('rich')}
-                  title="富文本模式"
-                >
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                    <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
-                  </svg>
-                </button>
-                <button
-                  className={`mode-btn ${editorMode === 'markdown' ? 'active' : ''}`}
-                  onClick={() => handleEditorModeChange('markdown')}
-                  title="Markdown 模式"
-                >
-                  M
-                </button>
-              </div>
-            )}
-            
             {editorMode === 'markdown' && (
               <div className="preview-mode-switch">
                 <button
