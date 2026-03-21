@@ -302,11 +302,8 @@ export function SettingsModal({ settings, plugins, onClose, onSave, onTogglePlug
                 <div className="settings-item">
                   <label>同步服务</label>
                   <select className="input" value={localSettings.syncProvider || ''} onChange={e => setLocalSettings({ ...localSettings, syncProvider: e.target.value as any })} disabled={!localSettings.syncEnabled}>
-                    <option value="">选择服务商</option>
                     <option value="local">本地同步文件夹</option>
-                    <option value="web">Web 同步</option>
-                    <option value="google">Google Drive</option>
-                    <option value="onedrive">OneDrive</option>
+                    <option value="web">WebDAV 同步</option>
                   </select>
                 </div>
               </div>
@@ -333,14 +330,22 @@ export function SettingsModal({ settings, plugins, onClose, onSave, onTogglePlug
 
               {localSettings.syncProvider === 'web' && (
                 <div className="settings-section">
-                  <h3 className="settings-section-title">Web 同步</h3>
+                  <h3 className="settings-section-title">WebDAV 同步</h3>
                   <div className="settings-item">
-                    <label>Web 同步地址</label>
-                    <input type="text" className="input" value={localSettings.syncWebUrl || ''} onChange={e => setLocalSettings({ ...localSettings, syncWebUrl: e.target.value })} placeholder="https://your-sync-server.com/api/sync" disabled={!localSettings.syncEnabled} />
+                    <label>WebDAV 地址</label>
+                    <input type="text" className="input" value={localSettings.syncWebUrl || ''} onChange={e => setLocalSettings({ ...localSettings, syncWebUrl: e.target.value })} placeholder="https://your-webdav-server.com/dav/" disabled={!localSettings.syncEnabled} />
                   </div>
                   <div className="settings-item">
-                    <label>Web 同步令牌</label>
-                    <input type="password" className="input" value={localSettings.syncWebToken || ''} onChange={e => setLocalSettings({ ...localSettings, syncWebToken: e.target.value })} placeholder="访问令牌" disabled={!localSettings.syncEnabled} />
+                    <label>用户名</label>
+                    <input type="text" className="input" value={localSettings.syncWebUsername || ''} onChange={e => setLocalSettings({ ...localSettings, syncWebUsername: e.target.value })} placeholder="用户名" disabled={!localSettings.syncEnabled} />
+                  </div>
+                  <div className="settings-item">
+                    <label>密码</label>
+                    <input type="password" className="input" value={localSettings.syncWebPassword || ''} onChange={e => setLocalSettings({ ...localSettings, syncWebPassword: e.target.value })} placeholder="密码" disabled={!localSettings.syncEnabled} />
+                  </div>
+                  <div className="settings-item">
+                    <label>访问令牌（可选）</label>
+                    <input type="password" className="input" value={localSettings.syncWebToken || ''} onChange={e => setLocalSettings({ ...localSettings, syncWebToken: e.target.value })} placeholder="用于自定义 API" disabled={!localSettings.syncEnabled} />
                   </div>
                 </div>
               )}
@@ -426,8 +431,47 @@ export function SettingsModal({ settings, plugins, onClose, onSave, onTogglePlug
               <div className="settings-section">
                 <h3 className="settings-section-title">自定义 CSS</h3>
                 <div className="settings-item">
-                  <label>自定义样式</label>
-                  <textarea className="input textarea" value={localSettings.customCss || ''} onChange={e => setLocalSettings({ ...localSettings, customCss: e.target.value })} placeholder="输入自定义 CSS 样式..." rows={6} />
+                  <label>全局样式</label>
+                  <textarea className="input textarea" value={localSettings.customCss || ''} onChange={e => setLocalSettings({ ...localSettings, customCss: e.target.value })} placeholder="输入自定义 CSS 样式..." rows={4} />
+                </div>
+              </div>
+
+              <div className="settings-section">
+                <h3 className="settings-section-title">界面自定义</h3>
+                <div className="settings-item">
+                  <label>主内容区 (.main-content)</label>
+                  <textarea className="input textarea" value={localSettings.uiCustomCss?.mainContent || ''} onChange={e => setLocalSettings({ 
+                    ...localSettings, 
+                    uiCustomCss: { ...localSettings.uiCustomCss, mainContent: e.target.value }
+                  })} placeholder="例如: background: #f5f5f5;" rows={3} />
+                </div>
+                <div className="settings-item">
+                  <label>左侧边栏 (.sidebar)</label>
+                  <textarea className="input textarea" value={localSettings.uiCustomCss?.leftSidebar || ''} onChange={e => setLocalSettings({ 
+                    ...localSettings, 
+                    uiCustomCss: { ...localSettings.uiCustomCss, leftSidebar: e.target.value }
+                  })} placeholder="例如: width: 280px;" rows={3} />
+                </div>
+                <div className="settings-item">
+                  <label>右侧边栏 (.right-panel)</label>
+                  <textarea className="input textarea" value={localSettings.uiCustomCss?.rightSidebar || ''} onChange={e => setLocalSettings({ 
+                    ...localSettings, 
+                    uiCustomCss: { ...localSettings.uiCustomCss, rightSidebar: e.target.value }
+                  })} placeholder="例如: width: 250px;" rows={3} />
+                </div>
+                <div className="settings-item">
+                  <label>编辑器 (.editor)</label>
+                  <textarea className="input textarea" value={localSettings.uiCustomCss?.editor || ''} onChange={e => setLocalSettings({ 
+                    ...localSettings, 
+                    uiCustomCss: { ...localSettings.uiCustomCss, editor: e.target.value }
+                  })} placeholder="例如: font-size: 16px;" rows={3} />
+                </div>
+                <div className="settings-item">
+                  <label>笔记列表 (.note-list)</label>
+                  <textarea className="input textarea" value={localSettings.uiCustomCss?.noteList || ''} onChange={e => setLocalSettings({ 
+                    ...localSettings, 
+                    uiCustomCss: { ...localSettings.uiCustomCss, noteList: e.target.value }
+                  })} placeholder="例如: width: 350px;" rows={3} />
                 </div>
               </div>
             </>

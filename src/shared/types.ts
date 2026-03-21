@@ -79,6 +79,8 @@ export interface AppSettings {
   syncPath: string;
   syncWebUrl: string;
   syncWebToken: string;
+  syncWebUsername: string;
+  syncWebPassword: string;
   encryptionEnabled: boolean;
   encryptionKey: string;
   autoSave: boolean;
@@ -88,11 +90,20 @@ export interface AppSettings {
   storagePath: string;
   template: string;
   customCss: string;
+  uiCustomCss: UICustomCSS;
   zoom: number;
   shortcuts: ShortcutSettings;
 }
 
-export type SyncProviderType = 'google' | 'onedrive' | 'local' | 'web';
+export interface UICustomCSS {
+  mainContent: string;
+  leftSidebar: string;
+  rightSidebar: string;
+  editor: string;
+  noteList: string;
+}
+
+export type SyncProviderType = 'google' | 'onedrive' | 'local' | 'web' | 'webdav';
 export type SyncMode = 'incremental' | 'bidirectional';
 export type EditorMode = 'rich' | 'markdown';
 export type MarkdownPreviewMode = 'live' | 'edit' | 'preview';

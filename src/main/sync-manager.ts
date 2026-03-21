@@ -2,6 +2,7 @@ import log from 'electron-log';
 import type { Note } from '../shared/types';
 import { SqliteDatabase } from './sqlite-database';
 import { SettingsManager } from './settings-manager';
+import { WebDAVService } from './webdav-service';
 
 export class SyncManager {
   private database: SqliteDatabase;
@@ -75,6 +76,9 @@ export class SyncManager {
       case 'local':
         await this.uploadToLocal(notes);
         break;
+      case 'web':
+        await this.uploadToWebDAV(notes);
+        break;
     }
   }
 
@@ -88,6 +92,8 @@ export class SyncManager {
         return await this.downloadFromOneDrive();
       case 'local':
         return await this.downloadFromLocal();
+      case 'web':
+        return await this.downloadFromWebDAV();
       default:
         return [];
     }
@@ -105,6 +111,23 @@ export class SyncManager {
     log.info('Uploading to local sync folder...');
   }
 
+  private async uploadToWebDAV(notes: Note[]): Promise<void> {
+    const settings = this.settingsManager.getSettings();
+    const webdav = new WebDAVService({
+      url: settings.syncWebUrl,
+      username: settings.syncWebUsername,
+      password: settings.syncWebPassword,
+    });
+
+    await webdav.ensureBasePath();
+
+    for (const note of notes) {
+      const filename = `${note.id}.json`;
+      await webdav.uploadFile(filename, JSON.stringify(note));
+      log.info(`[WebDAV] Uploaded: ${filename}`);
+    }
+  }
+
   private async downloadFromGoogleDrive(): Promise<Note[]> {
     log.info('Downloading from Google Drive...');
     return [];
@@ -118,6 +141,40 @@ export class SyncManager {
   private async downloadFromLocal(): Promise<Note[]> {
     log.info('Downloading from local sync folder...');
     return [];
+  }
+
+  private async downloadFromWebDAV(): Promise<Note[]> {
+    const settings = this.settingsManager.getSettings();
+    const webdav = new WebDAVService({
+      url: settings.syncWebUrl,
+      username: settings.syncWebUsername,
+      password: settings.syncWebPassword,
+    });
+
+    const files = await webdav.listFiles();
+    const notes: Note[] = [];
+
+    for (const filename of files) {
+      if (!filename.endsWith('.json')) continue;
+
+      const content = await webdav.downloadFile(filename);
+      if (!content) continue;
+
+      try {
+        const note = JSON.parse(content) as Note;
+        notes.push(note);
+        log.info(`[WebDAV] Downloaded: ${filename}`);
+      } catch (error) {
+        log.warn(`[WebDAV] Failed to parse: ${filename}`, error);
+      }
+    }
+
+    return notes;
+  }
+
+  async testWebDAVConnection(url: string, username: string, password: string): Promise<{ success: boolean; error?: string }> {
+    const webdav = new WebDAVService({ url, username, password });
+    return await webdav.testConnection();
   }
 
   getStatus(): { lastSync: number; pending: number; isSyncing: boolean } {

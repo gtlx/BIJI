@@ -15,6 +15,8 @@ const defaultSettings: AppSettings = {
   syncPath: '',
   syncWebUrl: '',
   syncWebToken: '',
+  syncWebUsername: '',
+  syncWebPassword: '',
   encryptionEnabled: false,
   encryptionKey: '',
   autoSave: true,
@@ -24,6 +26,13 @@ const defaultSettings: AppSettings = {
   storagePath: '',
   template: 'blank',
   customCss: '',
+  uiCustomCss: {
+    mainContent: '',
+    leftSidebar: '',
+    rightSidebar: '',
+    editor: '',
+    noteList: '',
+  },
   zoom: 100,
   shortcuts: {
     newNote: 'Ctrl+N',

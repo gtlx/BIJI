@@ -147,6 +147,7 @@ export default function App() {
       setPlugins(pluginsData);
       applyTheme(settingsData.theme);
       setZoom(settingsData.zoom);
+      applyCustomCss(settingsData);
     } catch (error) {
       console.error('Failed to load data:', error);
       showToast('加载数据失败', 'error');
@@ -369,21 +370,43 @@ export default function App() {
     if (newSettings.theme) {
       applyTheme(newSettings.theme);
     }
-    if (newSettings.customCss) {
-      applyCustomCss(newSettings.customCss);
+    if (newSettings.customCss !== undefined || newSettings.uiCustomCss !== undefined) {
+      applyCustomCss(updated);
     }
     if (newSettings.zoom) {
       setZoom(newSettings.zoom);
     }
   };
 
-  const applyCustomCss = (css: string) => {
+  const applyCustomCss = (settings: AppSettings) => {
     let styleEl = document.getElementById('custom-css');
     if (!styleEl) {
       styleEl = document.createElement('style');
       styleEl.id = 'custom-css';
       document.head.appendChild(styleEl);
     }
+
+    let css = settings.customCss || '';
+
+    if (settings.uiCustomCss) {
+      const ui = settings.uiCustomCss;
+      if (ui.mainContent) {
+        css += `\n.main-content { ${ui.mainContent} }`;
+      }
+      if (ui.leftSidebar) {
+        css += `\n.sidebar { ${ui.leftSidebar} }`;
+      }
+      if (ui.rightSidebar) {
+        css += `\n.right-panel { ${ui.rightSidebar} }`;
+      }
+      if (ui.editor) {
+        css += `\n.editor { ${ui.editor} }`;
+      }
+      if (ui.noteList) {
+        css += `\n.note-list { ${ui.noteList} }`;
+      }
+    }
+
     styleEl.textContent = css;
   };
 
@@ -433,38 +456,40 @@ export default function App() {
         onSearch={handleSearch}
       />
       <div className="main-content">
-        {showGraph ? (
-          <GraphView
-            key={graphKey}
-            onSelectNote={(noteId) => {
-              const note = notes.find(n => n.id === noteId);
-              if (note) {
-                setSelectedNote(note);
-                setShowGraph(false);
-              }
-            }}
-            currentNoteId={selectedNote?.id}
-            onRefresh={() => setGraphKey(k => k + 1)}
-          />
-        ) : showGitPanel ? (
-          <GitPanel onClose={() => setShowGitPanel(false)} />
-        ) : showPublishPanel ? (
-          <PublishPanel onClose={() => setShowPublishPanel(false)} />
-        ) : (
-          <Editor
-            note={selectedNote}
-            onSave={handleSaveNote}
-            onDelete={handleDeleteNote}
-            settings={settings}
-            syncEnabled={isPluginEnabled('sync-plugin')}
-            onLinkClick={handleLinkClick}
-            scrollToHeading={scrollToHeading}
-            externalEditorMode={editorMode}
-            externalPreviewMode={previewMode}
-            onEditorModeChange={setEditorMode}
-            onPreviewModeChange={setPreviewMode}
-          />
-        )}
+        <div className="main-content-inner">
+          {showGraph ? (
+            <GraphView
+              key={graphKey}
+              onSelectNote={(noteId) => {
+                const note = notes.find(n => n.id === noteId);
+                if (note) {
+                  setSelectedNote(note);
+                  setShowGraph(false);
+                }
+              }}
+              currentNoteId={selectedNote?.id}
+              onRefresh={() => setGraphKey(k => k + 1)}
+            />
+          ) : showGitPanel ? (
+            <GitPanel onClose={() => setShowGitPanel(false)} />
+          ) : showPublishPanel ? (
+            <PublishPanel onClose={() => setShowPublishPanel(false)} />
+          ) : (
+            <Editor
+              note={selectedNote}
+              onSave={handleSaveNote}
+              onDelete={handleDeleteNote}
+              settings={settings}
+              syncEnabled={isPluginEnabled('sync-plugin')}
+              onLinkClick={handleLinkClick}
+              scrollToHeading={scrollToHeading}
+              externalEditorMode={editorMode}
+              externalPreviewMode={previewMode}
+              onEditorModeChange={setEditorMode}
+              onPreviewModeChange={setPreviewMode}
+            />
+          )}
+        </div>
         <StatusBar
           syncEnabled={isPluginEnabled('sync-plugin')}
         />
