@@ -1,3 +1,5 @@
+import type { ComponentType } from 'react';
+
 export interface Note {
   id: string;
   title: string;
@@ -227,12 +229,12 @@ export interface UIPluginConfig {
 
 export interface UIPlugin {
   manifest: UIPluginManifest;
-  component: React.ComponentType<any> | null;
+  component: ComponentType<any> | null;
   settings: Record<string, unknown>;
 }
 
 export interface UIPluginAPI {
-  register: (component: React.ComponentType<any>, options?: Record<string, unknown>) => void;
+  register: (component: ComponentType<any>, options?: Record<string, unknown>) => void;
   getNotes: () => Promise<Note[]>;
   getNote: (id: string) => Promise<Note | null>;
   saveNote: (note: Note) => Promise<void>;

@@ -226,7 +226,7 @@ export class PluginManager {
 
   async unloadAll(): Promise<void> {
     for (const [id, plugin] of this.plugins) {
-      if (plugin.instance.destroy) {
+      if (plugin.instance && typeof plugin.instance.destroy === 'function') {
         await plugin.instance.destroy();
       }
     }
