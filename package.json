@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "跨平台笔记编辑器 - 支持插件系统、云同步、离线功能",
   "main": "dist/main/main.js",
+  "bin": {
+    "biji": "dist/main/cli-entry.js"
+  },
   "author": "Biji Team",
   "license": "MIT",
   "scripts": {
