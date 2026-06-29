@@ -1,5 +1,6 @@
 use crate::models::{Folder, Note};
 use crate::utils::Error;
+use std::io::Write;
 use std::path::Path;
 
 /// 导入导出服务
@@ -113,4 +114,88 @@ pub struct ImportResult {
     pub success: bool,
     pub count: u32,
     pub error: Option<String>,
+}
+
+/// 导出笔记为 ZIP（base64 编码）
+pub fn export_notes_zip(
+    notes: &[Note],
+    get_content: &dyn Fn(&str) -> Result<Option<String>, Error>,
+) -> Result<String, Error> {
+    use zip::write::SimpleFileOptions;
+    let mut buffer = Vec::new();
+    {
+        let mut zip = zip::ZipWriter::new(std::io::Cursor::new(&mut buffer));
+        let opts =
+            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+        for note in notes {
+            let content = note.content.clone();
+            let filename = format!("{}.md", sanitize_filename(&note.title));
+            zip.start_file(&filename, opts)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+            zip.write_all(content.as_bytes())?;
+        }
+        zip.finish()
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+    }
+    Ok(base64::engine::general_purpose::STANDARD.encode(&buffer))
+}
+
+/// 从 ZIP（base64）导入笔记
+pub fn import_notes_zip(
+    base64_data: &str,
+    save_fn: &mut dyn FnMut(Note) -> Result<(), Error>,
+) -> Result<ImportResult, Error> {
+    use std::io::Read;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(base64_data)
+        .map_err(|e| Error::General(format!("Base64 decode: {}", e)))?;
+    let cursor = std::io::Cursor::new(bytes);
+    let mut archive =
+        zip::ZipArchive::new(cursor).map_err(|e| Error::General(format!("ZIP parse: {}", e)))?;
+    let mut count = 0u32;
+    for i in 0..archive.len() {
+        let mut file = archive
+            .by_index(i)
+            .map_err(|e| Error::General(format!("ZIP entry: {}", e)))?;
+        if !file.name().ends_with(".md") {
+            continue;
+        }
+        let mut content = String::new();
+        file.read_to_string(&mut content)?;
+        let title = file.name().trim_end_matches(".md").to_string();
+        let note = Note {
+            id: uuid::Uuid::new_v4().to_string(),
+            title,
+            content,
+            folder_id: None,
+            created_at: chrono::Utc::now().timestamp_millis(),
+            updated_at: chrono::Utc::now().timestamp_millis(),
+            tags: vec![],
+            is_encrypted: false,
+            sync_status: crate::models::SyncStatus::Pending,
+            deleted_at: None,
+            frontmatter: None,
+        };
+        save_fn(note)?;
+        count += 1;
+    }
+    Ok(ImportResult {
+        success: true,
+        count,
+        error: None,
+    })
+}
+
+fn sanitize_filename(name: &str) -> String {
+    name.chars()
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == '_' || c == ' ' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>()
+        .trim()
+        .to_string()
 }
