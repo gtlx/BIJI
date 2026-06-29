@@ -123,7 +123,20 @@ biji-tauri  ──depends on──►  biji-core  ◄──depends on──  bij
 
 ## 快速开始
 
-### 1. Web 浏览器模式（推荐，快速验证）
+### 四种运行模式
+
+Biji Note 支持四种运行模式，前端代码完全一致，只需切换后端适配器：
+
+| 模式 | 后端适配器 | 数据持久 | 启动命令 |
+|------|-----------|----------|----------|
+| 🖥️ **桌面 App** | `TauriBackend` (IPC) | ✅ SQLite | `cargo tauri dev` |
+| 🌐 **纯 Web** | `HttpBackend` (REST) | ✅ SQLite | `pnpm dev` + `cargo run` (HTTP) |
+| 🧪 **开发/演示** | `MockBackend` (内存) | ❌ 刷新丢失 | `pnpm dev` |
+| 💻 **终端 CLI** | 直接调用 `biji-core` | ✅ SQLite | `cargo run -p biji-cli -- list` |
+
+切换后端只需改 `frontend/src/api/index.ts` 一行代码。
+
+### 1. 🧪 Web 浏览器模式（快速体验界面）
 
 不需要安装 Rust，不需要编译，直接在浏览器中运行：
 
@@ -138,7 +151,7 @@ pnpm run dev
 > 此模式使用 `MockBackend`，数据存储在浏览器内存中，刷新页面会重置。  
 > 用于快速体验界面布局和功能逻辑。
 
-### 2. CLI 命令行模式
+### 2. 💻 CLI 命令行模式
 
 需要安装 Rust 工具链（https://rustup.rs）：
 
@@ -151,7 +164,41 @@ cargo run -p biji-cli -- status
 
 > CLI 和桌面 App 共享同一份数据（存储在系统数据目录），数据不会丢失。
 
-### 3. 桌面 App 模式（完整功能）
+### 3. 🖥️ 桌面 App 模式（完整功能）
+
+需要安装 Tauri 系统依赖，然后一次启动：
+
+```bash
+# 开发模式
+cargo tauri dev
+
+# 构建安装包
+cargo tauri build
+```
+
+### 4. 🌐 纯 Web 模式（未来扩展）
+
+添加一个 `HttpBackend` + Rust HTTP Server，前端变成纯 Web 应用：
+
+```typescript
+// frontend/src/api/http-adapter.ts
+export class HttpBackend implements BackendAdapter {
+  async getNotes() {
+    const res = await fetch('http://localhost:8080/api/notes');
+    return res.json();
+  }
+  // ...
+}
+```
+
+```rust
+// biji-server/src/main.rs
+use actix_web::{web, App, HttpServer};
+
+async fn get_notes(app: web::Data<biji_core::App>) -> impl Responder {
+    web::Json(app.db.get_all_notes(false).unwrap())
+}
+```
 
 ```bash
 # 一次性启动
