@@ -1,0 +1,12 @@
+{
+  "name": "biji-rust-workspace",
+  "private": true,
+  "scripts": {
+    "tauri": "cd biji-tauri && cargo tauri",
+    "tauri:dev": "cd biji-tauri && cargo tauri dev",
+    "tauri:build": "cd biji-tauri && cargo tauri build",
+    "cli": "cargo run -p biji-cli --",
+    "frontend:dev": "cd frontend && npm run dev",
+    "frontend:build": "cd frontend && npm run build"
+  }
+}
