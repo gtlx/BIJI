@@ -21,10 +21,10 @@ pub fn extract_headings(markdown: &str) -> Vec<Heading> {
     let parser = Parser::new(markdown);
 
     for event in parser {
-        if let pulldown_cmark::Event::Start(tag) = event {
+        if let pulldown_cmark::Event::Start(ref tag) = event {
             if let pulldown_cmark::Tag::Heading { level, .. } = tag {
                 headings.push(Heading {
-                    level: level as u32,
+                    level: *level as u32,
                     text: String::new(),
                 });
             }

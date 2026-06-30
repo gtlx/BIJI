@@ -19,7 +19,7 @@ pub fn replace_wikilinks(content: &str) -> String {
     re.replace_all(content, |caps: &regex::Captures| {
         let title = &caps[1];
         format!(
-            r#"<a href="#" class="wikilink" data-title="{}">{}</a>"#,
+            r##"<a href="#" class="wikilink" data-title="{}">{}</a>"##,
             title, title
         )
     })

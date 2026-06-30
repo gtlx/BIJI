@@ -1,5 +1,6 @@
 use crate::database::Database;
-use crate::models::{Note, SearchQuery, SyncStatus};
+use crate::models::note::SyncStatus;
+use crate::models::{Note, SearchQuery};
 use crate::utils::Error;
 
 impl Database {

@@ -51,7 +51,7 @@ impl Database {
                 created_at: row.get("created_at")?,
                 updated_at: row.get("updated_at")?,
                 is_encrypted: row.get::<_, i32>("is_encrypted")? != 0,
-                sync_status: crate::models::SyncStatus::Synced,
+                sync_status: crate::models::note::SyncStatus::Synced,
                 deleted_at: row.get("deleted_at")?,
                 tags: Vec::new(),
                 frontmatter: None,
@@ -114,7 +114,7 @@ impl Database {
                 created_at: row.get("created_at")?,
                 updated_at: row.get("updated_at")?,
                 is_encrypted: row.get::<_, i32>("is_encrypted")? != 0,
-                sync_status: crate::models::SyncStatus::Synced,
+                sync_status: crate::models::note::SyncStatus::Synced,
                 deleted_at: row.get("deleted_at")?,
                 tags: Vec::new(),
                 frontmatter: None,
@@ -150,10 +150,14 @@ impl Database {
 
         let nodes: Vec<GraphNode> = notes
             .into_iter()
-            .map(|n| GraphNode {
-                id: n.id,
-                title: n.title,
-                link_count: node_map.get(&n.id).copied().unwrap_or(0),
+            .map(|n| {
+                let node_id = n.id.clone();
+                let count = node_map.get(&node_id).copied().unwrap_or(0);
+                GraphNode {
+                    id: node_id,
+                    title: n.title,
+                    link_count: count,
+                }
             })
             .collect();
 

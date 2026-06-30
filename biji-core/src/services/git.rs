@@ -1,5 +1,6 @@
 use crate::utils::Error;
 use git2::{Repository, StatusOptions};
+use std::io::Write;
 use std::path::Path;
 
 /// Git 服务 — 基于 libgit2 (git2-rs)

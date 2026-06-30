@@ -53,13 +53,12 @@ impl Database {
     }
 
     /// 获取存储路径
-    pub fn storage_path(&self) -> &str {
+    pub fn storage_path(&self) -> String {
         // 从 db_path 截取目录
         Path::new(&self.db_path)
             .parent()
-            .map(|p| p.to_string_lossy())
-            .as_deref()
-            .unwrap_or("")
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default()
     }
 
     /// 获取原始连接（内部使用）

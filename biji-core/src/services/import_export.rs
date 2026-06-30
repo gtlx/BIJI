@@ -1,3 +1,4 @@
+use base64::Engine;
 use crate::models::{Folder, Note};
 use crate::utils::Error;
 use std::io::Write;
@@ -62,7 +63,7 @@ impl ImportExportService {
                     updated_at: chrono::Utc::now().timestamp_millis(),
                     tags: vec![],
                     is_encrypted: false,
-                    sync_status: crate::models::SyncStatus::Pending,
+                    sync_status: crate::models::note::SyncStatus::Pending,
                     deleted_at: None,
                     frontmatter: None,
                 };
@@ -172,7 +173,7 @@ pub fn import_notes_zip(
             updated_at: chrono::Utc::now().timestamp_millis(),
             tags: vec![],
             is_encrypted: false,
-            sync_status: crate::models::SyncStatus::Pending,
+            sync_status: crate::models::note::SyncStatus::Pending,
             deleted_at: None,
             frontmatter: None,
         };

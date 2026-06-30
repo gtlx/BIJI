@@ -1,4 +1,5 @@
-use biji_core::models::{SearchQuery, SyncStatus};
+use biji_core::models::note::SyncStatus;
+use biji_core::models::SearchQuery;
 use biji_core::App;
 use clap::{Parser, Subcommand};
 

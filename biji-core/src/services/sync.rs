@@ -1,5 +1,6 @@
 use crate::database::Database;
-use crate::models::{SyncResult, SyncStatus};
+use crate::models::sync::SyncStatus;
+use crate::models::SyncResult;
 use crate::services::webdav::WebDAVClient;
 use crate::utils::Error;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -99,14 +100,14 @@ impl SyncManager {
     }
 
     /// 获取同步状态
-    pub fn get_status(&self) -> crate::models::SyncStatus {
+    pub fn get_status(&self) -> crate::models::sync::SyncStatus {
         let pending = self
             .database
             .get_pending_sync_notes()
             .map(|n| n.len() as u32)
             .unwrap_or(0);
 
-        crate::models::SyncStatus {
+        SyncStatus {
             is_syncing: self.is_syncing.load(Ordering::SeqCst),
             last_sync: *self.last_sync_time.lock().unwrap(),
             pending,
