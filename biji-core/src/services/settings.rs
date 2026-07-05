@@ -13,7 +13,10 @@ impl SettingsManager {
     pub fn load(settings_path: &Path) -> Result<Self, Error> {
         let settings = if settings_path.exists() {
             let content = std::fs::read_to_string(settings_path)?;
-            serde_json::from_str(&content).unwrap_or_default()
+            serde_json::from_str(&content).unwrap_or_else(|e| {
+                log::warn!("Failed to parse settings.json: {}; using defaults", e);
+                AppSettings::default()
+            })
         } else {
             AppSettings::default()
         };
@@ -52,7 +55,7 @@ impl SettingsManager {
 
     /// 持久化到文件
     fn save(&self) -> Result<(), Error> {
-        let dir = Path::new(&self.settings_path).parent().unwrap();
+        let dir = Path::new(&self.settings_path).parent().expect("settings_path should have a parent directory");
         std::fs::create_dir_all(dir)?;
         let content = serde_json::to_string_pretty(&self.settings)?;
         std::fs::write(&self.settings_path, content)?;
@@ -85,7 +88,7 @@ impl SettingsManager {
     }
 
     fn ui_plugins_path(settings_path: &str) -> String {
-        let dir = Path::new(settings_path).parent().unwrap();
+        let dir = Path::new(settings_path).parent().expect("settings_path should have a parent directory");
         dir.join("ui-plugins.json").to_string_lossy().to_string()
     }
 
@@ -95,7 +98,10 @@ impl SettingsManager {
         let path = std::path::Path::new(path);
         if path.exists() {
             let content = std::fs::read_to_string(path)?;
-            Ok(serde_json::from_str(&content).unwrap_or_default())
+            Ok(serde_json::from_str(&content).unwrap_or_else(|e| {
+                log::warn!("Failed to parse ui-plugins.json: {}; using empty", e);
+                std::collections::HashMap::new()
+            }))
         } else {
             Ok(std::collections::HashMap::new())
         }

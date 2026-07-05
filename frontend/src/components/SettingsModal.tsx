@@ -65,6 +65,13 @@ export function SettingsModal({ settings, plugins, onClose, onSave, onTogglePlug
                   <span>字体大小</span>
                   <input type="number" value={localSettings.font_size} onChange={e => setLocalSettings({ ...localSettings, font_size: parseInt(e.target.value) || 14 })} />
                 </label>
+                <label className="settings-field">
+                  <span>工具栏位置</span>
+                  <select value={localSettings.toolbar_position} onChange={e => setLocalSettings({ ...localSettings, toolbar_position: e.target.value as any })}>
+                    <option value="left">左侧</option>
+                    <option value="right">右侧</option>
+                  </select>
+                </label>
               </div>
             )}
 

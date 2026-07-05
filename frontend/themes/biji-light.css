@@ -1,0 +1,37 @@
+/* Biji Note 默认亮色主题 */
+:root {
+  --sidebar-width: 240px;
+  --note-list-width: 280px;
+  --right-panel-width: 260px;
+  --toolbar-width: 48px;
+
+  --bg-primary: #ffffff;
+  --bg-secondary: #f7f8fa;
+  --bg-tertiary: #eef0f4;
+  --text-primary: #1e1e2e;
+  --text-secondary: #6b6f7b;
+  --text-muted: #9ca0ab;
+  --text-tertiary: #b9bcc6;
+  --border-color: #e2e5ec;
+  --accent-color: #5b7cfa;
+  --accent-hover: #4a6ae6;
+  --accent-bg: #eef1ff;
+  --danger-color: #e74c3c;
+  --danger-bg: #fde8e8;
+  --danger-border: #f5b7b1;
+  --success-color: #27ae60;
+  --success-bg: #e6f7ed;
+  --success-border: #b7ebc5;
+  --warning-color: #f39c12;
+  --warning-bg: #fef7e0;
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  --radius-sm: 4px;
+  --radius: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  --shadow: 0 1px 3px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.06);
+  --shadow-lg: 0 8px 30px rgba(0,0,0,0.08);
+}

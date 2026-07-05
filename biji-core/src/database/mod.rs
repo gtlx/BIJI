@@ -6,13 +6,10 @@ mod search;
 mod tag_repo;
 
 pub use connection::*;
-pub use folder_repo::*;
-pub use link_repo::*;
-pub use note_repo::*;
-pub use search::*;
-pub use tag_repo::*;
 
-use crate::models::*;
+use crate::models::note::SyncStatus;
+use crate::models::Note;
+use crate::utils::frontmatter::parse_frontmatter;
 use crate::utils::Error;
 use rusqlite::Connection;
 use std::path::Path;
@@ -46,13 +43,18 @@ impl Database {
 
     /// 执行 SQL 迁移
     fn run_migrations(&self) -> Result<(), Error> {
-        let conn = self.conn.lock().unwrap();
+        let conn = self.conn.lock().expect("Database mutex poisoned in run_migrations");
         let sql = include_str!("../../migrations/001_init.sql");
         conn.execute_batch(sql)?;
         Ok(())
     }
 
-    /// 获取存储路径
+    /// 获取数据库文件路径
+    pub fn db_path(&self) -> &str {
+        &self.db_path
+    }
+
+    /// 获取存储目录路径
     pub fn storage_path(&self) -> String {
         // 从 db_path 截取目录
         Path::new(&self.db_path)
@@ -63,6 +65,29 @@ impl Database {
 
     /// 获取原始连接（内部使用）
     pub(crate) fn conn(&self) -> std::sync::MutexGuard<'_, Connection> {
-        self.conn.lock().unwrap()
+        self.conn.lock().expect("Database mutex poisoned in conn()")
     }
+}
+
+/// 从 SQLite 行构建 Note（含 frontmatter 解析）
+pub(crate) fn note_from_row(row: &rusqlite::Row) -> rusqlite::Result<Note> {
+    let content: String = row.get("content")?;
+    let frontmatter = parse_frontmatter(&content).map(|(fm, _)| fm);
+    Ok(Note {
+        id: row.get("id")?,
+        title: row.get("title")?,
+        content,
+        folder_id: row.get("folder_id")?,
+        created_at: row.get("created_at")?,
+        updated_at: row.get("updated_at")?,
+        is_encrypted: row.get::<_, i32>("is_encrypted")? != 0,
+        sync_status: serde_json::from_str(&format!(
+            "\"{}\"",
+            row.get::<_, String>("sync_status")?
+        ))
+        .unwrap_or(SyncStatus::Pending),
+        deleted_at: row.get("deleted_at")?,
+        tags: Vec::new(),
+        frontmatter,
+    })
 }

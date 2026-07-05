@@ -8,6 +8,7 @@
   border-right: 1px solid var(--border-color);
   transition: width 0.2s ease, min-width 0.2s ease;
   overflow: hidden;
+  position: relative;
 }
 
 .sidebar.collapsed {
@@ -29,11 +30,12 @@
 }
 
 .app-title {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--accent-color);
   margin: 0;
   white-space: nowrap;
+  letter-spacing: -0.3px;
 }
 
 .sidebar-collapse-btn {
@@ -52,6 +54,7 @@
 .sidebar-collapse-btn:hover {
   background: var(--bg-primary);
   color: var(--text-primary);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
 }
 
 .sidebar-buttons {
@@ -264,6 +267,7 @@
   background: none;
   border: none;
   cursor: pointer;
+  position: relative;
 }
 
 .nav-item:hover {
@@ -272,8 +276,20 @@
 }
 
 .nav-item.active {
-  background-color: var(--accent-color);
-  color: white;
+  background-color: var(--accent-bg);
+  color: var(--accent-color);
+  font-weight: 500;
+}
+
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  background: var(--accent-color);
+  border-radius: 0 3px 3px 0;
 }
 
 .nav-item svg {
@@ -293,21 +309,23 @@
 }
 
 .nav-section {
-  margin-top: 16px;
+  margin-top: 20px;
 }
 
 .nav-section-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
+  padding: 6px 12px;
+  margin-bottom: 4px;
 }
 
 .nav-section-title {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: var(--text-tertiary);
   text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .nav-action-btn {
@@ -317,6 +335,9 @@
   background: none;
   border: none;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: all 0.15s ease;
 }
 

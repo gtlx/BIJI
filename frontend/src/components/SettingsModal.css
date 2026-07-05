@@ -15,7 +15,7 @@
 }
 
 .settings-section-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text-secondary);
   margin-bottom: 12px;
@@ -61,52 +61,99 @@
   flex: 1;
 }
 
+.settings-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
 .settings-tabs {
   display: flex;
-  gap: 4px;
-  padding: 0 16px;
-  border-bottom: 1px solid var(--border-color);
-  margin-bottom: 16px;
+  flex-direction: column;
+  width: 140px;
+  border-right: 1px solid var(--border-color);
+  padding: 12px 0;
+  flex-shrink: 0;
+  gap: 2px;
 }
 
-.tab-btn {
-  padding: 10px 16px;
+.settings-tab {
+  padding: 9px 16px;
+  text-align: left;
   background: none;
   border: none;
-  color: var(--text-secondary);
   cursor: pointer;
-  border-bottom: 2px solid transparent;
-  transition: all 0.15s ease;
+  color: var(--text-primary);
+  font-size: 13px;
+  transition: all 0.15s;
+  margin: 0 8px;
+  border-radius: var(--radius-sm);
 }
 
-.tab-btn:hover {
+.settings-tab:hover {
+  background: var(--bg-tertiary);
   color: var(--text-primary);
 }
 
-.tab-btn.active {
+.settings-tab.active {
+  background: var(--accent-bg);
   color: var(--accent-color);
-  border-bottom-color: var(--accent-color);
+  font-weight: 500;
 }
 
-.settings-tabs-content {
-  max-height: 400px;
+.settings-panel {
+  flex: 1;
+  padding: 20px;
   overflow-y: auto;
 }
 
-.settings-item input.textarea {
-  width: 100%;
-  min-height: 100px;
-  resize: vertical;
+.settings-section h3 {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.plugin-toggle-item {
+.settings-field {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px;
-  background-color: var(--bg-secondary);
-  border-radius: var(--radius-md);
-  margin-bottom: 8px;
+  padding: 8px 0;
+  gap: 16px;
+}
+
+.settings-field span {
+  font-size: 13px;
+  min-width: 80px;
+  flex-shrink: 0;
+}
+
+.settings-field select,
+.settings-field input[type="text"],
+.settings-field input[type="password"],
+.settings-field input[type="number"],
+.settings-field input[type="checkbox"] {
+  flex: 1;
+  padding: 7px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 13px;
+  transition: border-color 0.15s;
+}
+
+.settings-field select:focus,
+.settings-field input[type="text"]:focus,
+.settings-field input[type="password"]:focus,
+.settings-field input[type="number"]:focus {
+  border-color: var(--accent-color);
+}
+
+.settings-field input[type="checkbox"] {
+  max-width: 20px;
+  accent-color: var(--accent-color);
 }
 
 .plugin-info {

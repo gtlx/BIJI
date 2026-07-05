@@ -49,7 +49,22 @@ CREATE INDEX IF NOT EXISTS idx_notes_updated ON notes(updated_at);
 CREATE INDEX IF NOT EXISTS idx_links_source ON links(source_id);
 CREATE INDEX IF NOT EXISTS idx_links_target ON links(target_title);
 
--- FTS5 全文搜索（v2 可添加）
--- CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
---     title, content, content='notes', content_rowid='rowid'
--- );
+CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
+    title, content, content='notes', content_rowid='rowid'
+);
+
+-- FTS5 同步触发器
+CREATE TRIGGER IF NOT EXISTS notes_ai AFTER INSERT ON notes BEGIN
+    INSERT INTO notes_fts(rowid, title, content) VALUES (new.rowid, new.title, new.content);
+END;
+
+CREATE TRIGGER IF NOT EXISTS notes_ad AFTER DELETE ON notes BEGIN
+    INSERT INTO notes_fts(notes_fts, rowid, title, content) VALUES('delete', old.rowid, old.title, old.content);
+END;
+
+CREATE TRIGGER IF NOT EXISTS notes_au AFTER UPDATE ON notes BEGIN
+    INSERT INTO notes_fts(notes_fts, rowid, title, content) VALUES('delete', old.rowid, old.title, old.content);
+    INSERT INTO notes_fts(rowid, title, content) VALUES (new.rowid, new.title, new.content);
+END;
+
+INSERT INTO notes_fts(notes_fts) VALUES('rebuild');

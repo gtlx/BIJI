@@ -24,7 +24,11 @@ Thumbs.db
 # Build
 biji-tauri/target/
 biji-tauri/icons/
+biji-tauri/gen/
 
 # Env
 .env
 .env.local
+
+# github
+.github

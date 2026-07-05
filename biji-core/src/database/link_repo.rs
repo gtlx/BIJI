@@ -34,66 +34,67 @@ impl Database {
             None => return Ok(Vec::new()),
         };
 
-        let conn = self.conn();
-        let mut stmt = conn.prepare(
-            "SELECT n.* FROM notes n
-             INNER JOIN links l ON n.id = l.source_id
-             WHERE l.target_title = ?1 AND n.id != ?2 AND n.deleted_at IS NULL
-             ORDER BY n.updated_at DESC",
-        )?;
+        let mut notes: Vec<crate::models::Note> = {
+            let conn = self.conn();
+            let mut stmt = conn.prepare(
+                "SELECT n.* FROM notes n
+                 INNER JOIN links l ON n.id = l.source_id
+                 WHERE l.target_title = ?1 AND n.id != ?2 AND n.deleted_at IS NULL
+                 ORDER BY n.updated_at DESC",
+            )?;
 
-        let rows = stmt.query_map(rusqlite::params![note.title, note_id], |row| {
-            Ok(crate::models::Note {
-                id: row.get("id")?,
-                title: row.get("title")?,
-                content: row.get("content")?,
-                folder_id: row.get("folder_id")?,
-                created_at: row.get("created_at")?,
-                updated_at: row.get("updated_at")?,
-                is_encrypted: row.get::<_, i32>("is_encrypted")? != 0,
-                sync_status: crate::models::note::SyncStatus::Synced,
-                deleted_at: row.get("deleted_at")?,
-                tags: Vec::new(),
-                frontmatter: None,
-            })
-        })?;
+            let rows = stmt.query_map(rusqlite::params![note.title, note_id], |row| {
+                crate::database::note_from_row(row)
+            })?;
 
-        let mut notes = Vec::new();
-        for row in rows {
-            let mut note = row?;
-            note.tags = self.get_note_tags(&note.id)?;
-            notes.push(note);
-        }
+            let mut notes = Vec::new();
+            for row in rows {
+                notes.push(row?);
+            }
+            notes
+        };
+        self.load_tags_for_notes(&mut notes)?;
         Ok(notes)
     }
 
     /// 获取所有链接关系
     pub fn get_all_links(&self) -> Result<Vec<NoteLink>, Error> {
-        let conn = self.conn();
-        let mut stmt = conn.prepare(
-            "SELECT l.source_id, l.target_title, l.link_type
-             FROM links l
-             INNER JOIN notes s ON l.source_id = s.id
-             WHERE s.deleted_at IS NULL",
-        )?;
+        let raw_links: Vec<(String, String, String)> = {
+            let conn = self.conn();
+            let mut stmt = conn.prepare(
+                "SELECT l.id, l.source_id, l.target_title
+                 FROM links l
+                 INNER JOIN notes s ON l.source_id = s.id
+                 WHERE s.deleted_at IS NULL",
+            )?;
 
-        let rows = stmt.query_map([], |row| {
-            let source_id: String = row.get("source_id")?;
-            let target_title: String = row.get("target_title")?;
-            Ok((source_id, target_title))
-        })?;
+            let rows = stmt.query_map([], |row| {
+                let id: String = row.get("id")?;
+                let source_id: String = row.get("source_id")?;
+                let target_title: String = row.get("target_title")?;
+                Ok((id, source_id, target_title))
+            })?;
+
+            let mut raw = Vec::new();
+            for row in rows {
+                raw.push(row?);
+            }
+            raw
+        };
 
         let mut links = Vec::new();
-        for row in rows {
-            let (source_id, target_title) = row?;
-            let source = self.get_note(&source_id)?.unwrap(); // 应有数据
-            let target = self.find_note_by_title(&target_title)?;
+        for (link_id, source_id, target_title) in &raw_links {
+            let source = match self.get_note(source_id)? {
+                Some(note) => note,
+                None => continue,
+            };
+            let target = self.find_note_by_title(target_title)?;
 
             links.push(NoteLink {
-                id: uuid::Uuid::new_v4().to_string(),
+                id: link_id.clone(),
                 source,
                 target,
-                target_title,
+                target_title: target_title.clone(),
             });
         }
         Ok(links)
@@ -101,33 +102,23 @@ impl Database {
 
     /// 按标题查找笔记
     pub fn find_note_by_title(&self, title: &str) -> Result<Option<crate::models::Note>, Error> {
-        let conn = self.conn();
-        let mut stmt =
-            conn.prepare("SELECT * FROM notes WHERE title = ?1 AND deleted_at IS NULL")?;
-
-        let mut rows = stmt.query_map(rusqlite::params![title], |row| {
-            Ok(crate::models::Note {
-                id: row.get("id")?,
-                title: row.get("title")?,
-                content: row.get("content")?,
-                folder_id: row.get("folder_id")?,
-                created_at: row.get("created_at")?,
-                updated_at: row.get("updated_at")?,
-                is_encrypted: row.get::<_, i32>("is_encrypted")? != 0,
-                sync_status: crate::models::note::SyncStatus::Synced,
-                deleted_at: row.get("deleted_at")?,
-                tags: Vec::new(),
-                frontmatter: None,
-            })
-        })?;
-
-        match rows.next() {
-            Some(Ok(mut note)) => {
-                note.tags = self.get_note_tags(&note.id)?;
-                Ok(Some(note))
+        let mut note: Option<crate::models::Note> = {
+            let conn = self.conn();
+            let mut stmt =
+                conn.prepare("SELECT * FROM notes WHERE title = ?1 AND deleted_at IS NULL")?;
+            let mut rows = stmt.query_map(rusqlite::params![title], |row| {
+                crate::database::note_from_row(row)
+            })?;
+            match rows.next() {
+                Some(Ok(n)) => Ok::<_, crate::utils::Error>(Some(n)),
+                _ => Ok(None),
             }
-            _ => Ok(None),
+        }?;
+
+        if let Some(ref mut n) = note {
+            n.tags = self.get_note_tags(&n.id)?;
         }
+        Ok(note)
     }
 
     /// 构建知识图谱数据

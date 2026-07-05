@@ -1,5 +1,12 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+
+/// 工具栏位置
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub enum ToolbarPosition {
+    #[default]
+    Left,
+    Right,
+}
 
 /// 应用设置
 /// 对应 TypeScript 的 AppSettings 接口
@@ -25,13 +32,15 @@ pub struct AppSettings {
     pub markdown_preview_mode: MarkdownPreviewMode,
     pub storage_path: String,
     pub template: String,
+    #[serde(default)]
+    pub toolbar_position: ToolbarPosition,
     pub custom_css: String,
     pub ui_custom_css: UICustomCSS,
     pub zoom: u32,
     pub shortcuts: ShortcutSettings,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ThemeMode {
     Light,
     Dark,
@@ -147,6 +156,7 @@ impl Default for AppSettings {
             markdown_preview_mode: MarkdownPreviewMode::Live,
             storage_path: String::new(),
             template: "blank".into(),
+            toolbar_position: ToolbarPosition::Left,
             custom_css: String::new(),
             ui_custom_css: UICustomCSS::default(),
             zoom: 100,

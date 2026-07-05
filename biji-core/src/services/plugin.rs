@@ -46,8 +46,8 @@ pub fn built_in_plugins() -> Vec<Plugin> {
 
 /// 插件管理器
 pub struct PluginManager {
-    plugins_dir: String,
-    database: std::sync::Arc<Database>,
+    _plugins_dir: String,
+    _database: std::sync::Arc<Database>,
     plugins: HashMap<String, Plugin>,
 }
 
@@ -59,8 +59,8 @@ impl PluginManager {
         }
 
         Self {
-            plugins_dir: plugins_dir.to_string_lossy().to_string(),
-            database,
+            _plugins_dir: plugins_dir.to_string_lossy().to_string(),
+            _database: database,
             plugins,
         }
     }

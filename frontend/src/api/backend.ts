@@ -56,6 +56,7 @@ export interface AppSettings {
   markdown_preview_mode: 'live' | 'edit' | 'preview';
   storage_path: string;
   template: string;
+  toolbar_position: 'left' | 'right';
   custom_css: string;
   ui_custom_css: UICustomCSS;
   zoom: number;

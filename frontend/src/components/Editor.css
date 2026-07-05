@@ -3,9 +3,11 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 24px;
+  padding: 32px;
   overflow: hidden;
   background: var(--bg-primary);
+  max-width: 860px;
+  margin: 0 auto;
 }
 
 .editor-header {
@@ -14,16 +16,20 @@
   justify-content: space-between;
   margin-bottom: 16px;
   max-width: 100%;
+  gap: 12px;
 }
 
 .editor-title {
   flex: 1;
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 700;
   border: none;
   outline: none;
   background: transparent;
   color: var(--text-primary);
+  letter-spacing: -0.5px;
+  line-height: 1.3;
+  min-height: 36px;
 }
 
 .editor-title::placeholder {
@@ -33,14 +39,15 @@
 .editor-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .editor-tags {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   margin-bottom: 16px;
   padding-bottom: 16px;
   border-bottom: 1px solid var(--border-color);
@@ -50,11 +57,12 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 10px;
-  background-color: rgba(155, 89, 182, 0.1);
+  padding: 3px 10px;
+  background-color: var(--accent-bg);
   border-radius: 12px;
   font-size: 12px;
-  color: #9b59b6;
+  color: var(--accent-color);
+  font-weight: 500;
 }
 
 .tag::before {
@@ -72,10 +80,14 @@
   font-size: 14px;
   line-height: 1;
   cursor: pointer;
+  color: inherit;
+  opacity: 0.6;
+  transition: all 0.15s;
 }
 
 .tag-remove:hover {
-  background-color: var(--border-color);
+  opacity: 1;
+  background-color: rgba(0,0,0,0.1);
 }
 
 .tag-input {
@@ -102,6 +114,7 @@
   resize: none;
   line-height: 1.8;
   padding: 0;
+  font-size: 15px;
 }
 
 .editor-content::placeholder {
@@ -128,7 +141,7 @@
   gap: 2px;
   padding: 3px;
   background-color: var(--bg-tertiary);
-  border-radius: 6px;
+  border-radius: 8px;
   border: 1px solid var(--border-color);
 }
 
@@ -136,9 +149,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 36px;
-  border-radius: 4px;
+  width: 36px;
+  height: 32px;
+  border-radius: 5px;
   font-size: 12px;
   font-weight: 600;
   color: var(--text-secondary);
@@ -149,8 +162,8 @@
 }
 
 .mode-btn svg {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
 }
 
 .mode-btn:hover {
@@ -178,11 +191,12 @@
 
 .markdown-preview {
   flex: 1;
-  padding: 16px;
+  padding: 20px;
   background-color: var(--bg-secondary);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius);
   overflow-y: auto;
   line-height: 1.8;
+  font-size: 15px;
 }
 
 .markdown-preview h1 {
@@ -190,12 +204,15 @@
   font-weight: 700;
   margin-bottom: 16px;
   color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 8px;
 }
 
 .markdown-preview h2 {
   font-size: 20px;
   font-weight: 600;
   margin-bottom: 12px;
+  margin-top: 24px;
   color: var(--text-primary);
 }
 
@@ -203,27 +220,29 @@
   font-size: 18px;
   font-weight: 600;
   margin-bottom: 8px;
+  margin-top: 20px;
   color: var(--text-primary);
 }
 
 .markdown-preview p {
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .markdown-preview code {
   padding: 2px 6px;
   background-color: var(--bg-tertiary);
   border-radius: var(--radius-sm);
-  font-family: 'Fira Code', monospace;
+  font-family: 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace;
   font-size: 13px;
 }
 
 .markdown-preview pre {
   padding: 16px;
   background-color: var(--bg-tertiary);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius);
   overflow-x: auto;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border-color);
 }
 
 .markdown-preview pre code {
@@ -231,9 +250,44 @@
   background: none;
 }
 
+.markdown-preview ul, .markdown-preview ol {
+  padding-left: 24px;
+  margin-bottom: 16px;
+}
+
 .markdown-preview li {
-  margin-left: 20px;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+}
+
+.markdown-preview blockquote {
+  border-left: 3px solid var(--accent-color);
+  padding: 8px 16px;
+  margin: 16px 0;
+  background: var(--bg-tertiary);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  color: var(--text-secondary);
+}
+
+.markdown-preview img {
+  max-width: 100%;
+  border-radius: var(--radius);
+}
+
+.markdown-preview table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 16px;
+}
+
+.markdown-preview th, .markdown-preview td {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  text-align: left;
+}
+
+.markdown-preview th {
+  background: var(--bg-tertiary);
+  font-weight: 600;
 }
 
 .markdown-live .editor-content,

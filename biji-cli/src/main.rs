@@ -223,7 +223,7 @@ fn cmd_status(app: &App) -> Result<(), biji_core::utils::Error> {
 
     println!("Biji Note Status");
     println!("================");
-    println!("Database:  {:?}", std::path::Path::new(".").join("biji.db"));
+    println!("Database:  {}", app.db.db_path());
     println!("Notes:     {}", notes.len());
     println!("Folders:   {}", folders.len());
     println!(
@@ -300,7 +300,7 @@ fn cmd_export(app: &App, path: &str) -> Result<(), biji_core::utils::Error> {
     // 导出根目录笔记
     if let Some(root_notes) = by_folder.get(&None) {
         for note in root_notes {
-            let filename = format!("{}.md", slugify(&note.title));
+            let filename = format!("{}.md", biji_core::utils::slugify(&note.title));
             let content = format!("# {}\n\n{}", note.title, note.content);
             std::fs::write(export_path.join(&filename), content)?;
         }
@@ -310,9 +310,9 @@ fn cmd_export(app: &App, path: &str) -> Result<(), biji_core::utils::Error> {
     for note in &notes {
         if let Some(ref fid) = note.folder_id {
             if let Some(fname) = folder_name.get(&Some(fid.clone())) {
-                let dir = export_path.join(slugify(fname));
+                let dir = export_path.join(biji_core::utils::slugify(fname));
                 std::fs::create_dir_all(&dir)?;
-                let filename = format!("{}.md", slugify(&note.title));
+                let filename = format!("{}.md", biji_core::utils::slugify(&note.title));
                 let content = format!("# {}\n\n{}", note.title, note.content);
                 std::fs::write(dir.join(&filename), content)?;
             }
@@ -323,12 +323,4 @@ fn cmd_export(app: &App, path: &str) -> Result<(), biji_core::utils::Error> {
     Ok(())
 }
 
-fn slugify(text: &str) -> String {
-    text.to_lowercase()
-        .chars()
-        .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_' || *c == ' ')
-        .collect::<String>()
-        .trim()
-        .replace(' ', "_")
-        .replace("__", "_")
-}
+

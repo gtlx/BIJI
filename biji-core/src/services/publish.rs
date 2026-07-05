@@ -40,7 +40,11 @@ impl PublishService {
             StaticSiteGenerator::VitePress => "vitepress",
         };
 
-        let output = Command::new("which").arg(cmd).output()?;
+        let output = if cfg!(target_os = "windows") {
+            Command::new("where").arg(cmd).output()?
+        } else {
+            Command::new("which").arg(cmd).output()?
+        };
 
         if output.status.success() {
             let version_output = Command::new(cmd).arg("--version").output().ok();
@@ -80,7 +84,7 @@ impl PublishService {
 
         let notes = self.get_all_notes()?;
         for note in &notes {
-            let filename = format!("{}.md", slugify(&note.title));
+            let filename = format!("{}.md", crate::utils::slugify(&note.title));
             std::fs::write(content_path.join(&filename), &note.content)?;
         }
 
@@ -133,7 +137,7 @@ theme = "ananke"
 
         let notes = self.get_all_notes()?;
         for note in &notes {
-            let filename = format!("{}.md", slugify(&note.title));
+            let filename = format!("{}.md", crate::utils::slugify(&note.title));
             std::fs::write(src_path.join(&filename), &note.content)?;
         }
 
@@ -165,7 +169,7 @@ theme = "ananke"
 
         let notes = self.get_all_notes()?;
         for note in &notes {
-            let filename = format!("{}.md", slugify(&note.title));
+            let filename = format!("{}.md", crate::utils::slugify(&note.title));
             std::fs::write(docs_path.join(&filename), &note.content)?;
         }
 
@@ -175,16 +179,30 @@ theme = "ananke"
             format!("# {}", config.site_name.as_deref().unwrap_or("My Notes")),
         )?;
 
-        Ok(PublishResult {
-            success: true,
-            output_path: Some(
-                site_path
-                    .join(".vitepress/dist")
-                    .to_string_lossy()
-                    .to_string(),
-            ),
-            error: None,
-        })
+        let output = Command::new("npx")
+            .args(["vitepress", "build", "docs"])
+            .current_dir(&site_path)
+            .output()?;
+
+        if output.status.success() {
+            Ok(PublishResult {
+                success: true,
+                output_path: Some(
+                    site_path
+                        .join(".vitepress/dist")
+                        .to_string_lossy()
+                        .to_string(),
+                ),
+                error: None,
+            })
+        } else {
+            let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+            Ok(PublishResult {
+                success: false,
+                output_path: None,
+                error: Some(stderr),
+            })
+        }
     }
 
     fn get_all_notes(&self) -> Result<Vec<SimpleNote>, Error> {
@@ -227,12 +245,4 @@ struct SimpleNote {
     content: String,
 }
 
-fn slugify(text: &str) -> String {
-    text.to_lowercase()
-        .chars()
-        .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_' || *c == ' ')
-        .collect::<String>()
-        .trim()
-        .replace(' ', "-")
-        .replace("--", "-")
-}
+

@@ -204,9 +204,6 @@ export function Sidebar({
 
           <div className="sidebar-footer">
             <button className="btn btn-primary sidebar-new-btn" onClick={onNewNote}>
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-              </svg>
               新建笔记
             </button>
             <button className="nav-item" onClick={onOpenSettings}>

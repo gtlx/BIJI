@@ -30,11 +30,4 @@ pub struct WebDAVConfig {
     pub base_path: Option<String>,
 }
 
-/// 网络同步数据包
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WebSyncData {
-    pub notes: Vec<super::Note>,
-    pub folders: Vec<super::Folder>,
-    pub last_modified: i64,
-    pub device_id: String,
-}
+

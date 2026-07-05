@@ -5,28 +5,28 @@ use std::sync::Arc;
 fn test_app() -> (tempfile::TempDir, Arc<biji_core::database::Database>) {
     let dir = tempfile::tempdir().unwrap();
     let app = App::init(dir.path()).unwrap();
-    let _ = &app; // keep app alive
+    let _ = &app;
     (dir, app.db.clone())
+}
+
+fn make_note(title: &str) -> Note {
+    Note {
+        id: uuid::Uuid::new_v4().to_string(),
+        title: title.into(),
+        content: format!("# {}\n\n这是内容", title),
+        folder_id: None,
+        created_at: chrono::Utc::now().timestamp_millis(),
+        updated_at: chrono::Utc::now().timestamp_millis(),
+        tags: vec![],
+        is_encrypted: false,
+        sync_status: SyncStatus::Pending,
+        deleted_at: None,
+        frontmatter: None,
+    }
 }
 
 mod note_tests {
     use super::*;
-
-    fn make_note(title: &str) -> Note {
-        Note {
-            id: uuid::Uuid::new_v4().to_string(),
-            title: title.into(),
-            content: format!("# {}\n\n这是内容", title),
-            folder_id: None,
-            created_at: chrono::Utc::now().timestamp_millis(),
-            updated_at: chrono::Utc::now().timestamp_millis(),
-            tags: vec![],
-            is_encrypted: false,
-            sync_status: SyncStatus::Pending,
-            deleted_at: None,
-            frontmatter: None,
-        }
-    }
 
     #[test]
     fn test_create_and_get_note() {
@@ -199,7 +199,6 @@ mod wikilink_tests {
         note.content = "参考 [[笔记A]] 和 [[笔记B]] 的内容".into();
         db.save_note(&note).unwrap();
 
-        // 保存后检查 links 表
         let links = db.get_all_links().unwrap();
         assert_eq!(links.len(), 2);
         assert_eq!(links[0].target_title, "笔记A");
@@ -257,5 +256,82 @@ mod pending_sync_tests {
         db.mark_synced(&[note.id.clone()]).unwrap();
         let pending = db.get_pending_sync_notes().unwrap();
         assert_eq!(pending.len(), 0);
+    }
+}
+
+mod encryption_tests {
+    use biji_core::services::EncryptionService;
+
+    fn test_key_64() -> String {
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".into()
+    }
+
+    #[test]
+    fn test_encrypt_decrypt_roundtrip() {
+        let enc = EncryptionService::new(&test_key_64());
+        let original = "Hello BIJI Note! 你好世界";
+        let encrypted = enc.encrypt(original).unwrap();
+        assert_ne!(encrypted.as_str(), original);
+        let decrypted = enc.decrypt(&encrypted).unwrap();
+        assert_eq!(decrypted, original);
+    }
+
+    #[test]
+    fn test_wrong_key_fails() {
+        let enc1 = EncryptionService::new(&test_key_64());
+        let enc2 = EncryptionService::new("2222222222222222222222222222222222222222222222222222222222222222");
+        let data = enc1.encrypt("secret data").unwrap();
+        let result = enc2.decrypt(&data);
+        assert!(result.is_err());
+    }
+}
+
+mod settings_tests {
+    use biji_core::services::SettingsManager;
+    use biji_core::models::ThemeMode;
+
+    #[test]
+    fn test_save_and_load_settings() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+
+        let mut mgr = SettingsManager::load(&path).unwrap();
+        let mut settings = mgr.get().clone();
+        settings.theme = ThemeMode::Dark;
+        settings.sync_enabled = true;
+        mgr.set(settings).unwrap();
+
+        let mgr2 = SettingsManager::load(&path).unwrap();
+        assert_eq!(mgr2.get().theme, ThemeMode::Dark);
+        assert!(mgr2.get().sync_enabled);
+    }
+
+    #[test]
+    fn test_load_nonexistent_returns_default() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("nonexistent.json");
+        let mgr = SettingsManager::load(&path).unwrap();
+        assert_eq!(mgr.get().theme, ThemeMode::System);
+        assert!(!mgr.get().sync_enabled);
+    }
+}
+
+mod frontmatter_integration_tests {
+    use super::*;
+
+    #[test]
+    fn test_save_and_read_note_with_frontmatter() {
+        let (_dir, db) = test_app();
+        let mut note = make_note("Frontmatter Test");
+        note.content = "---\ntitle: Custom Title\ntags: [rust, test]\ncompleted: true\n---\n\n# 内容正文".into();
+        db.save_note(&note).unwrap();
+
+        let fetched = db.get_note(&note.id).unwrap().unwrap();
+        assert_eq!(fetched.title, "Frontmatter Test");
+        // frontmatter should be parsed from content
+        let fm = fetched.frontmatter.unwrap();
+        assert_eq!(fm.title, Some("Custom Title".into()));
+        assert_eq!(fm.tags, Some(vec!["rust".into(), "test".into()]));
+        assert_eq!(fm.completed, Some(true));
     }
 }

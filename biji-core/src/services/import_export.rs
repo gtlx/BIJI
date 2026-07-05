@@ -3,6 +3,7 @@ use crate::models::{Folder, Note};
 use crate::utils::Error;
 use std::io::Write;
 use std::path::Path;
+use std::sync::OnceLock;
 
 /// 导入导出服务
 pub struct ImportExportService;
@@ -85,14 +86,16 @@ impl ImportExportService {
         let mut body = content.to_string();
 
         // YAML frontmatter
-        let re = regex::Regex::new(r"^---\n([\s\S]*?)\n---").unwrap();
+        static RE_FRONTMATTER: OnceLock<regex::Regex> = OnceLock::new();
+        let re = RE_FRONTMATTER.get_or_init(|| regex::Regex::new(r"^---\n([\s\S]*?)\n---").unwrap());
         if let Some(caps) = re.captures(content) {
             body = content[caps.get(0).unwrap().end()..].trim().to_string();
         }
 
         // 第一个 # 标题作为标题
-        if let Some(caps) = regex::Regex::new(r"^#\s+(.+)$")
-            .unwrap()
+        static RE_HEADING: OnceLock<regex::Regex> = OnceLock::new();
+        if let Some(caps) = RE_HEADING
+            .get_or_init(|| regex::Regex::new(r"^#\s+(.+)$").unwrap())
             .captures_iter(content)
             .next()
         {
@@ -120,7 +123,7 @@ pub struct ImportResult {
 /// 导出笔记为 ZIP（base64 编码）
 pub fn export_notes_zip(
     notes: &[Note],
-    get_content: &dyn Fn(&str) -> Result<Option<String>, Error>,
+    _get_content: &dyn Fn(&str) -> Result<Option<String>, Error>,
 ) -> Result<String, Error> {
     use zip::write::SimpleFileOptions;
     let mut buffer = Vec::new();

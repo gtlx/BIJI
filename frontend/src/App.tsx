@@ -39,7 +39,6 @@ export default function App() {
   const [showPublishPanel, setShowPublishPanel] = useState(false);
   const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
   const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false);
-  const [toolbarCollapsed, setToolbarCollapsed] = useState(false);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [graphKey, setGraphKey] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -95,6 +94,23 @@ export default function App() {
   };
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // 注入用户自定义 CSS
+  useEffect(() => {
+    const styleId = 'biji-custom-css';
+    let el = document.getElementById(styleId) as HTMLStyleElement | null;
+    if (settings?.custom_css) {
+      if (!el) {
+        el = document.createElement('style');
+        el.id = styleId;
+        document.head.appendChild(el);
+      }
+      el.textContent = settings.custom_css;
+    } else {
+      el?.remove();
+    }
+    return () => el?.remove();
+  }, [settings?.custom_css]);
 
   const handleNewNote = async () => {
     const templateId = settings?.template || 'blank';
@@ -214,6 +230,7 @@ export default function App() {
 
   return (
     <div className="app-container">
+      <div data-panel="left-sidebar">
       <Sidebar
         folders={folders}
         selectedFolderId={selectedFolderId}
@@ -227,7 +244,9 @@ export default function App() {
         collapsed={leftSidebarCollapsed}
         onToggleCollapse={() => setLeftSidebarCollapsed(prev => !prev)}
       />
+      </div>
 
+      <div data-panel="note-list">
       <NoteList
         notes={selectedFolderId ? notes.filter(n => n.folder_id === selectedFolderId) : notes}
         selectedNoteId={selectedNote?.id}
@@ -235,9 +254,10 @@ export default function App() {
         onNewNote={handleNewNote}
         onSearch={handleSearch}
       />
+      </div>
 
-      <div className="main-content">
-        <div className="main-content-inner">
+      <div className="main-content" data-panel="main-content">
+        <div className="main-content-inner" data-panel={showGraph ? 'graph' : showGitPanel ? 'git' : showPublishPanel ? 'publish' : 'editor'}>
           {showGraph ? (
             <GraphView
               key={graphKey}
@@ -267,12 +287,14 @@ export default function App() {
       </div>
 
       {selectedNote && !showGraph && !showGitPanel && !showPublishPanel && (
+        <div data-panel="right-sidebar">
         <RightPanel
           content={selectedNote?.content || ''}
           onHeadingClick={(heading, level) => {}}
           onToggle={() => setRightSidebarCollapsed(true)}
           onPropertiesClick={() => showToast('属性面板', 'info')}
         />
+        </div>
       )}
 
       <Toolbar
@@ -291,9 +313,8 @@ export default function App() {
         isGraphActive={showGraph}
         isGitActive={showGitPanel}
         isPublishActive={showPublishPanel}
-        collapsed={toolbarCollapsed}
-        onToggleCollapse={() => setToolbarCollapsed(prev => !prev)}
         builtInPlugins={plugins.filter(p => p.built_in)}
+        position={settings?.toolbar_position || 'left'}
       />
 
       <ToastContainer toasts={toasts} onRemove={removeToast} />

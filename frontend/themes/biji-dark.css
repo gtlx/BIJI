@@ -1,0 +1,25 @@
+/* Biji Note 默认暗色主题 */
+[data-theme='dark'] {
+  --bg-primary: #1a1b22;
+  --bg-secondary: #21222a;
+  --bg-tertiary: #2a2b35;
+  --text-primary: #e2e4ea;
+  --text-secondary: #a0a4b3;
+  --text-muted: #6b6f82;
+  --text-tertiary: #4e5263;
+  --border-color: #333641;
+  --accent-color: #7b9cfa;
+  --accent-hover: #6a8af0;
+  --accent-bg: #252d47;
+  --danger-color: #f44747;
+  --danger-bg: #3d1f1f;
+  --danger-border: #6b2a2a;
+  --success-color: #4ec9b0;
+  --success-bg: #1a3a32;
+  --success-border: #2a5a4e;
+  --warning-color: #dcdcaa;
+  --warning-bg: #3a3520;
+  --shadow: 0 1px 3px rgba(0,0,0,0.2);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.3);
+  --shadow-lg: 0 8px 30px rgba(0,0,0,0.4);
+}

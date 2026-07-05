@@ -8,7 +8,12 @@ pub struct AppState {
     pub core: Mutex<App>,
 }
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
+#[cfg(any(target_os = "android", target_os = "ios"))]
+#[tauri::mobile_entry_point]
+pub fn run_mobile() {
+    run()
+}
+
 pub fn run() {
     let data_dir = dirs_next::data_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("."))

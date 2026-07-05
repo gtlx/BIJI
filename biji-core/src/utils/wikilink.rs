@@ -18,9 +18,10 @@ pub fn replace_wikilinks(content: &str) -> String {
 
     re.replace_all(content, |caps: &regex::Captures| {
         let title = &caps[1];
+        let escaped = title.replace('"', "&quot;");
         format!(
             r##"<a href="#" class="wikilink" data-title="{}">{}</a>"##,
-            title, title
+            escaped, escaped
         )
     })
     .to_string()

@@ -1,4 +1,5 @@
 use crate::AppState;
+use biji_core::models::sync::SyncStatus;
 use biji_core::models::{SyncResult, WebDAVConfig};
 use tauri::State;
 
@@ -9,7 +10,7 @@ pub fn sync_start(state: State<AppState>, config: WebDAVConfig) -> Result<SyncRe
 }
 
 #[tauri::command]
-pub fn sync_status(state: State<AppState>) -> Result<biji_core::models::SyncStatus, String> {
+pub fn sync_status(state: State<AppState>) -> Result<SyncStatus, String> {
     Ok(state
         .core
         .lock()

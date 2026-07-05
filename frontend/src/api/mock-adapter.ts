@@ -27,6 +27,7 @@ export class MockBackend implements BackendAdapter {
     markdown_preview_mode: 'live',
     storage_path: '',
     template: 'blank',
+    toolbar_position: 'left',
     custom_css: '',
     ui_custom_css: { main_content: '', left_sidebar: '', right_sidebar: '', editor: '', note_list: '' },
     zoom: 100,

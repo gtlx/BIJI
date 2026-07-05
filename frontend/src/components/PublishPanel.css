@@ -1,3 +1,10 @@
+.publish-form {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 .publish-panel {
   width: 400px;
   background: var(--bg-secondary);
@@ -53,18 +60,19 @@
   padding: 12px;
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius);
   cursor: pointer;
   transition: all 0.15s;
 }
 
 .generator-item:hover {
   border-color: var(--accent-color);
+  box-shadow: 0 2px 8px rgba(74,144,217,0.08);
 }
 
 .generator-item.selected {
   border-color: var(--accent-color);
-  background: var(--accent-bg, rgba(74, 144, 217, 0.1));
+  background: var(--accent-bg);
 }
 
 .generator-item.unavailable {

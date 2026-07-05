@@ -36,6 +36,7 @@
 .right-panel-tabs {
   display: flex;
   border-bottom: 1px solid var(--border-color);
+  padding: 0 8px;
 }
 
 .right-panel-tab {
@@ -43,8 +44,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 10px 8px;
+  gap: 3px;
+  padding: 10px 8px 8px;
   background: transparent;
   border: none;
   color: var(--text-tertiary);
@@ -52,6 +53,8 @@
   transition: all 0.15s ease;
   font-size: 11px;
   border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
 }
 
 .right-panel-tab:hover {
@@ -62,6 +65,7 @@
 .right-panel-tab.active {
   color: var(--accent-color);
   border-bottom-color: var(--accent-color);
+  font-weight: 500;
 }
 
 .right-panel-content {

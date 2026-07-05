@@ -12,4 +12,4 @@ pub use note::*;
 pub use plugin::*;
 pub use search::*;
 pub use settings::*;
-pub use sync::*;
+pub use sync::{SyncResult, WebDAVConfig};

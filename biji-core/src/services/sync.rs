@@ -87,7 +87,7 @@ impl SyncManager {
             self.database.mark_synced(&synced_ids)?;
         }
 
-        *self.last_sync_time.lock().unwrap() = chrono::Utc::now().timestamp_millis();
+        *self.last_sync_time.lock().expect("Sync mutex poisoned in do_sync") = chrono::Utc::now().timestamp_millis();
 
         Ok(SyncResult {
             success: true,
@@ -109,7 +109,7 @@ impl SyncManager {
 
         SyncStatus {
             is_syncing: self.is_syncing.load(Ordering::SeqCst),
-            last_sync: *self.last_sync_time.lock().unwrap(),
+            last_sync: *self.last_sync_time.lock().expect("Sync mutex poisoned in get_status"),
             pending,
             progress: None,
             error: None,

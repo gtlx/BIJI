@@ -62,21 +62,21 @@ pub fn export_markdown(
     // 导出根目录的笔记
     if let Some(root_notes) = folder_map.get(&None) {
         for note in root_notes {
-            let content = format!("# {}\n\n{}", note.title, note.content);
-            let filename = format!("{}.md", slugify(&note.title));
+                let content = format!("# {}\n\n{}", note.title, note.content);
+            let filename = format!("{}.md", biji_core::utils::slugify(&note.title));
             std::fs::write(base_path.join(&filename), content).map_err(|e| e.to_string())?;
         }
     }
 
     // 导出有文件夹的笔记
     for folder in &folders {
-        let folder_path = base_path.join(slugify(&folder.name));
+        let folder_path = base_path.join(biji_core::utils::slugify(&folder.name));
         std::fs::create_dir_all(&folder_path).map_err(|e| e.to_string())?;
 
         if let Some(folder_notes) = folder_map.get(&Some(folder.id.clone())) {
             for note in folder_notes {
                 let content = format!("# {}\n\n{}", note.title, note.content);
-                let filename = format!("{}.md", slugify(&note.title));
+                let filename = format!("{}.md", biji_core::utils::slugify(&note.title));
                 std::fs::write(folder_path.join(&filename), content).map_err(|e| e.to_string())?;
             }
         }
@@ -89,11 +89,4 @@ pub fn export_markdown(
     })
 }
 
-fn slugify(text: &str) -> String {
-    text.to_lowercase()
-        .chars()
-        .filter(|c| c.is_alphanumeric() || *c == '-' || *c == ' ' || *c == '_')
-        .collect::<String>()
-        .trim()
-        .replace(' ', "_")
-}
+
