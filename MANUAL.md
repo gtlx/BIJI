@@ -174,3 +174,23 @@ cd frontend && pnpm run dev
 # 清理编译器缓存
 cargo clean
 ```
+
+## 依赖与 lockfile 规范
+
+### Rust
+
+- 所有 workspace member 的依赖版本必须在 crates.io 真实存在。
+- 不得引入未经验证的 crate（特别是加密、系统通知、网络相关）。
+
+### Node / 前端
+
+- `frontend/` 目录下必须生成且仅保持一份 lockfile（`yarn.lock`、`pnpm-lock.yaml`、`package-lock.json` 三选一）。
+- 当前 `frontend/` 缺少 lockfile，必须补充生成。
+- 新增依赖后必须重新生成 lockfile，并提交到 git。
+- 禁止手动编辑 lockfile。
+
+### 依赖审计检查点
+
+- 添加新依赖前，必须在 crates.io / npm registry 验证其真实存在。
+- 对于版本号，要按语义化版本前缀验证（如 `"0.32"` 需确认 `0.32.x` 系列中至少有一个版本存在）。
+- 编译通过不等于没有 bug，编译后仍需抽查运行时系统 API 调用。
