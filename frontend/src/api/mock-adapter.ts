@@ -3,8 +3,118 @@ import { BackendAdapter, Note, Folder, AppSettings, SearchQuery, GraphData, Sync
 // ============================================================
 // Mock 适配器 — 用于开发/测试，不依赖任何后端
 // ============================================================
+
+/** 开发预览示例数据(仅 Mock 后端使用,真实后端不受影响) */
+const MOCK_NOTES: Note[] = [
+  {
+    id: 'mock-note-welcome',
+    title: '欢迎使用 Biji 笔记',
+    content: `---
+title: 欢迎使用 Biji 笔记
+tags: [入门, 说明]
+created: 2026-08-17
+---
+
+# 欢迎使用 Biji 笔记
+
+这是一篇示例笔记,用来预览界面效果。
+
+## 核心功能
+
+- **双向链接**:输入 [[双向链接]] 即可连接笔记
+- **知识图谱**:在侧栏点击「图谱」查看笔记关系
+- **全文搜索**:按 \`Ctrl+F\` 快速定位
+- **Markdown 编辑**:支持标题、列表、代码块等语法
+
+> 提示:这些示例数据只存在于开发环境(Mock 后端),不会写入真实存储。
+
+## 下一步
+
+- 在左侧列表点击「新建笔记」创建你的第一篇笔记
+- 尝试输入 \`#标签\` 为笔记打标
+- 阅读 [[知识图谱使用指南]] 了解图谱玩法
+`,
+    created_at: Date.now() - 3 * 86400000,
+    updated_at: Date.now() - 3600000,
+    tags: ['入门', '说明'],
+    folder_id: null,
+    is_encrypted: false,
+    sync_status: 'synced',
+  },
+  {
+    id: 'mock-note-graph',
+    title: '知识图谱使用指南',
+    content: `---
+title: 知识图谱使用指南
+tags: [图谱, 教程]
+created: 2026-08-15
+---
+
+# 知识图谱使用指南
+
+图谱面板以节点方式展示笔记间的[[双向链接]]关系。
+
+## 节点说明
+
+- 每个节点代表一篇笔记,节点越大代表被引用越多
+- 点击节点可直接跳转到对应笔记
+- 链接来自笔记正文中的 \`[[笔记标题]]\` 语法
+
+## 示例关系
+
+本笔记与 [[欢迎使用 Biji 笔记]] 存在链接关系,在图谱中应可见一条连线。
+
+## 常见问题
+
+1. 图谱为空?——先给笔记添加 \`[[链接]]\` 再回来刷新
+2. 节点过多?——后续版本将支持按文件夹/标签过滤
+`,
+    created_at: Date.now() - 7 * 86400000,
+    updated_at: Date.now() - 2 * 3600000,
+    tags: ['图谱', '教程'],
+    folder_id: null,
+    is_encrypted: false,
+    sync_status: 'synced',
+  },
+  {
+    id: 'mock-note-daily',
+    title: '2026-08-17 工作日志',
+    content: `---
+title: 2026-08-17 工作日志
+tags: [日志, 待办]
+created: 2026-08-17
+---
+
+# 2026-08-17 工作日志
+
+## 今日完成
+
+- [x] 修复 M1 阶段 UI 问题(移动端切换/ESC 关闭/平板断点)
+- [x] 补充 Mock 示例数据便于预览
+- [ ] 编写使用文档
+- [ ] 规划 M2 双向链接体验优化
+
+## 遇到的问题
+
+- 移动端点列表项无法进入编辑器 —— 已修复
+- ESC 无法关闭弹窗 —— 已修复
+
+## 明日计划
+
+- 继续 M2 功能开发
+- 完善知识图谱可视化
+`,
+    created_at: Date.now() - 86400000,
+    updated_at: Date.now() - 1800000,
+    tags: ['日志', '待办'],
+    folder_id: null,
+    is_encrypted: false,
+    sync_status: 'synced',
+  },
+];
+
 export class MockBackend implements BackendAdapter {
-  private notes: Note[] = [];
+  private notes: Note[] = [...MOCK_NOTES];
   private folders: Folder[] = [];
   private settings: AppSettings = {
     theme: 'light',

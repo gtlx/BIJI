@@ -10,6 +10,8 @@ interface EditorProps {
   settings: AppSettings | null;
   syncEnabled: boolean;
   onLinkClick?: (noteTitle: string) => void;
+  /** 标题输入实时回调:让列表/笔记状态即时同步(新建笔记标题立即生效) */
+  onTitleChange?: (title: string) => void;
   /** 打开/关闭右侧大纲栏(桌面编辑器头部按钮) */
   onToggleOutline?: () => void;
   scrollToHeading?: string | null;
@@ -30,7 +32,7 @@ interface NoteFrontmatter {
 }
 
 export function Editor({
-  note, onSave, onDelete, settings, syncEnabled, onLinkClick, onToggleOutline,
+  note, onSave, onDelete, settings, syncEnabled, onLinkClick, onTitleChange, onToggleOutline,
   scrollToHeading, externalEditorMode, externalPreviewMode,
   onEditorModeChange, onPreviewModeChange
 }: EditorProps) {
@@ -123,7 +125,10 @@ export function Editor({
   useEffect(() => () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); }, []);
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setTitle(e.target.value);
+    const value = e.target.value;
+    setTitle(value);
+    // 标题实时同步到上层(列表即时显示,不再等自动保存)
+    onTitleChange?.(value);
     scheduleAutoSave();
   };
 
@@ -161,6 +166,12 @@ export function Editor({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    // ESC:关闭删除确认弹窗
+    if (e.key === 'Escape' && showDeleteConfirm) {
+      e.preventDefault();
+      setShowDeleteConfirm(false);
+      return;
+    }
     if ((e.ctrlKey || e.metaKey) && e.key === 's') {
       e.preventDefault();
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);

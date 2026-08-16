@@ -1,6 +1,15 @@
+/* 编辑器容器:撑满主区域(修复宽屏下内容挤在左上、右侧大片空白) */
+.editor-container {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .editor {
   width: 100%;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   padding: 32px;
@@ -11,8 +20,25 @@
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
-  max-width: 860px;
-  margin: 0 auto;
+}
+
+/* 空态:主区域居中显示,不挤在左上角 */
+.editor-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--text-secondary);
+  text-align: center;
+  min-height: 0;
+}
+.editor-empty svg {
+  opacity: 0.45;
+}
+.editor-empty p {
+  font-size: 15px;
 }
 
 /* 手机端:编辑器卡片铺满,减少留白 */

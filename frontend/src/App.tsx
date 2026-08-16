@@ -63,6 +63,8 @@ export default function App() {
   const [rightPanelTab, setRightPanelTab] = useState<RightTab>('outline');
   /** 手机端视图:列表 ⇄ 编辑器单栏切换 */
   const [mobileView, setMobileView] = useState<'list' | 'editor'>('list');
+  /** 是否处于手机视口(<768px):mobile-view-* 类只在手机视口下挂载 */
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 767px)').matches);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [graphKey, setGraphKey] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -106,10 +108,11 @@ export default function App() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // 手机断点监听:回到桌面/平板时复位单栏视图
+  // 手机断点监听:同步 isMobile 状态;离开手机视口时复位单栏视图
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 767px)');
     const onChange = (e: MediaQueryListEvent) => {
+      setIsMobile(e.matches);
       if (!e.matches) setMobileView('list');
     };
     mq.addEventListener('change', onChange);
@@ -197,6 +200,16 @@ export default function App() {
     showToast('笔记已保存');
   };
 
+  /** 编辑器标题实时变更:同步列表与当前选中笔记(新建笔记标题立即生效) */
+  const handleTitleChange = useCallback((title: string) => {
+    // 先取当前选中笔记,再一次性更新两个状态(避免在 updater 里嵌套 setState)
+    const current = selectedNote;
+    if (!current) return;
+    const updated = { ...current, title };
+    setNotes(prevNotes => prevNotes.map(n => n.id === updated.id ? updated : n));
+    setSelectedNote(updated);
+  }, [selectedNote]);
+
   const handleDeleteNote = async (id: string) => {
     await backend.deleteNote(id);
     setNotes(prev => prev.filter(n => n.id !== id));
@@ -236,6 +249,16 @@ export default function App() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // ESC:关闭最上层的弹窗(搜索/设置/插件管理),避免 overlay 残留
+      if (e.key === 'Escape') {
+        if (showSearch || showSettings || showPluginManager) {
+          e.preventDefault();
+          setShowSearch(false);
+          setShowSettings(false);
+          setShowPluginManager(false);
+        }
+        return;
+      }
       if (!settings?.shortcuts) return;
       const s = settings.shortcuts;
       const key: string[] = [];
@@ -258,7 +281,7 @@ export default function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [settings, handleNewNote, handleNewFolder, activeNav]);
+  }, [settings, handleNewNote, handleNewFolder, activeNav, showSearch, showSettings, showPluginManager]);
 
   if (isLoading) return <div className="loading">加载中...</div>;
 
@@ -266,7 +289,7 @@ export default function App() {
 
   return (
     <div
-      className={`app-container ${rightPanelOpen ? 'with-right-panel' : ''} mobile-view-${mobileView}`}
+      className={`app-container ${rightPanelOpen ? 'with-right-panel' : ''} ${isMobile ? `mobile-view-${mobileView}` : ''}`}
     >
       {/* 左侧导航栏(桌面/平板;手机隐藏) */}
       <div data-panel="left-sidebar">
@@ -328,6 +351,7 @@ export default function App() {
               settings={settings}
               syncEnabled={pomodoroEnabled}
               onLinkClick={handleLinkClick}
+              onTitleChange={handleTitleChange}
               onToggleOutline={() => {
                 setRightPanelOpen(prev => !prev);
                 if (rightPanelTab !== 'outline') setRightPanelTab('outline');
