@@ -1,10 +1,8 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  # 自动触发已关闭(2026-08-17 用户指示:CI 构建有问题,web 端优先阶段不需要自动构建)
+  # 需要时手动触发:GitHub Actions 页面 → Run workflow
   workflow_dispatch:
 
 env:
