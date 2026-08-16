@@ -37,6 +37,12 @@
 
 > 原「双向链接/图谱/标签」并入 M2/M3(块级后 wikilink 作用于块,图谱按块关系)
 
+## Git/发布/同步现状(2026-08-17 核查,先不用,排 M4)
+
+- 后端有雏形实现但**无测试未验证**:`services/git.rs`(libgit2:init/status/commit/log)、`services/publish.rs`(静态站点生成)、`services/webdav.rs`(同步)
+- 前端 web 模式(MockBackend)的 git/publish 方法为**假实现**(返回空/成功占位);Tauri 命令已注册但 Tauri 壳后置
+- **M4 再实现**:届时设计 Git 角色与块级历史的协调(块历史在 DB,git 管文件导出版本或块级快照;云同步走 webdav/库文件同步),并补测试
+
 ## 决策(2026-08-17 全部定稿,用户拍板)
 
 - 前期只做 web 端;UI 风格对齐商枢/bill(薄荷绿毛玻璃、内联 SVG、自适应三档)
