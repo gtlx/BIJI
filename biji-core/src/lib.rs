@@ -24,6 +24,8 @@ pub struct App {
     pub git: services::GitService,
     pub publish: services::PublishService,
     pub plugin_mgr: services::PluginManager,
+    /// M2 块级存储:块 CRUD / 历史快照 / 拆块同步
+    pub block_service: services::BlockService,
 }
 
 impl App {
@@ -59,6 +61,7 @@ impl App {
         let publish = services::PublishService::new(data_dir);
         let plugins_dir = data_dir.join("plugins");
         let plugin_mgr = services::PluginManager::new(db.clone(), &plugins_dir);
+        let block_service = services::BlockService::new(db.clone());
 
         log::info!("Biji Note core initialized at: {}", data_dir.display());
 
@@ -70,6 +73,7 @@ impl App {
             git,
             publish,
             plugin_mgr,
+            block_service,
         })
     }
 }

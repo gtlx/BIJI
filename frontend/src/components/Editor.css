@@ -103,6 +103,35 @@
   .outline-toggle-btn { display: none; }
 }
 
+/* M2:块时间戳展示(每段旁小字时间戳,可选开关) */
+.block-time-toggle.active {
+  color: var(--accent-color);
+  border-color: var(--accent-color);
+  background: var(--accent-bg);
+}
+
+.block-with-time {
+  position: relative;
+}
+
+.block-with-time .block-body > :last-child {
+  margin-bottom: 0;
+}
+
+.block-time {
+  display: inline-block;
+  margin: 2px 0 10px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  opacity: 0.75;
+  user-select: none;
+}
+
+.block-with-time:hover .block-time {
+  opacity: 1;
+  color: var(--accent-color);
+}
+
 .editor-tags {
   display: flex;
   align-items: center;

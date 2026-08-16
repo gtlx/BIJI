@@ -1,4 +1,71 @@
-import { BackendAdapter, Note, Folder, AppSettings, SearchQuery, GraphData, SyncResult, SyncStatus, GitStatus, GitLogEntry, PublishConfig, PublishResult, Plugin, ImportResult } from './backend';
+import {
+  BackendAdapter, Note, Folder, AppSettings, SearchQuery, GraphData, SyncResult, SyncStatus,
+  GitStatus, GitLogEntry, PublishConfig, PublishResult, Plugin, ImportResult,
+  NoteBlock, BlockHistoryEntry, BlockSearchResult, BlockType,
+} from './backend';
+
+// ============================================================
+// M2 拆块规则(与 biji-core utils/blocks.rs 保持一致)
+// 空行分隔;标题/列表项单行成块;引用/围栏代码合并;连续行合并为段落;frontmatter 剥离
+// ============================================================
+
+/** 剥离 YAML frontmatter(元数据不进块) */
+function stripFrontmatter(content: string): string {
+  const m = content.match(/^---\n[\s\S]*?\n---\n?([\s\S]*)$/);
+  return m ? m[1] : content;
+}
+
+/** 根据单块内容推断块类型 */
+function detectBlockType(content: string): BlockType {
+  const firstLine = content.split('\n')[0] || '';
+  if (/^\s*```|^\s*~~~/.test(firstLine)) return 'code';
+  if (/^\s{0,3}#{1,6}(\s|$)/.test(firstLine)) return 'heading';
+  if (/^\s*[-*+]\s/.test(firstLine) || /^\s*\d+\.(\s|$)/.test(firstLine)) return 'list_item';
+  if (firstLine.trimStart().startsWith('>')) return 'quote';
+  return 'paragraph';
+}
+
+/** 整篇 markdown → 块序列 */
+function splitContentToBlocks(content: string): { type: BlockType; content: string }[] {
+  const lines = stripFrontmatter(content).split('\n');
+  const drafts: { type: BlockType; content: string }[] = [];
+  const isFence = (l: string) => /^\s*```|^\s*~~~/.test(l);
+  const isHeading = (l: string) => /^\s{0,3}#{1,6}(\s|$)/.test(l);
+  const isListItem = (l: string) => /^\s*[-*+]\s/.test(l) || /^\s*\d+\.(\s|$)/.test(l);
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (!line.trim()) { i++; continue; }
+    // 围栏代码块
+    if (isFence(line)) {
+      const codeLines = [line]; i++;
+      while (i < lines.length && !isFence(lines[i])) { codeLines.push(lines[i]); i++; }
+      if (i < lines.length) { codeLines.push(lines[i]); i++; }
+      drafts.push({ type: 'code', content: codeLines.join('\n') });
+      continue;
+    }
+    // 标题:单行成块
+    if (isHeading(line)) { drafts.push({ type: 'heading', content: line }); i++; continue; }
+    // 列表项:单行成块
+    if (isListItem(line)) { drafts.push({ type: 'list_item', content: line }); i++; continue; }
+    // 引用:连续 > 行合并
+    if (line.trimStart().startsWith('>')) {
+      const quoteLines = [line]; i++;
+      while (i < lines.length && lines[i].trimStart().startsWith('>')) { quoteLines.push(lines[i]); i++; }
+      drafts.push({ type: 'quote', content: quoteLines.join('\n') });
+      continue;
+    }
+    // 普通段落:连续非空行合并
+    const paraLines = [line]; i++;
+    while (i < lines.length) {
+      const l = lines[i];
+      if (!l.trim() || isHeading(l) || isListItem(l) || isFence(l) || l.trimStart().startsWith('>')) break;
+      paraLines.push(l); i++;
+    }
+    drafts.push({ type: 'paragraph', content: paraLines.join('\n') });
+  }
+  return drafts;
+}
 
 // ============================================================
 // Mock 适配器 — 用于开发/测试，不依赖任何后端
@@ -116,6 +183,12 @@ created: 2026-08-17
 export class MockBackend implements BackendAdapter {
   private notes: Note[] = [...MOCK_NOTES];
   private folders: Folder[] = [];
+  /** M2:内存块表(块数组) */
+  private blocks: NoteBlock[] = [];
+  /** M2:内存历史表(历史数组) */
+  private histories: BlockHistoryEntry[] = [];
+  /** 内存 id 序号 */
+  private seq = 0;
   private settings: AppSettings = {
     theme: 'light',
     font_size: 14,
@@ -161,6 +234,8 @@ export class MockBackend implements BackendAdapter {
     const idx = this.notes.findIndex(n => n.id === note.id);
     if (idx >= 0) this.notes[idx] = note;
     else this.notes.push(note);
+    // M2:编辑保存时后端拆块入库(整篇编辑 → 块序列 diff,只盖变更块时间戳)
+    await this.syncNoteBlocks(note.id, note.content);
   }
 
   async deleteNote(id: string, permanent = false): Promise<void> {
@@ -176,7 +251,19 @@ export class MockBackend implements BackendAdapter {
     let results = this.notes.filter(n => !n.deleted_at);
     if (query.keyword) {
       const kw = query.keyword.toLowerCase();
-      results = results.filter(n => n.title.toLowerCase().includes(kw) || n.content.toLowerCase().includes(kw));
+      if (query.mode === 'title') {
+        // 标题模式:只匹配标题
+        results = results.filter(n => n.title.toLowerCase().includes(kw));
+      } else if (query.mode === 'content') {
+        // 内容模式:按块命中(命中块所在笔记,去重)
+        const hitNoteIds = new Set(
+          this.blocks.filter(b => b.content.toLowerCase().includes(kw)).map(b => b.note_id)
+        );
+        results = results.filter(n => hitNoteIds.has(n.id));
+      } else {
+        // 兼容旧行为:标题或内容
+        results = results.filter(n => n.title.toLowerCase().includes(kw) || n.content.toLowerCase().includes(kw));
+      }
     }
     if (query.folder_id) results = results.filter(n => n.folder_id === query.folder_id);
     return results;
@@ -220,4 +307,139 @@ export class MockBackend implements BackendAdapter {
   async getPlugins(): Promise<Plugin[]> { return []; }
   async togglePlugin(id: string, enabled: boolean): Promise<void> {}
   onMenuEvent(event: string, callback: () => void): () => void { return () => {}; }
+
+  // ==================== M2 块级存储(内存实现) ====================
+
+  /** 生成内存 id */
+  private nextId(prefix: string): string {
+    this.seq += 1;
+    return `${prefix}-${this.seq}-${Date.now().toString(36)}`;
+  }
+
+  /** 写一条历史快照 */
+  private pushHistory(blockId: string | null, snapshot: string, changeType: BlockHistoryEntry['change_type'], ts: number): void {
+    this.histories.push({
+      id: this.nextId('mock-hist'),
+      block_id: blockId,
+      content_snapshot: snapshot,
+      changed_at: ts,
+      change_type: changeType,
+    });
+  }
+
+  /** 存量 mock 笔记首次访问时懒拆块(确定性 id,时间戳 = 笔记 updated_at) */
+  private ensureBlocksForNote(noteId: string): void {
+    if (this.blocks.some(b => b.note_id === noteId)) return;
+    const note = this.notes.find(n => n.id === noteId);
+    if (!note) return;
+    const ts = note.updated_at || Date.now();
+    const drafts = splitContentToBlocks(note.content);
+    this.blocks.push(...drafts.map((d, i) => ({
+      id: `mock-${noteId}-${i}`,
+      note_id: noteId,
+      parent_id: null,
+      type: d.type,
+      content: d.content,
+      created_at: ts,
+      updated_at: ts,
+      sort_order: i,
+    })));
+  }
+
+  async createBlock(input: { note_id: string; content: string; parent_id?: string | null }): Promise<NoteBlock> {
+    const ts = Date.now();
+    const block: NoteBlock = {
+      id: this.nextId('mock-blk'),
+      note_id: input.note_id,
+      parent_id: input.parent_id ?? null,
+      type: detectBlockType(input.content),
+      content: input.content,
+      created_at: ts,
+      updated_at: ts,
+      sort_order: this.blocks.filter(b => b.note_id === input.note_id).length,
+    };
+    this.blocks.push(block);
+    this.pushHistory(block.id, block.content, 'create', ts);
+    return block;
+  }
+
+  async updateBlock(id: string, content: string): Promise<NoteBlock> {
+    const block = this.blocks.find(b => b.id === id);
+    if (!block) throw new Error(`block not found: ${id}`);
+    if (block.content === content) return { ...block }; // 内容未变:不盖时间戳、不写历史
+    const ts = Date.now();
+    this.pushHistory(id, block.content, 'update', ts);
+    block.content = content;
+    block.type = detectBlockType(content);
+    block.updated_at = ts;
+    return { ...block };
+  }
+
+  async deleteBlock(id: string, permanent = true): Promise<void> {
+    const block = this.blocks.find(b => b.id === id);
+    if (!block) return;
+    this.pushHistory(id, block.content, 'delete', Date.now());
+    this.blocks = this.blocks.filter(b => b.id !== id);
+  }
+
+  async reorderBlocks(noteId: string, orderedIds: string[]): Promise<void> {
+    orderedIds.forEach((id, i) => {
+      const b = this.blocks.find(x => x.id === id && x.note_id === noteId);
+      if (b) b.sort_order = i;
+    });
+  }
+
+  async getNoteBlocks(noteId: string): Promise<NoteBlock[]> {
+    this.ensureBlocksForNote(noteId);
+    return this.blocks
+      .filter(b => b.note_id === noteId)
+      .sort((a, b) => a.sort_order - b.sort_order || a.created_at - b.created_at);
+  }
+
+  async getBlockHistory(blockId: string): Promise<BlockHistoryEntry[]> {
+    return this.histories
+      .filter(h => h.block_id === blockId)
+      .sort((a, b) => b.changed_at - a.changed_at);
+  }
+
+  async searchBlocks(keyword: string): Promise<BlockSearchResult[]> {
+    const kw = keyword.toLowerCase();
+    const aliveNotes = new Set(this.notes.filter(n => !n.deleted_at).map(n => n.id));
+    return this.blocks
+      .filter(b => b.content.toLowerCase().includes(kw) && aliveNotes.has(b.note_id))
+      .map(b => ({
+        block_id: b.id,
+        note_id: b.note_id,
+        note_title: this.notes.find(n => n.id === b.note_id)?.title || '',
+        content: b.content,
+        updated_at: b.updated_at,
+      }))
+      .sort((a, b) => b.updated_at - a.updated_at);
+  }
+
+  /** 整篇保存 → 块序列 diff(位置对齐):同内容跳过 / 不同 update / 多出 create / 少了 delete */
+  async syncNoteBlocks(noteId: string, content: string): Promise<number> {
+    this.ensureBlocksForNote(noteId);
+    const drafts = splitContentToBlocks(content);
+    const existing = this.blocks
+      .filter(b => b.note_id === noteId)
+      .sort((a, b) => a.sort_order - b.sort_order);
+    let changed = 0;
+
+    for (let i = 0; i < drafts.length; i++) {
+      const cur = existing[i];
+      if (!cur) {
+        await this.createBlock({ note_id: noteId, content: drafts[i].content });
+        changed++;
+      } else if (cur.content !== drafts[i].content) {
+        await this.updateBlock(cur.id, drafts[i].content);
+        changed++;
+      }
+    }
+    for (let i = drafts.length; i < existing.length; i++) {
+      await this.deleteBlock(existing[i].id);
+      changed++;
+    }
+    return changed;
+  }
 }

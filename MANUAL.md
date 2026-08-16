@@ -156,6 +156,15 @@ Vite + React 18 构建，纯 CSS（无 Tailwind/SCSS）。样式系统使用 CSS
 - 命令调用 `biji-core` 中的业务逻辑
 - 数据存储在 SQLite 数据库中（`biji.db`）
 
+## M2 块级存储(2026-08-17)
+
+- **分层**:`models/block.rs`(类型)→ `database/block_repo.rs` + `database/migrations.rs`(存储/迁移)→ `services/block_service.rs`(业务:时间戳+历史快照+拆块 diff)→ 前端 `BackendAdapter` 块方法(Mock 内存实现;Tauri 占位报错,待 M3 接入命令)
+- **迁移**:`PRAGMA user_version` 版本化;002 迁移建 `blocks`/`block_history` 表,并对存量笔记首次自动拆块(frontmatter 不进块,notes.content 保留完整)
+- **拆块规则**(`utils/blocks.rs`):空行分隔;标题/列表项单行成块;连续引用/围栏代码合并;连续行合并为段落块
+- **块服务**:create_block(类型由内容推断)/ update_block(内容未变不盖时间戳不写历史;变更则盖 updated_at + 历史快照=变更前内容)/ delete_block(先写 delete 历史再硬删,历史保留)/ reorder / get_note_blocks / get_block_history / sync_note_blocks(整篇保存→位置对齐 diff,只盖变更块时间戳)
+- **双模式搜索**:`SearchMode::Title`(notes.title→笔记)/ `SearchMode::Content`(blocks.content→块级命中:命中块+所在笔记+片段);入口 `database::search_by_mode`
+- **前端**:编辑器头部时钟按钮 = 块时间戳可选开关(localStorage 记忆),开启后预览按块渲染并显示每段更新时间;SearchModal 增加 标题/内容 模式切换
+
 ## 常用命令
 
 ```bash

@@ -1,3 +1,4 @@
+pub mod block;
 pub mod folder;
 pub mod graph;
 pub mod note;
@@ -6,6 +7,7 @@ pub mod search;
 pub mod settings;
 pub mod sync;
 
+pub use block::*;
 pub use folder::*;
 pub use graph::*;
 pub use note::*;

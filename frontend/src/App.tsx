@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { backend } from './api';
-import type { Note, Folder, AppSettings, SearchQuery, Plugin } from './api/backend';
+import type { Note, Folder, AppSettings, SearchQuery, Plugin, NoteBlock } from './api/backend';
 import { DEFAULT_TEMPLATES } from './api/backend';
 import { Sidebar, type SidebarNavItem } from './components/Sidebar';
 import { NoteList } from './components/NoteList';
@@ -68,6 +68,10 @@ export default function App() {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [graphKey, setGraphKey] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  /** M2:当前选中笔记的块序列(切换笔记/保存后刷新,供编辑器块时间戳展示) */
+  const [noteBlocks, setNoteBlocks] = useState<NoteBlock[]>([]);
+  /** 检索双模式(title/content),SearchModal 切换 */
+  const [searchMode, setSearchMode] = useState<'title' | 'content'>('title');
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
     const id = crypto.randomUUID();
@@ -107,6 +111,19 @@ export default function App() {
   };
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // M2:切换笔记时加载其块序列(供编辑器块时间戳展示);无选中笔记则清空
+  useEffect(() => {
+    let cancelled = false;
+    if (selectedNote) {
+      backend.getNoteBlocks(selectedNote.id)
+        .then(blocks => { if (!cancelled) setNoteBlocks(blocks); })
+        .catch(() => { if (!cancelled) setNoteBlocks([]); });
+    } else {
+      setNoteBlocks([]);
+    }
+    return () => { cancelled = true; };
+  }, [selectedNote?.id]);
 
   // 手机断点监听:同步 isMobile 状态;离开手机视口时复位单栏视图
   useEffect(() => {
@@ -196,6 +213,11 @@ export default function App() {
     await backend.saveNote(updated);
     setNotes(prev => prev.map(n => n.id === note.id ? updated : n));
     setSelectedNote(updated);
+    // M2:保存时后端已拆块入库,刷新块序列让时间戳展示跟上
+    try {
+      const blocks = await backend.getNoteBlocks(updated.id);
+      setNoteBlocks(blocks);
+    } catch { /* 块 API 未就绪时静默降级 */ }
     if (activeNav === 'graph') setGraphKey(k => k + 1);
     showToast('笔记已保存');
   };
@@ -352,6 +374,7 @@ export default function App() {
               syncEnabled={pomodoroEnabled}
               onLinkClick={handleLinkClick}
               onTitleChange={handleTitleChange}
+              noteBlocks={noteBlocks}
               onToggleOutline={() => {
                 setRightPanelOpen(prev => !prev);
                 if (rightPanelTab !== 'outline') setRightPanelTab('outline');
@@ -399,6 +422,9 @@ export default function App() {
       {showSearch && (
         <SearchModal
           notes={notes}
+          mode={searchMode}
+          onModeChange={(m) => { setSearchMode(m); }}
+          onSearch={handleSearch}
           onClose={() => setShowSearch(false)}
           onSelectNote={(note) => { setSelectedNote(note); setShowSearch(false); setMobileView('editor'); }}
         />

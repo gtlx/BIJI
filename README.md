@@ -34,6 +34,7 @@ Biji Note 是一款功能丰富的跨平台笔记编辑器，最初基于 Electr
 | **双向链接** | `[[笔记标题]]` 语法创建笔记间关联，自动解析并持久化到数据库 |
 | **知识图谱** | 可视化展示笔记间的关联关系，后端计算节点和边，前端 D3.js 渲染 |
 | **Markdown 编辑** | 实时预览、编辑、预览三种模式，支持 YAML Frontmatter |
+| **块级存储(M2)** | 笔记内容按段落/标题拆块入库，每块带 created_at/updated_at（块时间戳演变）与历史快照；编辑保存时自动拆块，检索按块命中 |
 | **SQLite 存储** | 使用 SQLite + WAL 模式，高性能本地存储，支持 FTS5 全文搜索 |
 | **WebDAV 同步** | 支持 Nextcloud、坚果云等 WebDAV 兼容服务 |
 | **Git 版本控制** | 基于 libgit2，支持 init/commit/log/diff/restore |
@@ -290,28 +291,33 @@ biji-rust/
 ├── biji-core/                    # ★ 核心库 — 纯 Rust，零框架依赖
 │   ├── Cargo.toml
 │   ├── migrations/
-│   │   └── 001_init.sql          # SQLite 表结构迁移
+│   │   ├── 001_init.sql          # 初始 schema（notes/folders/links/tags + FTS5）
+│   │   └── 002_blocks.sql        # M2 块级存储：blocks + block_history 表
 │   └── src/
 │       ├── lib.rs                # App 结构体：所有功能的统一入口
 │       ├── models/               # 数据结构，对应 TypeScript types.ts
 │       │   ├── mod.rs
 │       │   ├── note.rs           # Note, SyncStatus, NoteFrontmatter, NoteLink
+│       │   ├── block.rs          # M2：Block, BlockHistory, BlockType, ChangeType, BlockSearchResult
 │       │   ├── folder.rs         # Folder
 │       │   ├── settings.rs       # AppSettings, ThemeMode, ShortcutSettings
 │       │   ├── plugin.rs         # Plugin, UIPluginManifest, PluginPosition
 │       │   ├── graph.rs          # GraphData, GraphNode, GraphEdge
 │       │   ├── sync.rs           # SyncResult, SyncStatus, WebDAVConfig
-│       │   └── search.rs         # SearchQuery
+│       │   └── search.rs         # SearchQuery, SearchMode(标题/内容双模式)
 │       ├── database/             # 数据持久化层
-│       │   ├── mod.rs            # Database 结构体：连接管理 + 迁移
+│       │   ├── mod.rs            # Database 结构体：连接管理
 │       │   ├── connection.rs     # 事务辅助函数
+│       │   ├── migrations.rs     # 版本化迁移（PRAGMA user_version）+ 存量笔记自动拆块
 │       │   ├── note_repo.rs      # 笔记 CRUD + 搜索 + 批量操作
+│       │   ├── block_repo.rs     # M2：块 CRUD / 历史 / 排序 / 按块搜索
 │       │   ├── folder_repo.rs    # 文件夹 CRUD
 │       │   ├── link_repo.rs      # [[链接]] 解析 + 存储 + 反向链接
 │       │   ├── tag_repo.rs       # 标签管理 + note_tags 关联
-│       │   └── search.rs         # FTS5 / LIKE 降级搜索
+│       │   └── search.rs         # FTS5 / LIKE 降级搜索 + 双模式检索入口
 │       ├── services/             # 业务服务层
 │       │   ├── mod.rs
+│       │   ├── block_service.rs  # M2：块 CRUD（时间戳+历史快照）+ 整篇保存拆块 diff
 │       │   ├── settings.rs       # JSON 文件读写配置管理
 │       │   ├── encryption.rs     # AES-256-GCM 加解密
 │       │   ├── sync.rs           # 同步协调器
@@ -324,6 +330,7 @@ biji-rust/
 │           ├── mod.rs
 │           ├── errors.rs         # 统一错误类型 (thiserror)
 │           ├── markdown.rs       # Markdown → HTML 渲染 + 标题提取
+│           ├── blocks.rs         # M2：拆块规则（段落/标题/列表/引用/代码）
 │           └── wikilink.rs       # [[Wiki 链接]] 解析 + HTML 替换
 │
 ├── biji-tauri/                   # ★ Tauri 桌面应用壳
@@ -495,12 +502,24 @@ async fn main() {
 ### 数据库表结构
 
 ```sql
-notes           -- 笔记主表（含软删除、同步状态）
+notes           -- 笔记主表（含软删除、同步状态；内容/元数据保留，块归属 note）
+blocks          -- 块表(M2)：笔记内容按段落/标题拆块，每块 {type, content, created_at, updated_at, sort_order}
+block_history   -- 块历史表(M2)：每次变更 {内容快照, changed_at, change_type(create/update/delete)}
 folders         -- 文件夹（树形结构，parent_id 引用）
 links           -- 双向链接关系（source_id → target_title）
 tags            -- 标签唯一表
 note_tags       -- 笔记-标签多对多关联
 ```
+
+#### M2 块级存储说明
+
+- **真相源**:SQLite 中 `blocks` 表;导出时才生成文件夹(Obsidian 式布局,M4)
+- **拆块规则**(`utils/blocks.rs`):frontmatter 剥离;空行分隔;标题/列表项单行成块;连续引用/围栏代码合并;连续行合并为段落
+- **块时间戳演变**:每块 `created_at`(创建)不可变,`updated_at`(更新)每次编辑覆盖;整段替换 = 一个 update = 盖一个时间戳
+- **历史快照**:`update_block`/`delete_block` 先写 `block_history`(快照 = 变更前内容);块被硬删后历史行保留(block_id 置 NULL),审计轨迹不丢
+- **迁移**:`PRAGMA user_version` 版本化;002 迁移对存量笔记首次自动拆块(notes.content 保留原内容完整)
+- **检索双模式**:标题模式搜 `notes.title` 返回笔记;内容模式搜 `blocks.content` 返回块级命中(命中块 + 所在笔记 + 片段)
+- **编辑链路**:前端整篇编辑保存 → 后端 `sync_note_blocks` 拆块 + 位置对齐 diff(同内容跳过 / 不同 update / 多出 create / 少了 delete)→ 只盖变更块时间戳
 
 ### 设置文件
 

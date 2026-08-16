@@ -99,6 +99,44 @@ export interface SearchQuery {
   date_from?: number;
   date_to?: number;
   include_deleted?: boolean;
+  /** 检索双模式(M2):title 只搜标题 / content 按块命中;缺省兼容旧行为 */
+  mode?: 'title' | 'content';
+}
+
+// ============================================================
+// M2 块级存储 — 块 / 块历史 / 块级命中 类型
+// ============================================================
+
+export type BlockType = 'paragraph' | 'heading' | 'list_item' | 'quote' | 'code' | 'other';
+
+/** 块:笔记内容的最小单元,带创建/更新时间戳(BIJI 灵魂:块时间戳演变) */
+export interface NoteBlock {
+  id: string;
+  note_id: string;
+  parent_id: string | null;
+  type: BlockType;
+  content: string;
+  created_at: number;
+  updated_at: number;
+  sort_order: number;
+}
+
+/** 块历史快照:每次变更(create/update/delete)一条,内容快照 + 时间 */
+export interface BlockHistoryEntry {
+  id: string;
+  block_id: string | null;
+  content_snapshot: string;
+  changed_at: number;
+  change_type: 'create' | 'update' | 'delete';
+}
+
+/** 内容模式搜索的块级命中:命中块 + 所在笔记 + 片段 */
+export interface BlockSearchResult {
+  block_id: string;
+  note_id: string;
+  note_title: string;
+  content: string;
+  updated_at: number;
 }
 
 export interface SyncResult {
@@ -169,6 +207,23 @@ export interface BackendAdapter {
   deleteNote(id: string, permanent?: boolean): Promise<void>;
   searchNotes(query: SearchQuery): Promise<Note[]>;
   getGraphData(): Promise<GraphData>;
+
+  // === 块(M2 块级存储) ===
+  /** 新建块(类型由内容推断,追加到笔记末尾) */
+  createBlock(input: { note_id: string; content: string; parent_id?: string | null }): Promise<NoteBlock>;
+  /** 更新块内容:盖 updated_at + 写历史快照 */
+  updateBlock(id: string, content: string): Promise<NoteBlock>;
+  deleteBlock(id: string, permanent?: boolean): Promise<void>;
+  /** 重排笔记内块顺序 */
+  reorderBlocks(noteId: string, orderedIds: string[]): Promise<void>;
+  /** 按 sort_order 返回笔记块序列(含每块 created_at/updated_at) */
+  getNoteBlocks(noteId: string): Promise<NoteBlock[]>;
+  /** 块历史时间线(新→旧) */
+  getBlockHistory(blockId: string): Promise<BlockHistoryEntry[]>;
+  /** 内容模式搜索:按块命中(命中块 + 笔记 + 片段) */
+  searchBlocks(keyword: string): Promise<BlockSearchResult[]>;
+  /** 笔记保存时后端拆块入库(整篇编辑模式:内容 → 块序列 diff,返回变更块数) */
+  syncNoteBlocks(noteId: string, content: string): Promise<number>;
 
   // === 文件夹 ===
   getFolders(includeDeleted?: boolean): Promise<Folder[]>;

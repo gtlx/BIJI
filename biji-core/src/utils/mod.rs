@@ -1,3 +1,4 @@
+pub mod blocks;
 pub mod errors;
 pub mod frontmatter;
 pub mod markdown;

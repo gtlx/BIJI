@@ -67,6 +67,37 @@
   padding: 8px;
 }
 
+/* M2:检索双模式切换(标题 / 内容按块命中) */
+.search-mode-switch {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 8px;
+  padding: 3px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+}
+
+.search-mode-switch .mode-btn {
+  padding: 4px 10px;
+  border: none;
+  border-radius: calc(var(--radius-sm) - 2px);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.search-mode-switch .mode-btn:hover {
+  color: var(--text-primary);
+}
+
+.search-mode-switch .mode-btn.active {
+  background: var(--accent-color);
+  color: #fff;
+}
+
 .search-empty {
   padding: 32px;
   text-align: center;

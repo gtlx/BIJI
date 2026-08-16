@@ -61,6 +61,19 @@ export class TauriBackend implements BackendAdapter {
     return invoke('get_graph_data');
   }
 
+  // ===== 块(M2 占位:Tauri 命令尚未接入,报错提示;同 Mock 语义待 M3) =====
+  private blockNotImplemented(): never {
+    throw new Error('块 API 未实现(M2 占位):Tauri 块命令(save_note 拆块/块 CRUD/历史)待接入,当前请用 Web/Mock 模式体验 M2 块级存储');
+  }
+  async createBlock(): Promise<never> { return this.blockNotImplemented(); }
+  async updateBlock(): Promise<never> { return this.blockNotImplemented(); }
+  async deleteBlock(): Promise<never> { return this.blockNotImplemented(); }
+  async reorderBlocks(): Promise<never> { return this.blockNotImplemented(); }
+  async getNoteBlocks(): Promise<never> { return this.blockNotImplemented(); }
+  async getBlockHistory(): Promise<never> { return this.blockNotImplemented(); }
+  async searchBlocks(): Promise<never> { return this.blockNotImplemented(); }
+  async syncNoteBlocks(): Promise<never> { return this.blockNotImplemented(); }
+
   // ===== 文件夹 =====
   async getFolders(includeDeleted = false): Promise<Folder[]> {
     return invoke('get_folders', { includeDeleted });

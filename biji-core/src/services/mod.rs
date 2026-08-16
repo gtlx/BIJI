@@ -1,3 +1,4 @@
+mod block_service;
 mod encryption;
 mod git;
 mod import_export;
@@ -7,6 +8,7 @@ mod settings;
 mod sync;
 mod webdav;
 
+pub use block_service::*;
 pub use encryption::*;
 pub use git::*;
 pub use import_export::*;

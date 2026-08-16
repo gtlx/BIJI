@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { Note, AppSettings } from '../api/backend';
+import type { Note, AppSettings, NoteBlock } from '../api/backend';
 import { StrokeIcon } from '../icons';
 import './Editor.css';
 
@@ -19,6 +19,8 @@ interface EditorProps {
   externalPreviewMode?: string;
   onEditorModeChange?: (mode: string) => void;
   onPreviewModeChange?: (mode: string) => void;
+  /** M2:当前笔记的块序列(含每块时间戳),用于块时间戳展示 */
+  noteBlocks?: NoteBlock[];
 }
 
 interface NoteFrontmatter {
@@ -34,7 +36,7 @@ interface NoteFrontmatter {
 export function Editor({
   note, onSave, onDelete, settings, syncEnabled, onLinkClick, onTitleChange, onToggleOutline,
   scrollToHeading, externalEditorMode, externalPreviewMode,
-  onEditorModeChange, onPreviewModeChange
+  onEditorModeChange, onPreviewModeChange, noteBlocks,
 }: EditorProps) {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -44,6 +46,10 @@ export function Editor({
   const [editorMode, setEditorMode] = useState<string>('markdown');
   const [previewMode, setPreviewMode] = useState<string>('live');
   const [frontmatter, setFrontmatter] = useState<NoteFrontmatter>({});
+  /** M2 可选开关:每段旁小字块时间戳(localStorage 记忆) */
+  const [showBlockTimestamps, setShowBlockTimestamps] = useState<boolean>(() => {
+    try { return localStorage.getItem('biji.show_block_timestamps') === '1'; } catch { return false; }
+  });
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isComposingRef = useRef(false);
@@ -209,6 +215,32 @@ export function Editor({
     }
   };
 
+  /** M2:块时间戳可选开关(记忆到 localStorage) */
+  const toggleBlockTimestamps = () => {
+    setShowBlockTimestamps(v => {
+      const next = !v;
+      try { localStorage.setItem('biji.show_block_timestamps', next ? '1' : '0'); } catch { /* ignore */ }
+      return next;
+    });
+  };
+
+  /** 格式化块时间戳:MM-DD HH:mm */
+  const fmtTs = (ts: number): string => {
+    const d = new Date(ts);
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  };
+
+  /** M2:按块渲染预览 + 每段旁小字时间戳(块时间戳演变的最小展示) */
+  const renderBlocksWithTimestamps = (blocks: NoteBlock[]): string =>
+    blocks
+      .map(b => {
+        const body = renderMarkdownPreview(b.content);
+        return `<div class="block-with-time"><div class="block-body">${body}</div>` +
+          `<span class="block-time" title="块更新时间 ${new Date(b.updated_at).toLocaleString()}">${fmtTs(b.updated_at)}</span></div>`;
+      })
+      .join('');
+
   if (!note) {
     return (
       <div className="editor-container">
@@ -237,6 +269,15 @@ export function Editor({
                 <StrokeIcon name="outline" size={18} />
               </button>
             )}
+            <button
+              className={`outline-toggle-btn block-time-toggle ${showBlockTimestamps ? 'active' : ''}`}
+              onClick={toggleBlockTimestamps}
+              title={showBlockTimestamps ? '隐藏块时间戳' : '显示块时间戳(每段更新时间)'}
+            >
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm1-13h-2v6l5.25 3.15 1-1.65-4.25-2.5V7z"/>
+              </svg>
+            </button>
             {editorMode === 'markdown' && (
               <div className="preview-mode-switch">
                 <button className={`mode-btn ${previewMode === 'live' ? 'active' : ''}`}
@@ -273,7 +314,11 @@ export function Editor({
               style={{ fontFamily: settings?.font_family || 'inherit', fontSize: `${settings?.font_size || 14}px` }} />
           )}
           {(previewMode === 'live' || previewMode === 'preview') && (
-            <div className="markdown-preview" dangerouslySetInnerHTML={{ __html: renderMarkdownPreview(content) }} onClick={handleWikilinkClick} />
+            <div className="markdown-preview" dangerouslySetInnerHTML={{
+              __html: showBlockTimestamps && noteBlocks && noteBlocks.length > 0
+                ? renderBlocksWithTimestamps(noteBlocks)
+                : renderMarkdownPreview(content),
+            }} onClick={handleWikilinkClick} />
           )}
         </div>
       </div>

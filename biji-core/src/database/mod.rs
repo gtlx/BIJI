@@ -1,11 +1,14 @@
+mod block_repo;
 mod connection;
 mod folder_repo;
 mod link_repo;
+mod migrations;
 mod note_repo;
 mod search;
 mod tag_repo;
 
 pub use connection::*;
+pub use search::{search_by_mode, SearchModeResult};
 
 use crate::models::note::SyncStatus;
 use crate::models::Note;
@@ -35,18 +38,10 @@ impl Database {
             db_path: db_path.to_string_lossy().to_string(),
         };
 
-        db.run_migrations()?;
+        migrations::run(&db.conn())?;
         log::info!("Database opened: {}", db_path.display());
 
         Ok(db)
-    }
-
-    /// 执行 SQL 迁移
-    fn run_migrations(&self) -> Result<(), Error> {
-        let conn = self.conn.lock().expect("Database mutex poisoned in run_migrations");
-        let sql = include_str!("../../migrations/001_init.sql");
-        conn.execute_batch(sql)?;
-        Ok(())
     }
 
     /// 获取数据库文件路径
