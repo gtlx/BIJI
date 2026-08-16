@@ -12,7 +12,7 @@ export function PluginManagerModal({ onClose, onPluginChange }: PluginManagerMod
   const [plugins, setPlugins] = useState<Plugin[]>([]);
 
   useState(() => {
-    backend.getPlugins().then(p => setPlugins(p));
+    backend.getPlugins().then((p: Plugin[]) => setPlugins(p));
   });
 
   const handleToggle = async (id: string, enabled: boolean) => {

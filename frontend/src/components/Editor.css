@@ -5,9 +5,22 @@
   flex-direction: column;
   padding: 32px;
   overflow: hidden;
-  background: var(--bg-primary);
+  background: var(--glass-strong);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
   max-width: 860px;
   margin: 0 auto;
+}
+
+/* 手机端:编辑器卡片铺满,减少留白 */
+@media (max-width: 767px) {
+  .editor {
+    padding: 20px 16px;
+    border-radius: var(--radius-md);
+  }
 }
 
 .editor-header {
@@ -41,6 +54,27 @@
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
+}
+
+/* 大纲开关按钮(编辑器头部) */
+.outline-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-strong);
+  color: var(--teal-700);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.outline-toggle-btn:hover {
+  background: var(--accent-bg);
+}
+@media (max-width: 767px) {
+  .outline-toggle-btn { display: none; }
 }
 
 .editor-tags {

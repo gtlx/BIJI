@@ -1,5 +1,6 @@
 // 集中管理所有 SVG 图标路径
 // 所有图标使用 currentColor 以继承父元素颜色
+import type React from 'react';
 
 export const ICON_PATHS: Record<string, string> = {
   search:
@@ -51,6 +52,193 @@ export function Icon({
     >
       <path d={path} />
     </svg>
+  );
+}
+
+// ============================================================
+// Stroke 风图标(lucide 同款画风,商枢 nav.tsx 同源;随 currentColor 变色)
+// 用于导航侧栏 / 底部 Tab 栏 / 编辑器工具按钮,统一 stroke 视觉语言
+// ============================================================
+
+/** 内联 SVG 图标包装:统一 stroke 渲染(lucide 风格,零依赖) */
+export function NavIcon({
+  children,
+  size = 20,
+  className,
+}: {
+  children: React.ReactNode;
+  size?: number;
+  className?: string;
+}) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={className}
+    >
+      {children}
+    </svg>
+  );
+}
+
+/* 图标 path 素材按需摘录自 lucide 开源图标库(MIT 协议) */
+
+/** 笔记:文件带折角 */
+const S_NOTES = (
+  <>
+    <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+    <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+    <path d="M16 13H8" />
+    <path d="M16 17H8" />
+    <path d="M10 9H8" />
+  </>
+);
+
+/** 搜索:放大镜 */
+const S_SEARCH = (
+  <>
+    <path d="M21 21l-4.35-4.35" />
+    <path d="M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z" />
+  </>
+);
+
+/** 知识图谱:节点网络 */
+const S_GRAPH = (
+  <>
+    <rect x="9" y="2" width="6" height="6" rx="1" />
+    <rect x="16" y="16" width="6" height="6" rx="1" />
+    <rect x="2" y="16" width="6" height="6" rx="1" />
+    <path d="M12 8v4" />
+    <path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3" />
+  </>
+);
+
+/** Git:分支 */
+const S_GIT = (
+  <>
+    <path d="M6 3v12" />
+    <path d="M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+    <path d="M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+    <path d="M18 9a9 9 0 0 1-9 9" />
+  </>
+);
+
+/** 发布:上传 */
+const S_PUBLISH = (
+  <>
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <path d="m17 8-5-5-5 5" />
+    <path d="M12 3v12" />
+  </>
+);
+
+/** 插件:拼图块 */
+const S_PLUGIN = (
+  <>
+    <path d="M19.439 7.85c-.049.322.059.648.289.878l1.568 1.568c.47.47.706 1.087.706 1.704s-.235 1.233-.706 1.704l-1.611 1.611a.98.98 0 0 1-.837.276c-.47-.07-.802-.48-.968-.925a2.501 2.501 0 1 0-3.214 3.214c.446.166.855.497.925.968a.979.979 0 0 1-.276.837l-1.61 1.61a2.404 2.404 0 0 1-1.705.707 2.402 2.402 0 0 1-1.704-.706l-1.568-1.568a1.026 1.026 0 0 0-.877-.29c-.493.074-.84.504-1.02.968a2.5 2.5 0 1 1-3.237-3.237c.464-.18.894-.527.967-1.02a1.026 1.026 0 0 0-.289-.877l-1.568-1.568A2.402 2.402 0 0 1 1.998 12c0-.617.236-1.234.706-1.704L4.23 8.77c.24-.24.581-.353.917-.303.515.077.877.528 1.073 1.01a2.5 2.5 0 1 0 3.259-3.259c-.482-.196-.933-.558-1.01-1.073a1.026 1.026 0 0 1 .303-.917l1.611-1.61A2.402 2.402 0 0 1 12 1.998c.617 0 1.234.236 1.704.706l1.568 1.568c.23.23.556.338.877.29.493-.074.84-.504 1.02-.968a2.5 2.5 0 1 1 3.237 3.237c-.464.18-.894.527-.967 1.02Z" />
+  </>
+);
+
+/** 设置:齿轮 */
+const S_SETTINGS = (
+  <>
+    <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+    <circle cx="12" cy="12" r="3" />
+  </>
+);
+
+/** 文件夹 */
+const S_FOLDER = (
+  <>
+    <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z" />
+  </>
+);
+
+/** 新建:加号 */
+const S_PLUS = (
+  <>
+    <path d="M12 5v14" />
+    <path d="M5 12h14" />
+  </>
+);
+
+/** 关闭:叉号 */
+const S_CLOSE = (
+  <>
+    <path d="M18 6 6 18" />
+    <path d="m6 6 12 12" />
+  </>
+);
+
+/** 大纲:列表 */
+const S_OUTLINE = (
+  <>
+    <path d="M8 6h13" />
+    <path d="M8 12h13" />
+    <path d="M8 18h13" />
+    <path d="M3 6h.01" />
+    <path d="M3 12h.01" />
+    <path d="M3 18h.01" />
+  </>
+);
+
+/** 返回:左箭头(移动端编辑器返回列表) */
+const S_BACK = (
+  <>
+    <path d="M19 12H5" />
+    <path d="m12 19-7-7 7-7" />
+  </>
+);
+
+/** 番茄钟 */
+const S_TIMER = (
+  <>
+    <path d="M10 2h4" />
+    <path d="M12 14l3-3" />
+    <circle cx="12" cy="14" r="8" />
+  </>
+);
+
+/** Stroke 图标注册表:name → 子元素(与 ICON_PATHS 互补,供导航/工具按钮使用) */
+export const STROKE_ICONS: Record<string, React.ReactNode> = {
+  notes: S_NOTES,
+  search: S_SEARCH,
+  graph: S_GRAPH,
+  git: S_GIT,
+  publish: S_PUBLISH,
+  plugin: S_PLUGIN,
+  settings: S_SETTINGS,
+  folder: S_FOLDER,
+  plus: S_PLUS,
+  close: S_CLOSE,
+  outline: S_OUTLINE,
+  back: S_BACK,
+  timer: S_TIMER,
+};
+
+/** Stroke 图标组件 — 按名称取素材,渲染为统一 stroke 风格 */
+export function StrokeIcon({
+  name,
+  size = 20,
+  className,
+}: {
+  name: string;
+  size?: number;
+  className?: string;
+}) {
+  const content = STROKE_ICONS[name];
+  if (!content) return null;
+  return (
+    <NavIcon size={size} className={className}>
+      {content}
+    </NavIcon>
   );
 }
 

@@ -25,7 +25,7 @@ export function GraphView({ onSelectNote, currentNoteId, onRefresh: _onRefresh }
         const width = svgRef.current.clientWidth || 800;
         const height = svgRef.current.clientHeight || 600;
 
-        const simulation = d3.forceSimulation(data.nodes)
+        const simulation = d3.forceSimulation(data.nodes as d3.SimulationNodeDatum[])
           .force('link', d3.forceLink(data.edges).id((d: any) => d.id).distance(100))
           .force('charge', d3.forceManyBody().strength(-300))
           .force('center', d3.forceCenter(width / 2, height / 2));
@@ -43,7 +43,7 @@ export function GraphView({ onSelectNote, currentNoteId, onRefresh: _onRefresh }
           .data(data.nodes)
           .join('circle')
           .attr('r', 8)
-          .attr('fill', (d: any) => d.id === currentNoteId ? '#4a90d9' : '#69b3a2')
+          .attr('fill', (d: any) => d.id === currentNoteId ? '#14b8a6' : '#5eead4')
           .attr('stroke', '#fff')
           .attr('stroke-width', 1.5)
           .style('cursor', 'pointer')

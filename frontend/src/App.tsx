@@ -2,10 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { backend } from './api';
 import type { Note, Folder, AppSettings, SearchQuery, Plugin } from './api/backend';
 import { DEFAULT_TEMPLATES } from './api/backend';
-import { Sidebar, type SidebarButton } from './components/Sidebar';
+import { Sidebar, type SidebarNavItem } from './components/Sidebar';
 import { NoteList } from './components/NoteList';
 import { Editor } from './components/Editor';
-import { Toolbar, type ToolbarButton } from './components/Toolbar';
 import { StatusBar } from './components/StatusBar';
 import { ToastContainer } from './components/Toast';
 import { SettingsModal } from './components/SettingsModal';
@@ -14,8 +13,9 @@ import { GitPanel } from './components/GitPanel';
 import { PublishPanel } from './components/PublishPanel';
 import { SearchModal } from './components/SearchModal';
 import { PluginManagerModal } from './components/PluginManagerModal';
-import { PomodoroTimer } from './components/PomodoroTimer';
 import { RightPanel } from './components/RightPanel';
+import { MobileTabbar, type TabItem } from './components/MobileTabbar';
+import { StrokeIcon } from './icons';
 import './App.css';
 
 interface ToastItem {
@@ -23,6 +23,27 @@ interface ToastItem {
   message: string;
   type?: 'success' | 'error' | 'info';
 }
+
+/** 应用导航(桌面左侧栏 = 移动端底部 Tab 栏的并集,商枢注册表思路) */
+const NAV_ITEMS: SidebarNavItem[] = [
+  { id: 'notes', icon: 'notes', label: '笔记' },
+  { id: 'search', icon: 'search', label: '搜索' },
+  { id: 'graph', icon: 'graph', label: '图谱' },
+  { id: 'git', icon: 'git', label: 'Git' },
+  { id: 'publish', icon: 'publish', label: '发布' },
+  { id: 'plugins', icon: 'plugin', label: '插件' },
+];
+
+/** 移动端底部 Tab(手机 <768px;搜索/设置为模态入口) */
+const MOBILE_TABS: TabItem[] = [
+  { id: 'notes', icon: 'notes', label: '笔记' },
+  { id: 'search', icon: 'search', label: '搜索' },
+  { id: 'graph', icon: 'graph', label: '图谱' },
+  { id: 'settings', icon: 'settings', label: '设置' },
+];
+
+/** 右侧栏标签页 */
+type RightTab = 'outline' | 'properties' | 'pomodoro';
 
 export default function App() {
   const [notes, setNotes] = useState<Note[]>([]);
@@ -34,11 +55,14 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showPluginManager, setShowPluginManager] = useState(false);
-  const [showGraph, setShowGraph] = useState(false);
-  const [showGitPanel, setShowGitPanel] = useState(false);
-  const [showPublishPanel, setShowPublishPanel] = useState(false);
+  /** 当前主区视图:notes(编辑器)/ graph / git / publish */
+  const [activeNav, setActiveNav] = useState<string>('notes');
   const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
-  const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false);
+  /** 右侧大纲栏(默认折叠,减少视觉噪音;由编辑器大纲按钮/番茄钟打开) */
+  const [rightPanelOpen, setRightPanelOpen] = useState(false);
+  const [rightPanelTab, setRightPanelTab] = useState<RightTab>('outline');
+  /** 手机端视图:列表 ⇄ 编辑器单栏切换 */
+  const [mobileView, setMobileView] = useState<'list' | 'editor'>('list');
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [graphKey, setGraphKey] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -51,19 +75,6 @@ export default function App() {
   const removeToast = useCallback((id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
-
-  const [sidebarButtons, setSidebarButtons] = useState<SidebarButton[]>([
-    { id: 'files', icon: 'files', label: '文件', visible: true },
-    { id: 'search', icon: 'search', label: '搜索', visible: true },
-    { id: 'tags', icon: 'tags', label: '标签', visible: false },
-  ]);
-
-  const [toolbarButtons, setToolbarButtons] = useState<ToolbarButton[]>([
-    { id: 'graph', icon: 'graph', label: '图谱' },
-    { id: 'git', icon: 'git', label: 'Git' },
-    { id: 'publish', icon: 'publish', label: '发布' },
-    { id: 'plugins', icon: 'plugin', label: '插件' },
-  ]);
 
   const loadData = useCallback(async () => {
     try {
@@ -95,6 +106,16 @@ export default function App() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  // 手机断点监听:回到桌面/平板时复位单栏视图
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const onChange = (e: MediaQueryListEvent) => {
+      if (!e.matches) setMobileView('list');
+    };
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
   // 注入用户自定义 CSS
   useEffect(() => {
     const styleId = 'biji-custom-css';
@@ -111,6 +132,23 @@ export default function App() {
     }
     return () => el?.remove();
   }, [settings?.custom_css]);
+
+  /** 导航点击统一入口:桌面侧栏 + 移动底栏共用 */
+  const handleNavClick = (id: string) => {
+    if (id === 'notes') {
+      setActiveNav('notes');
+      setMobileView('list');
+    } else if (id === 'search') {
+      setShowSearch(true);
+    } else if (id === 'graph' || id === 'git' || id === 'publish') {
+      setActiveNav(id);
+      setMobileView('editor');
+    } else if (id === 'plugins') {
+      setShowPluginManager(true);
+    } else if (id === 'settings') {
+      setShowSettings(true);
+    }
+  };
 
   const handleNewNote = async () => {
     const templateId = settings?.template || 'blank';
@@ -133,6 +171,8 @@ export default function App() {
     await backend.saveNote(newNote);
     setNotes(prev => [newNote, ...prev]);
     setSelectedNote(newNote);
+    setActiveNav('notes');
+    setMobileView('editor');
     showToast('已创建新笔记');
   };
 
@@ -153,7 +193,7 @@ export default function App() {
     await backend.saveNote(updated);
     setNotes(prev => prev.map(n => n.id === note.id ? updated : n));
     setSelectedNote(updated);
-    if (showGraph) setGraphKey(k => k + 1);
+    if (activeNav === 'graph') setGraphKey(k => k + 1);
     showToast('笔记已保存');
   };
 
@@ -187,17 +227,11 @@ export default function App() {
     const linked = notes.find(n => n.title === noteTitle);
     if (linked) {
       setSelectedNote(linked);
-      setShowGraph(false);
+      setActiveNav('notes');
+      setMobileView('editor');
     } else {
       showToast(`未找到笔记: ${noteTitle}`, 'info');
     }
-  };
-
-  const handleToggleSidebarButton = (buttonId: string) => {
-    if (buttonId === 'search') setShowSearch(true);
-    else if (buttonId === 'graph') { setShowGraph(!showGraph); setShowGitPanel(false); setShowPublishPanel(false); }
-    else if (buttonId === 'git') { setShowGitPanel(!showGitPanel); setShowGraph(false); setShowPublishPanel(false); }
-    else if (buttonId === 'publish') { setShowPublishPanel(!showPublishPanel); setShowGraph(false); setShowGitPanel(false); }
   };
 
   useEffect(() => {
@@ -216,105 +250,114 @@ export default function App() {
         [s.new_note]: () => { e.preventDefault(); handleNewNote(); },
         [s.new_folder]: () => { e.preventDefault(); handleNewFolder(); },
         [s.search]: () => { e.preventDefault(); setShowSearch(true); },
-        [s.toggle_graph]: () => { e.preventDefault(); setShowGraph(prev => !prev); },
+        [s.toggle_graph]: () => { e.preventDefault(); handleNavClick(activeNav === 'graph' ? 'notes' : 'graph'); },
         [s.toggle_left_sidebar]: () => { e.preventDefault(); setLeftSidebarCollapsed(prev => !prev); },
-        [s.toggle_right_sidebar]: () => { e.preventDefault(); setRightSidebarCollapsed(prev => !prev); },
+        [s.toggle_right_sidebar]: () => { e.preventDefault(); setRightPanelOpen(prev => !prev); },
       };
       shortcuts[pressed]?.();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [settings, handleNewNote, handleNewFolder]);
+  }, [settings, handleNewNote, handleNewFolder, activeNav]);
 
   if (isLoading) return <div className="loading">加载中...</div>;
 
+  const pomodoroEnabled = plugins.some(p => p.id === 'pomodoro-plugin' && p.enabled);
+
   return (
-    <div className="app-container">
+    <div
+      className={`app-container ${rightPanelOpen ? 'with-right-panel' : ''} mobile-view-${mobileView}`}
+    >
+      {/* 左侧导航栏(桌面/平板;手机隐藏) */}
       <div data-panel="left-sidebar">
-      <Sidebar
-        folders={folders}
-        selectedFolderId={selectedFolderId}
-        onSelectFolder={setSelectedFolderId}
-        onOpenSettings={() => setShowSettings(true)}
-        onNewNote={handleNewNote}
-        onNewFolder={handleNewFolder}
-        buttons={sidebarButtons}
-        onButtonsChange={setSidebarButtons}
-        onToggleButton={handleToggleSidebarButton}
-        collapsed={leftSidebarCollapsed}
-        onToggleCollapse={() => setLeftSidebarCollapsed(prev => !prev)}
-      />
+        <Sidebar
+          folders={folders}
+          selectedFolderId={selectedFolderId}
+          onSelectFolder={setSelectedFolderId}
+          onOpenSettings={() => setShowSettings(true)}
+          onNewNote={handleNewNote}
+          onNewFolder={handleNewFolder}
+          navItems={NAV_ITEMS}
+          activeNav={activeNav}
+          onNavClick={handleNavClick}
+          collapsed={leftSidebarCollapsed}
+          onToggleCollapse={() => setLeftSidebarCollapsed(prev => !prev)}
+        />
       </div>
 
+      {/* 笔记列表(桌面/平板并排;手机单栏切换) */}
       <div data-panel="note-list">
-      <NoteList
-        notes={selectedFolderId ? notes.filter(n => n.folder_id === selectedFolderId) : notes}
-        selectedNoteId={selectedNote?.id}
-        onSelectNote={setSelectedNote}
-        onNewNote={handleNewNote}
-        onSearch={handleSearch}
-      />
+        <NoteList
+          notes={selectedFolderId ? notes.filter(n => n.folder_id === selectedFolderId) : notes}
+          selectedNoteId={selectedNote?.id}
+          onSelectNote={(note) => { setSelectedNote(note); setMobileView('editor'); }}
+          onNewNote={handleNewNote}
+          onSearch={handleSearch}
+        />
       </div>
 
+      {/* 主区:编辑器 / 图谱 / Git / 发布 */}
       <div className="main-content" data-panel="main-content">
-        <div className="main-content-inner" data-panel={showGraph ? 'graph' : showGitPanel ? 'git' : showPublishPanel ? 'publish' : 'editor'}>
-          {showGraph ? (
+        <button
+          className="mobile-back-btn"
+          onClick={() => setMobileView('list')}
+          title="返回笔记列表"
+        >
+          <StrokeIcon name="back" size={20} />
+        </button>
+        <div className="main-content-inner" data-panel={activeNav === 'graph' ? 'graph' : activeNav === 'git' ? 'git' : activeNav === 'publish' ? 'publish' : 'editor'}>
+          {activeNav === 'graph' ? (
             <GraphView
               key={graphKey}
               onSelectNote={(noteId) => {
                 const note = notes.find(n => n.id === noteId);
-                if (note) { setSelectedNote(note); setShowGraph(false); }
+                if (note) { setSelectedNote(note); setActiveNav('notes'); setMobileView('editor'); }
               }}
               currentNoteId={selectedNote?.id}
               onRefresh={() => setGraphKey(k => k + 1)}
             />
-          ) : showGitPanel ? (
-            <GitPanel onClose={() => setShowGitPanel(false)} />
-          ) : showPublishPanel ? (
-            <PublishPanel onClose={() => setShowPublishPanel(false)} />
+          ) : activeNav === 'git' ? (
+            <GitPanel onClose={() => handleNavClick('notes')} />
+          ) : activeNav === 'publish' ? (
+            <PublishPanel onClose={() => handleNavClick('notes')} />
           ) : (
             <Editor
               note={selectedNote}
               onSave={handleSaveNote}
               onDelete={handleDeleteNote}
               settings={settings}
-              syncEnabled={plugins.some(p => p.id === 'sync-plugin' && p.enabled)}
+              syncEnabled={pomodoroEnabled}
               onLinkClick={handleLinkClick}
+              onToggleOutline={() => {
+                setRightPanelOpen(prev => !prev);
+                if (rightPanelTab !== 'outline') setRightPanelTab('outline');
+              }}
             />
           )}
         </div>
         <StatusBar syncEnabled={plugins.some(p => p.id === 'sync-plugin' && p.enabled)} />
       </div>
 
-      {selectedNote && !showGraph && !showGitPanel && !showPublishPanel && (
+      {/* 右侧大纲栏:默认折叠,仅在编辑器视图可开 */}
+      {selectedNote && activeNav === 'notes' && rightPanelOpen && (
         <div data-panel="right-sidebar">
-        <RightPanel
-          content={selectedNote?.content || ''}
-          onHeadingClick={(heading, level) => {}}
-          onToggle={() => setRightSidebarCollapsed(true)}
-          onPropertiesClick={() => showToast('属性面板', 'info')}
-        />
+          <RightPanel
+            key={rightPanelTab}
+            content={selectedNote?.content || ''}
+            defaultTab={rightPanelTab}
+            pomodoroEnabled={pomodoroEnabled}
+            onHeadingClick={(heading, level) => {}}
+            onToggle={() => setRightPanelOpen(false)}
+            onPropertiesClick={() => showToast('属性面板', 'info')}
+          />
         </div>
       )}
 
-      <Toolbar
-        buttons={toolbarButtons}
-        onButtonOrderChange={setToolbarButtons}
-        onPluginClick={(id) => { if (id === 'plugins') setShowPluginManager(true); }}
-        onBuiltInPluginClick={(pluginId) => {
-          if (pluginId === 'pomodoro-plugin') {
-            setRightSidebarCollapsed(false);
-            showToast('番茄钟已打开', 'info');
-          } else showToast(`插件 ${pluginId}`);
-        }}
-        onGraphClick={() => handleToggleSidebarButton('graph')}
-        onGitClick={() => handleToggleSidebarButton('git')}
-        onPublishClick={() => handleToggleSidebarButton('publish')}
-        isGraphActive={showGraph}
-        isGitActive={showGitPanel}
-        isPublishActive={showPublishPanel}
-        builtInPlugins={plugins.filter(p => p.built_in)}
-        position={settings?.toolbar_position || 'left'}
+      {/* 移动端底部 Tab 栏(<768px 显示) */}
+      <MobileTabbar
+        items={MOBILE_TABS}
+        activeId={activeNav}
+        onTabClick={handleNavClick}
       />
 
       <ToastContainer toasts={toasts} onRemove={removeToast} />
@@ -333,7 +376,7 @@ export default function App() {
         <SearchModal
           notes={notes}
           onClose={() => setShowSearch(false)}
-          onSelectNote={(note) => { setSelectedNote(note); setShowSearch(false); }}
+          onSelectNote={(note) => { setSelectedNote(note); setShowSearch(false); setMobileView('editor'); }}
         />
       )}
 

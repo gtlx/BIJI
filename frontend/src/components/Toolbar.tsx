@@ -23,7 +23,7 @@ interface ToolbarProps {
 }
 
 export function Toolbar({
-  buttons, onGraphClick, onGitClick, onPublishClick, onPluginClick,
+  buttons, onGraphClick, onGitClick, onPublishClick, onPluginClick, onBuiltInPluginClick,
   isGraphActive, isGitActive, isPublishActive,
   builtInPlugins, position
 }: ToolbarProps) {

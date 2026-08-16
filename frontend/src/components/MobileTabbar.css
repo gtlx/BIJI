@@ -1,0 +1,22 @@
+/* 底部 Tab 栏样式:基础规则放组件文件,显示/隐藏断点由 App.css 统一管理(.tabbar) */
+
+.tabbar-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-family: inherit;
+  transition: color 0.15s ease;
+}
+.tabbar-item:hover { color: var(--teal-600); }
+.tabbar-item.active {
+  color: var(--teal-600);
+  font-weight: 600;
+}

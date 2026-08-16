@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Note, AppSettings } from '../api/backend';
+import { StrokeIcon } from '../icons';
 import './Editor.css';
 
 interface EditorProps {
@@ -9,6 +10,8 @@ interface EditorProps {
   settings: AppSettings | null;
   syncEnabled: boolean;
   onLinkClick?: (noteTitle: string) => void;
+  /** 打开/关闭右侧大纲栏(桌面编辑器头部按钮) */
+  onToggleOutline?: () => void;
   scrollToHeading?: string | null;
   externalEditorMode?: string;
   externalPreviewMode?: string;
@@ -27,7 +30,7 @@ interface NoteFrontmatter {
 }
 
 export function Editor({
-  note, onSave, onDelete, settings, syncEnabled, onLinkClick,
+  note, onSave, onDelete, settings, syncEnabled, onLinkClick, onToggleOutline,
   scrollToHeading, externalEditorMode, externalPreviewMode,
   onEditorModeChange, onPreviewModeChange
 }: EditorProps) {
@@ -214,6 +217,15 @@ export function Editor({
         <div className="editor-header">
           <input type="text" className="editor-title" value={title} onChange={handleTitleChange} placeholder="标题" />
           <div className="editor-actions">
+            {onToggleOutline && (
+              <button
+                className="outline-toggle-btn"
+                onClick={onToggleOutline}
+                title="大纲"
+              >
+                <StrokeIcon name="outline" size={18} />
+              </button>
+            )}
             {editorMode === 'markdown' && (
               <div className="preview-mode-switch">
                 <button className={`mode-btn ${previewMode === 'live' ? 'active' : ''}`}

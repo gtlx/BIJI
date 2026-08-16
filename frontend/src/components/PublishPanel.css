@@ -6,12 +6,19 @@
 }
 
 .publish-panel {
-  width: 400px;
-  background: var(--bg-secondary);
-  border-left: 1px solid var(--border-color);
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  background: var(--glass-strong);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
   display: flex;
   flex-direction: column;
   height: 100%;
+  overflow: hidden;
 }
 
 .publish-header {

@@ -177,13 +177,13 @@
 }
 
 .legend-dot.current {
-  background: #4a90d9;
-  border: 2px solid #2d5a8a;
+  background: var(--teal-500);
+  border: 2px solid var(--teal-700);
 }
 
 .legend-dot.linked {
-  background: #69b3a2;
-  border: 2px solid #408e71;
+  background: #5eead4;
+  border: 2px solid var(--teal-600);
 }
 
 .graph-view .node {

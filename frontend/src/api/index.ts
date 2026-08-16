@@ -1,4 +1,5 @@
-import { BackendAdapter, TauriBackend } from './tauri-adapter';
+import type { BackendAdapter } from './backend';
+import { TauriBackend } from './tauri-adapter';
 import { MockBackend } from './mock-adapter';
 
 // 检测是否在 Tauri 环境中
