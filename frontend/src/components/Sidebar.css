@@ -335,3 +335,36 @@
 @media (max-width: 767px) {
   .sidebar { display: none; }
 }
+
+/* ---------- [M3.5a] 标签区 ---------- */
+.tag-group { display: flex; flex-direction: column; }
+.tag-item { padding-left: 8px; }
+.tag-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tree-count {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  background: var(--bg-tertiary);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+.tag-notes {
+  display: flex;
+  flex-direction: column;
+  margin-left: 22px;
+  padding: 2px 0 6px;
+  border-left: 2px solid var(--glass-border);
+}
+.tag-note { gap: 8px; padding: 7px 12px; }
+.tag-note-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.tag-note:hover .tag-note-title { color: var(--teal-700); }

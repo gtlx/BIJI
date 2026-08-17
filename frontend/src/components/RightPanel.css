@@ -173,3 +173,62 @@
 @media (max-width: 767px) {
   .right-panel { display: none; }
 }
+
+/* ============================================================
+   [M3.5a 反向链接(块级)]
+   编辑器右侧面板:当前笔记被哪些块引用(来源笔记 + 片段 + 块时间戳)
+   ============================================================ */
+.backlinks-panel { padding: 4px 2px; }
+.backlinks-empty {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  text-align: center;
+  padding: 18px 8px;
+}
+.backlinks-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+}
+.backlinks-item {
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  padding: 8px 10px;
+}
+.backlinks-source {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--accent-color);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  padding: 0;
+}
+.backlinks-source:hover { text-decoration: underline; }
+.backlinks-time {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+.backlinks-snippet {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  margin: 5px 0 0;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

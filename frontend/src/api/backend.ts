@@ -139,6 +139,29 @@ export interface BlockSearchResult {
   updated_at: number;
 }
 
+/** [M3.5a 日历热力图] 按日统计的块活跃(日期 "YYYY-MM-DD" + 当日创建/更新块数) */
+export interface BlockActivity {
+  date: string;
+  created: number;
+  updated: number;
+}
+
+/** [M3.5a 反向链接(块级)] 引用某笔记的块:来源笔记 + 片段 + 块时间戳 */
+export interface BlockBacklink {
+  block_id: string;
+  source_note_id: string;
+  source_note_title: string;
+  content: string;
+  created_at: number;
+  updated_at: number;
+}
+
+/** [M3.5a 标签树] 标签及笔记数 */
+export interface TagCount {
+  name: string;
+  count: number;
+}
+
 export interface SyncResult {
   success: boolean;
   uploaded: number;
@@ -224,6 +247,22 @@ export interface BackendAdapter {
   searchBlocks(keyword: string): Promise<BlockSearchResult[]>;
   /** 笔记保存时后端拆块入库(整篇编辑模式:内容 → 块序列 diff,返回变更块数) */
   syncNoteBlocks(noteId: string, content: string): Promise<number>;
+
+  // === [M3.5a 日历热力图] ===
+  /** 按日统计块活跃:返回 [{date, created, updated}] (毫秒范围,本地日) */
+  getBlockActivity(dateFrom: number, dateTo: number): Promise<BlockActivity[]>;
+  /** 取范围内有写入的块(创建或更新),供日历点天看当天写了什么 */
+  getBlocksInRange(dateFrom: number, dateTo: number): Promise<BlockSearchResult[]>;
+
+  // === [M3.5a 反向链接(块级)] ===
+  /** 引用某笔记的块列表(来源笔记 + 片段 + 块时间戳) */
+  getBlockBacklinks(noteId: string): Promise<BlockBacklink[]>;
+
+  // === [M3.5a 标签树/过滤] ===
+  /** 全部标签及笔记数(排除已删除笔记) */
+  getTags(): Promise<TagCount[]>;
+  /** 按标签列出笔记(过滤 NoteList) */
+  getNotesByTag(tag: string): Promise<Note[]>;
 
   // === 文件夹 ===
   getFolders(includeDeleted?: boolean): Promise<Folder[]>;

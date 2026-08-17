@@ -124,6 +124,36 @@ pub struct BlockSearchResult {
     pub updated_at: i64,
 }
 
+/// [M3.5a 日历热力图] 按日统计的块活跃
+///
+/// BIJI 灵魂是把块时间戳可视化:某天有多少块被创建 / 被更新,色阶表达写作节奏。
+/// `date` 形如 "YYYY-MM-DD"(按本地时区换算);created/updated 为当日计数的块数。
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct BlockActivity {
+    pub date: String,
+    pub created: i64,
+    pub updated: i64,
+}
+
+/// [M3.5a 反向链接(块级)] 引用某篇笔记的块
+///
+/// 与笔记级反向链接不同,这里精确到「哪一段话引用了它」:来源笔记 + 块片段 + 块时间戳。
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct BlockBacklink {
+    /// 引用块 id
+    pub block_id: String,
+    /// 来源笔记 id
+    pub source_note_id: String,
+    /// 来源笔记标题
+    pub source_note_title: String,
+    /// 引用块内容片段(含 [[目标]])
+    pub content: String,
+    /// 引用块创建时间
+    pub created_at: i64,
+    /// 引用块更新时间
+    pub updated_at: i64,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

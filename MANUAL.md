@@ -165,6 +165,22 @@ Vite + React 18 构建，纯 CSS（无 Tailwind/SCSS）。样式系统使用 CSS
 - **双模式搜索**:`SearchMode::Title`(notes.title→笔记)/ `SearchMode::Content`(blocks.content→块级命中:命中块+所在笔记+片段);入口 `database::search_by_mode`
 - **前端**:编辑器头部时钟按钮 = 块时间戳可选开关(localStorage 记忆),开启后预览按块渲染并显示每段更新时间;SearchModal 增加 标题/内容 模式切换
 
+## M3.5a 体验增强第一批(2026-08-17)
+
+三项均基于**块级时间戳**定位,分层沿用 model/storage/service + 前端 BackendAdapter。
+
+### ① 日历 + 块热力图
+- 后端:`block_repo::get_block_activity(date_from, date_to)` → `[{date, created, updated}]`(毫秒范围,按本地日聚合,排除已删笔记下的块);`get_blocks_in_range` → 范围内创建/更新的块(片段+笔记标题+时间戳)
+- 前端:「日历」导航视图 `CalendarView`:月历网格,某天写的块越多色越深(薄荷绿→teal 五档 `heat-0..4`),点某天显示当天写入的块清单(来源笔记+块时间戳+片段),点块跳转笔记;月切换/回到今天/空态
+
+### ② 反向链接面板(块级)
+- 后端:`link_repo::get_block_backlinks(note_id)` → 引用目标笔记的 `[块id, 来源笔记, 片段, 块时间戳]`(在笔记级反向链接基础上精确到引用块)
+- 前端:编辑器工具栏「反向链接」按钮 / 右侧面板 「反向链接」标签页:列出引用块(来源笔记+片段+块时间戳),点跳来源笔记;无引用显示「暂无反向链接」
+
+### ③ 标签树/过滤
+- 后端:`tag_repo::get_all_tags` → 全部标签+计数(排除已删笔记);`get_notes_by_tag` → 按标签列笔记(大小写不敏感)
+- 前端:侧栏「标签」区列出标签(计数),点击展开该标签下笔记并过滤 NoteList(扁平列出+清除按钮),点过滤列表跳笔记
+
 ## 常用命令
 
 ```bash

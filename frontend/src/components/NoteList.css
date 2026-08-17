@@ -176,3 +176,38 @@
 .tree-note-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 2px; }
 .tree-note-title { font-size: 13px; font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
 .tree-note-preview { font-size: 12px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0; }
+
+/* ============================================================
+   [M3.5a 标签树/过滤] 标签过滤视图
+   ============================================================ */
+.tag-filtered { display: flex; flex-direction: column; }
+.tag-filter-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  margin: 4px 6px 8px;
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  color: var(--accent-color);
+  font-size: 13px;
+  font-weight: 600;
+}
+.tag-filter-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tag-filter-count { margin-left: auto; font-size: 11px; color: var(--text-tertiary); font-weight: 400; }
+.tag-filter-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.tag-filter-clear:hover { background: var(--danger-bg); color: var(--danger-color); }
+.tag-list { padding: 0 6px; }

@@ -13,6 +13,10 @@ import {
   PublishResult,
   Plugin,
   ImportResult,
+  BlockActivity,
+  BlockSearchResult,
+  BlockBacklink,
+  TagCount,
 } from './backend';
 
 // ============================================================
@@ -73,6 +77,23 @@ export class TauriBackend implements BackendAdapter {
   async getBlockHistory(): Promise<never> { return this.blockNotImplemented(); }
   async searchBlocks(): Promise<never> { return this.blockNotImplemented(); }
   async syncNoteBlocks(): Promise<never> { return this.blockNotImplemented(); }
+
+  // ===== [M3.5a] 日历热力图 / 反向链接 / 标签树 (Tauri 命令待 M6 接入,先走 invoke 命名) =====
+  async getBlockActivity(dateFrom: number, dateTo: number): Promise<BlockActivity[]> {
+    return invoke('get_block_activity', { dateFrom, dateTo });
+  }
+  async getBlocksInRange(dateFrom: number, dateTo: number): Promise<BlockSearchResult[]> {
+    return invoke('get_blocks_in_range', { dateFrom, dateTo });
+  }
+  async getBlockBacklinks(noteId: string): Promise<BlockBacklink[]> {
+    return invoke('get_block_backlinks', { noteId });
+  }
+  async getTags(): Promise<TagCount[]> {
+    return invoke('get_tags');
+  }
+  async getNotesByTag(tag: string): Promise<Note[]> {
+    return invoke('get_notes_by_tag', { tag });
+  }
 
   // ===== 文件夹 =====
   async getFolders(includeDeleted = false): Promise<Folder[]> {

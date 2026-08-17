@@ -52,4 +52,11 @@ pub struct NoteLink {
     pub target_title: String,
 }
 
-
+/// [M3.5a 标签树] 标签及笔记计数
+///
+/// 侧栏「标签」区:列出所有标签 + 各自笔记数,可展开该标签下笔记 / 点击过滤笔记列表。
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TagCount {
+    pub name: String,
+    pub count: i64,
+}

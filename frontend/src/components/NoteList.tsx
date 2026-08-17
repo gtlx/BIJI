@@ -11,6 +11,10 @@ interface NoteListProps {
   onSelectNote: (note: Note) => void;
   onSelectFolder: (id: string | null) => void;
   onNewNote: () => void;
+  /** [M3.5a 标签树] 已选标签:扁平列出该标签下笔记 */
+  selectedTag?: string | null;
+  /** [M3.5a 标签树] 清除标签过滤(回到文件夹树) */
+  onClearTag?: () => void;
 }
 
 /** 默认展开深度:根下两层(根=0,一级=1,二级=2),更深默认收起 */
@@ -19,7 +23,7 @@ const STORAGE_KEY = 'biji.tree.expanded';
 
 export function NoteList({
   notes, folders, selectedNoteId, selectedFolderId,
-  onSelectNote, onSelectFolder, onNewNote,
+  onSelectNote, onSelectFolder, onNewNote, selectedTag = null, onClearTag,
 }: NoteListProps) {
   const [filterText, setFilterText] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(() => {
@@ -201,7 +205,30 @@ export function NoteList({
       </div>
 
       <div className="note-list-content">
-        {notes.length === 0 ? (
+        {selectedTag ? (
+          /* [M3.5a 标签树] 标签过滤:扁平列出该标签下笔记 */
+          <div className="tag-filtered">
+            <div className="tag-filter-header">
+              <StrokeIcon name="tag" size={14} />
+              <span className="tag-filter-label">{selectedTag}</span>
+              <span className="tag-filter-count">
+                {notes.filter(n => !n.deleted_at && n.tags.some(t => t.toLowerCase() === selectedTag.toLowerCase())).length} 篇
+              </span>
+              <button className="tag-filter-clear" onClick={onClearTag} title="清除标签过滤">
+                <StrokeIcon name="close" size={13} />
+              </button>
+            </div>
+            {notes.filter(n => !n.deleted_at && n.tags.some(t => t.toLowerCase() === selectedTag.toLowerCase())).length === 0 ? (
+              <div className="empty-state"><p>该标签下暂无笔记</p></div>
+            ) : (
+              <div className="tree tag-list">
+                {notes
+                  .filter(n => !n.deleted_at && n.tags.some(t => t.toLowerCase() === selectedTag.toLowerCase()))
+                  .map(n => renderNote(n))}
+              </div>
+            )}
+          </div>
+        ) : notes.length === 0 ? (
           <div className="empty-state">
             <svg viewBox="0 0 24 24" fill="currentColor">
               <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>

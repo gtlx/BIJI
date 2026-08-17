@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { backend } from './api';
-import type { Note, Folder, AppSettings, Plugin, NoteBlock } from './api/backend';
+import type { Note, Folder, AppSettings, Plugin, NoteBlock, TagCount } from './api/backend';
 import { DEFAULT_TEMPLATES } from './api/backend';
 import { Sidebar, type SidebarNavItem } from './components/Sidebar';
 import { NoteList } from './components/NoteList';
@@ -9,6 +9,7 @@ import { StatusBar } from './components/StatusBar';
 import { ToastContainer } from './components/Toast';
 import { SettingsModal } from './components/SettingsModal';
 import { GraphView } from './components/GraphView';
+import { CalendarView } from './components/CalendarView';
 import { GitPanel } from './components/GitPanel';
 import { PublishPanel } from './components/PublishPanel';
 import { SearchModal } from './components/SearchModal';
@@ -27,6 +28,7 @@ interface ToastItem {
 /** 应用导航(桌面左侧栏 = 移动端底部 Tab 栏的并集,商枢注册表思路) */
 const NAV_ITEMS: SidebarNavItem[] = [
   { id: 'notes', icon: 'notes', label: '笔记' },
+  { id: 'calendar', icon: 'calendar', label: '日历' },
   { id: 'search', icon: 'search', label: '搜索' },
   { id: 'graph', icon: 'graph', label: '图谱' },
   { id: 'git', icon: 'git', label: 'Git' },
@@ -37,13 +39,14 @@ const NAV_ITEMS: SidebarNavItem[] = [
 /** 移动端底部 Tab(手机 <768px;搜索/设置为模态入口) */
 const MOBILE_TABS: TabItem[] = [
   { id: 'notes', icon: 'notes', label: '笔记' },
+  { id: 'calendar', icon: 'calendar', label: '日历' },
   { id: 'search', icon: 'search', label: '搜索' },
   { id: 'graph', icon: 'graph', label: '图谱' },
   { id: 'settings', icon: 'settings', label: '设置' },
 ];
 
 /** 右侧栏标签页 */
-type RightTab = 'outline' | 'properties' | 'pomodoro';
+type RightTab = 'outline' | 'properties' | 'pomodoro' | 'backlinks';
 
 export default function App() {
   const [notes, setNotes] = useState<Note[]>([]);
@@ -72,6 +75,10 @@ export default function App() {
   const [noteBlocks, setNoteBlocks] = useState<NoteBlock[]>([]);
   /** 检索双模式(title/content),SearchModal 切换 */
   const [searchMode, setSearchMode] = useState<'title' | 'content'>('title');
+  /** [M3.5a 标签树] 全部标签(侧栏标签区) */
+  const [tags, setTags] = useState<TagCount[]>([]);
+  /** [M3.5a 标签树] 已选标签:过滤 NoteList */
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
     const id = crypto.randomUUID();
@@ -84,16 +91,18 @@ export default function App() {
 
   const loadData = useCallback(async () => {
     try {
-      const [notesData, foldersData, settingsData, pluginsData] = await Promise.all([
+      const [notesData, foldersData, settingsData, pluginsData, tagsData] = await Promise.all([
         backend.getNotes(),
         backend.getFolders(),
         backend.getSettings(),
         backend.getPlugins(),
+        backend.getTags().catch(() => [] as TagCount[]),
       ]);
       setNotes(notesData);
       setFolders(foldersData);
       setSettings(settingsData);
       setPlugins(pluginsData);
+      setTags(tagsData);
       applyTheme(settingsData.theme);
     } catch (error) {
       console.error('Failed to load data:', error);
@@ -160,6 +169,9 @@ export default function App() {
       setMobileView('list');
     } else if (id === 'search') {
       setShowSearch(true);
+    } else if (id === 'calendar') {
+      setActiveNav('calendar');
+      setMobileView('editor');
     } else if (id === 'graph' || id === 'git' || id === 'publish') {
       setActiveNav(id);
       setMobileView('editor');
@@ -167,6 +179,18 @@ export default function App() {
       setShowPluginManager(true);
     } else if (id === 'settings') {
       setShowSettings(true);
+    }
+  };
+
+  /** [M3.5a] 日历/反向链接的跳转入口:打开目标笔记 */
+  const jumpToNote = ({ id, title }: { id: string; title: string }) => {
+    const target = notes.find(n => n.id === id);
+    if (target) {
+      setSelectedNote(target);
+      setActiveNav('notes');
+      setMobileView('editor');
+    } else {
+      showToast(`未找到笔记: ${title}`, 'info');
     }
   };
 
@@ -312,7 +336,7 @@ export default function App() {
         <Sidebar
           folders={folders}
           selectedFolderId={selectedFolderId}
-          onSelectFolder={setSelectedFolderId}
+          onSelectFolder={(id) => { setSelectedFolderId(id); setSelectedTag(null); }}
           onOpenSettings={() => setShowSettings(true)}
           onNewNote={handleNewNote}
           onNewFolder={handleNewFolder}
@@ -321,6 +345,10 @@ export default function App() {
           onNavClick={handleNavClick}
           collapsed={leftSidebarCollapsed}
           onToggleCollapse={() => setLeftSidebarCollapsed(prev => !prev)}
+          tags={tags}
+          notes={notes}
+          selectedTag={selectedTag}
+          onSelectTag={setSelectedTag}
         />
       </div>
 
@@ -332,8 +360,10 @@ export default function App() {
           selectedNoteId={selectedNote?.id}
           selectedFolderId={selectedFolderId}
           onSelectNote={(note) => { setSelectedNote(note); setMobileView('editor'); }}
-          onSelectFolder={setSelectedFolderId}
+          onSelectFolder={(id) => { setSelectedFolderId(id); setSelectedTag(null); }}
           onNewNote={handleNewNote}
+          selectedTag={selectedTag}
+          onClearTag={() => setSelectedTag(null)}
         />
       </div>
 
@@ -346,7 +376,7 @@ export default function App() {
         >
           <StrokeIcon name="back" size={20} />
         </button>
-        <div className="main-content-inner" data-panel={activeNav === 'graph' ? 'graph' : activeNav === 'git' ? 'git' : activeNav === 'publish' ? 'publish' : 'editor'}>
+        <div className="main-content-inner" data-panel={activeNav === 'graph' ? 'graph' : activeNav === 'calendar' ? 'calendar' : activeNav === 'git' ? 'git' : activeNav === 'publish' ? 'publish' : 'editor'}>
           {activeNav === 'graph' ? (
             <GraphView
               key={graphKey}
@@ -357,6 +387,8 @@ export default function App() {
               currentNoteId={selectedNote?.id}
               onRefresh={() => setGraphKey(k => k + 1)}
             />
+          ) : activeNav === 'calendar' ? (
+            <CalendarView onSelectNote={jumpToNote} />
           ) : activeNav === 'git' ? (
             <GitPanel onClose={() => handleNavClick('notes')} />
           ) : activeNav === 'publish' ? (
@@ -377,6 +409,10 @@ export default function App() {
                 setRightPanelOpen(prev => !prev);
                 if (rightPanelTab !== 'outline') setRightPanelTab('outline');
               }}
+              onOpenBacklinks={() => {
+                setRightPanelOpen(true);
+                setRightPanelTab('backlinks');
+              }}
             />
           )}
         </div>
@@ -391,6 +427,8 @@ export default function App() {
             content={selectedNote?.content || ''}
             defaultTab={rightPanelTab}
             pomodoroEnabled={pomodoroEnabled}
+            noteId={selectedNote?.id || null}
+            onSelectNote={jumpToNote}
             onHeadingClick={(heading, level) => {}}
             onToggle={() => setRightPanelOpen(false)}
             onPropertiesClick={() => showToast('属性面板', 'info')}

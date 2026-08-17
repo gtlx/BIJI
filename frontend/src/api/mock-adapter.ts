@@ -1,7 +1,7 @@
 import {
   BackendAdapter, Note, Folder, AppSettings, SearchQuery, GraphData, SyncResult, SyncStatus,
   GitStatus, GitLogEntry, PublishConfig, PublishResult, Plugin, ImportResult,
-  NoteBlock, BlockHistoryEntry, BlockSearchResult, BlockType,
+  NoteBlock, BlockHistoryEntry, BlockSearchResult, BlockType, BlockActivity, BlockBacklink, TagCount,
 } from './backend';
 
 // ============================================================
@@ -470,5 +470,108 @@ export class MockBackend implements BackendAdapter {
       changed++;
     }
     return changed;
+  }
+
+  // ==================== [M3.5a 日历热力图 / 反向链接 / 标签树] ====================
+
+  /** 毫秒 → 本地日 "YYYY-MM-DD"(与后端 millis_to_day 口径一致) */
+  private toDay(millis: number): string {
+    const d = new Date(millis);
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  }
+
+  /** 懒拆所有存量笔记的块(日历/反向链接需要全量块) */
+  private ensureAllBlocks(): void {
+    this.notes.forEach(n => !n.deleted_at && this.ensureBlocksForNote(n.id));
+  }
+
+  /** 解析块内的 [[wikilink]] 目标标题 */
+  private wikilinkTargets(content: string): string[] {
+    const targets: string[] = [];
+    for (const m of content.matchAll(/\[\[([^\[\]|#]+)(?:[|#][^\]]*)?\]\]/g)) {
+      targets.push(m[1].trim());
+    }
+    return targets;
+  }
+
+  /** 按日统计块活跃(created/updated) */
+  async getBlockActivity(dateFrom: number, dateTo: number): Promise<BlockActivity[]> {
+    this.ensureAllBlocks();
+    const created = new Map<string, number>();
+    const updated = new Map<string, number>();
+    const bump = (map: Map<string, number>, ts: number) => {
+      if (ts < dateFrom || ts > dateTo) return;
+      const d = this.toDay(ts);
+      map.set(d, (map.get(d) || 0) + 1);
+    };
+    this.blocks.forEach(b => { bump(created, b.created_at); bump(updated, b.updated_at); });
+    const days = new Set([...created.keys(), ...updated.keys()]);
+    return [...days].sort().map(date => ({
+      date,
+      created: created.get(date) || 0,
+      updated: updated.get(date) || 0,
+    }));
+  }
+
+  /** 范围内有写入的块(创建或更新) */
+  async getBlocksInRange(dateFrom: number, dateTo: number): Promise<BlockSearchResult[]> {
+    this.ensureAllBlocks();
+    const alive = new Set(this.notes.filter(n => !n.deleted_at).map(n => n.id));
+    return this.blocks
+      .filter(b => alive.has(b.note_id) &&
+        ((b.created_at >= dateFrom && b.created_at <= dateTo) || (b.updated_at >= dateFrom && b.updated_at <= dateTo)))
+      .map(b => ({
+        block_id: b.id,
+        note_id: b.note_id,
+        note_title: this.notes.find(n => n.id === b.note_id)?.title || '',
+        content: b.content,
+        updated_at: b.updated_at,
+      }))
+      .sort((a, b) => b.updated_at - a.updated_at);
+  }
+
+  /** 引用目标笔记的块(块级反向链接) */
+  async getBlockBacklinks(noteId: string): Promise<BlockBacklink[]> {
+    this.ensureAllBlocks();
+    const target = this.notes.find(n => n.id === noteId);
+    if (!target || target.deleted_at) return [];
+    const backlinks: BlockBacklink[] = [];
+    this.blocks.forEach(b => {
+      if (b.note_id === noteId) return;
+      const note = this.notes.find(n => n.id === b.note_id);
+      if (!note || note.deleted_at) return;
+      if (this.wikilinkTargets(b.content).includes(target.title)) {
+        backlinks.push({
+          block_id: b.id,
+          source_note_id: note.id,
+          source_note_title: note.title,
+          content: b.content,
+          created_at: b.created_at,
+          updated_at: b.updated_at,
+        });
+      }
+    });
+    return backlinks.sort((a, b) => b.updated_at - a.updated_at);
+  }
+
+  /** 全部标签及笔记数 */
+  async getTags(): Promise<TagCount[]> {
+    const map = new Map<string, number>();
+    this.notes.filter(n => !n.deleted_at).forEach(n => n.tags.forEach(t => {
+      const k = t.toLowerCase();
+      map.set(k, (map.get(k) || 0) + 1);
+    }));
+    return [...map.entries()]
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+  }
+
+  /** 按标签列出笔记 */
+  async getNotesByTag(tag: string): Promise<Note[]> {
+    const lower = tag.toLowerCase();
+    return this.notes
+      .filter(n => !n.deleted_at && n.tags.some(t => t.toLowerCase() === lower))
+      .sort((a, b) => b.updated_at - a.updated_at);
   }
 }

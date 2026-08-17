@@ -15,6 +15,8 @@ interface EditorProps {
   onLinkClick?: (noteTitle: string) => void;
   onTitleChange?: (title: string) => void;
   onToggleOutline?: () => void;
+  /** [M3.5a 反向链接] 打开右侧反向链接面板 */
+  onOpenBacklinks?: () => void;
   scrollToHeading?: string | null;
   externalEditorMode?: string;
   externalPreviewMode?: string;
@@ -38,7 +40,7 @@ const RECENT_WINDOW_MS = 2 * 24 * 3600 * 1000;
 
 export function Editor({
   note, folders, onSelectFolder, onSave, onDelete, settings, syncEnabled, onLinkClick,
-  onTitleChange, onToggleOutline, scrollToHeading, externalEditorMode, externalPreviewMode,
+  onTitleChange, onToggleOutline, onOpenBacklinks, scrollToHeading, externalEditorMode, externalPreviewMode,
   onEditorModeChange, onPreviewModeChange, noteBlocks,
 }: EditorProps) {
   const [title, setTitle] = useState('');
@@ -345,6 +347,15 @@ export function Editor({
                 title="大纲"
               >
                 <StrokeIcon name="outline" size={18} />
+              </button>
+            )}
+            {onOpenBacklinks && (
+              <button
+                className="outline-toggle-btn"
+                onClick={onOpenBacklinks}
+                title="反向链接:谁引用了当前笔记"
+              >
+                <StrokeIcon name="backlink" size={18} />
               </button>
             )}
             <button

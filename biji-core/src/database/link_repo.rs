@@ -164,4 +164,125 @@ impl Database {
 
         Ok(GraphData { nodes, edges })
     }
+
+    /// [M3.5a 反向链接(块级)] 引用当前笔记的块列表
+    ///
+    /// 在已建立的反向链接来源笔记中,精确到「哪一段话引用了它」:
+    /// 遍历来源笔记的块,找到内容含 `[[当前标题]]` 的块,返回 块片段 + 来源笔记 + 块时间戳。
+    pub fn get_block_backlinks(&self, note_id: &str) -> Result<Vec<crate::models::BlockBacklink>, Error> {
+        // 目标笔记标题(链接以标题为锚)
+        let note = match self.get_note(note_id)? {
+            Some(n) => n,
+            None => return Ok(Vec::new()),
+        };
+        if note.deleted_at.is_some() {
+            return Ok(Vec::new());
+        }
+        // 笔记级反向链接(来源笔记集合)
+        let sources = self.get_backlinks(note_id)?;
+
+        // 逐来源笔记扫描块,收集真正引用目标标题的块
+        let mut out: Vec<crate::models::BlockBacklink> = Vec::new();
+        for src in &sources {
+            // 复用块级联:来源笔记的块(含时间戳)
+            {
+                let blocks = self.get_note_blocks(&src.id)?;
+                for b in blocks {
+                    if b.content.contains(&format!("[[{}", note.title)) {
+                        out.push(crate::models::BlockBacklink {
+                            block_id: b.id,
+                            source_note_id: src.id.clone(),
+                            source_note_title: src.title.clone(),
+                            content: b.content,
+                            created_at: b.created_at,
+                            updated_at: b.updated_at,
+                        });
+                    }
+                }
+            }
+        }
+        // 按更新倒序中减序
+        out.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+        Ok(out)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{BlockType, Note, SyncStatus};
+
+    fn open_db() -> (tempfile::TempDir, Database) {
+        let dir = tempfile::tempdir().unwrap();
+        let db = Database::open(&dir.path().join("biji.db")).unwrap();
+        (dir, db)
+    }
+
+    fn make_note(id: &str, title: &str, content: &str) -> Note {
+        Note {
+            id: id.to_string(),
+            title: title.to_string(),
+            content: content.to_string(),
+            folder_id: None,
+            created_at: 1_000,
+            updated_at: 2_000,
+            tags: vec![],
+            is_encrypted: false,
+            sync_status: SyncStatus::Pending,
+            deleted_at: None,
+            frontmatter: None,
+        }
+    }
+
+    fn make_block(note_id: &str, content: &str, order: i64, ts: i64) -> crate::models::Block {
+        crate::models::Block {
+            id: uuid::Uuid::new_v4().to_string(),
+            note_id: note_id.to_string(),
+            parent_id: None,
+            block_type: BlockType::Paragraph,
+            content: content.to_string(),
+            created_at: ts,
+            updated_at: ts,
+            sort_order: order,
+        }
+    }
+
+    /// [M3.5a] 反向链接(块级):精确到引用块
+    #[test]
+    fn test_get_block_backlinks_matches_referencing_blocks() {
+        let (_dir, db) = open_db();
+        db.save_note(&make_note("target", "目标笔记", "目标内容")).unwrap();
+        db.save_note(&make_note("src1", "来源一", "正文里引用 [[目标笔记]] 一次。"))
+            .unwrap();
+        db.save_note(&make_note("src2", "来源二", "无关内容。")).unwrap();
+
+        // 为来源一建两块:一块引用目标,一块不引用
+        db.insert_block(&make_block("src1", "这段引用 [[目标笔记]]", 0, 200)).unwrap();
+        db.insert_block(&make_block("src1", "这段不引用", 1, 300)).unwrap();
+        // 来源二只有一块,不引用
+        db.insert_block(&make_block("src2", "没有链接", 0, 100)).unwrap();
+
+        let backlinks = db.get_block_backlinks("target").unwrap();
+        assert_eq!(backlinks.len(), 1, "应只命中 1 个引用块,实际: {:?}", backlinks);
+        let bl = &backlinks[0];
+        assert_eq!(bl.source_note_id, "src1");
+        assert_eq!(bl.source_note_title, "来源一");
+        assert!(bl.content.contains("[[目标笔记]]"));
+        assert_eq!(bl.created_at, 200);
+    }
+
+    /// [M3.5a] 反向链接(块级):无引用 → 空;目标不存在 → 空
+    #[test]
+    fn test_get_block_backlinks_empty_cases() {
+        let (_dir, db) = open_db();
+        db.save_note(&make_note("lonely", "无人引用", "内容")).unwrap();
+        db.save_note(&make_note("other", "其他", "不引用任何人")).unwrap();
+        db.insert_block(&make_block("other", "一段话", 0, 100)).unwrap();
+
+        let backlinks = db.get_block_backlinks("lonely").unwrap();
+        assert!(backlinks.is_empty());
+
+        let missing = db.get_block_backlinks("no-such-note").unwrap();
+        assert!(missing.is_empty());
+    }
 }

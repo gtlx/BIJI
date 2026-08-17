@@ -231,6 +231,94 @@ impl Database {
         }
         Ok(results)
     }
+
+    // ==================== [M3.5a 日历热力图] ====================
+
+    /// 毫秒时间戳 → 本地日 "YYYY-MM-DD"(与前端 CalendarView 色阶口径一致)
+    fn millis_to_day(millis: i64) -> String {
+        chrono::DateTime::from_timestamp_millis(millis)
+            .map(|dt| dt.with_timezone(&chrono::Local).format("%Y-%m-%d").to_string())
+            .unwrap_or_default()
+    }
+
+    /// 统计 [date_from, date_to](毫秒)内按日的块活跃
+    ///
+    /// 某块创建记入当日 created,更新记入当日 updated(排除已删除笔记下的块)。
+    /// 返回按日升序的 BlockActivity 列表;无任何写入的日期不出现(前端按需补齐空天)。
+    pub fn get_block_activity(&self, date_from: i64, date_to: i64) -> Result<Vec<crate::models::BlockActivity>, Error> {
+        use std::collections::BTreeMap;
+        let conn = self.conn();
+
+        let mut created: BTreeMap<String, i64> = BTreeMap::new();
+        let mut updated: BTreeMap<String, i64> = BTreeMap::new();
+
+        {
+            let mut stmt = conn.prepare(
+                "SELECT b.created_at FROM blocks b
+                 INNER JOIN notes n ON b.note_id = n.id
+                 WHERE n.deleted_at IS NULL AND b.created_at BETWEEN ?1 AND ?2",
+            )?;
+            let rows = stmt.query_map(rusqlite::params![date_from, date_to], |r| r.get::<_, i64>(0))?;
+            for row in rows {
+                let ts = row?;
+                *created.entry(Self::millis_to_day(ts)).or_insert(0) += 1;
+            }
+        }
+        {
+            let mut stmt = conn.prepare(
+                "SELECT b.updated_at FROM blocks b
+                 INNER JOIN notes n ON b.note_id = n.id
+                 WHERE n.deleted_at IS NULL AND b.updated_at BETWEEN ?1 AND ?2",
+            )?;
+            let rows = stmt.query_map(rusqlite::params![date_from, date_to], |r| r.get::<_, i64>(0))?;
+            for row in rows {
+                let ts = row?;
+                *updated.entry(Self::millis_to_day(ts)).or_insert(0) += 1;
+            }
+        }
+
+        let mut merged: BTreeMap<String, crate::models::BlockActivity> = BTreeMap::new();
+        for (d, c) in created {
+            merged.entry(d.clone()).or_insert_with(|| crate::models::BlockActivity {
+                date: d.clone(), created: 0, updated: 0,
+            }).created = c;
+        }
+        for (d, u) in updated {
+            merged.entry(d.clone()).or_insert_with(|| crate::models::BlockActivity {
+                date: d.clone(), created: 0, updated: 0,
+            }).updated = u;
+        }
+        Ok(merged.into_values().collect())
+    }
+
+    /// [M3.5a 日历] 取 [date_from, date_to] 内有写入的块(创建或更新)
+    ///
+    /// 供日历「点某天 → 显示当天写了哪些块」:含块片段 + 所在笔记标题 + 块时间戳。
+    pub fn get_blocks_in_range(&self, date_from: i64, date_to: i64) -> Result<Vec<crate::models::BlockSearchResult>, Error> {
+        let conn = self.conn();
+        let mut stmt = conn.prepare(
+            "SELECT b.id AS block_id, b.note_id, n.title AS note_title, b.content, b.updated_at
+             FROM blocks b
+             INNER JOIN notes n ON b.note_id = n.id
+             WHERE n.deleted_at IS NULL
+               AND (b.created_at BETWEEN ?1 AND ?2 OR b.updated_at BETWEEN ?1 AND ?2)
+             ORDER BY b.updated_at DESC",
+        )?;
+        let rows = stmt.query_map(rusqlite::params![date_from, date_to], |row| {
+            Ok(crate::models::BlockSearchResult {
+                block_id: row.get("block_id")?,
+                note_id: row.get("note_id")?,
+                note_title: row.get("note_title")?,
+                content: row.get("content")?,
+                updated_at: row.get("updated_at")?,
+            })
+        })?;
+        let mut results = Vec::new();
+        for row in rows {
+            results.push(row?);
+        }
+        Ok(results)
+    }
 }
 
 #[cfg(test)]
@@ -459,5 +547,80 @@ mod tests {
         assert_eq!(history.len(), 3);
         assert_eq!(history[0].content_snapshot, "v3");
         assert_eq!(history[2].content_snapshot, "v1");
+    }
+
+    /// [M3.5a] 日历热力图:按日统计 created/updated 块数
+    #[test]
+    fn test_get_block_activity_groups_by_day() {
+        let (_dir, db) = open_db();
+        save_note(&db, "n1", "笔记", "内容");
+        // 固定基准毫秒(UTC 2023-11-14 05:33 UTC)
+        let day = 1_700_000_000_000i64;
+        let day_start = day - 4 * 3600_000; // 按本地时区确保落入同一天(取当天首尾)
+        let day_end = day_start + 24 * 3600_000;
+        // 3 块当日创建;把初始 updated_at 挪到前一天(不计入本日 updated)
+        let b1 = make_block("n1", "A", 0, day_start + 100);
+        let b2 = make_block("n1", "B", 1, day_start + 200);
+        let b3 = make_block("n1", "C", 2, day_start + 300);
+        db.insert_block(&b1).unwrap();
+        db.insert_block(&b2).unwrap();
+        db.insert_block(&b3).unwrap();
+        for id in [&b1.id, &b2.id, &b3.id] {
+            db.conn().execute(
+                "UPDATE blocks SET updated_at = ?1 WHERE id = ?2",
+                rusqlite::params![day_start - 86400_000, id],
+            ).unwrap();
+        }
+        // 当日只更新其中的 2 块
+        db.update_block_content(&b1.id, "A2", day_start + 500).unwrap();
+        db.update_block_content(&b2.id, "B2", day_start + 600).unwrap();
+
+        let activity = db.get_block_activity(day_start, day_end).unwrap();
+        assert_eq!(activity.len(), 1, "应正好一个日期条目: {:?}", activity);
+        assert_eq!(activity[0].created, 3, "当日创建 3 块");
+        assert_eq!(activity[0].updated, 2, "当日只更新 2 块");
+        // date 形如 YYYY-MM-DD
+        let parts: Vec<&str> = activity[0].date.split('-').collect();
+        assert_eq!(parts.len(), 3);
+    }
+
+    /// [M3.5a] 日历:范围外块不计入;已删除笔记下的块不计入
+    #[test]
+    fn test_get_block_activity_respects_range_and_deleted() {
+        let (_dir, db) = open_db();
+        save_note(&db, "n1", "笔记", "内容");
+        save_note(&db, "n2", "删除的", "内容");
+        let day1 = 1_700_000_000_000i64;
+        let day2 = day1 + 86400_000;
+        db.insert_block(&make_block("n1", "天1", 0, day1)).unwrap();
+        db.insert_block(&make_block("n2", "删除", 0, day2)).unwrap();
+        db.delete_note("n2", false).unwrap();
+
+        let activity = db.get_block_activity(day1, day1 + 86400_000).unwrap();
+        assert_eq!(activity.len(), 1);
+        assert_eq!(activity[0].created, 1);
+    }
+
+    /// [M3.5a] 日历:点天取当天写入的块(片段 + 笔记标题)
+    #[test]
+    fn test_get_blocks_in_range_returns_day_blocks() {
+        let (_dir, db) = open_db();
+        save_note(&db, "n1", "笔记A", "内容");
+        save_note(&db, "n2", "笔记B", "内容");
+        let day = 1_700_000_000_000i64;
+        db.insert_block(&make_block("n1", "早上的块", 0, day + 100)).unwrap();
+        db.insert_block(&make_block("n2", "晚上的块", 0, day + 600)).unwrap();
+
+        let day_start = day - 4 * 3600_000;
+        let day_end = day_start + 24 * 3600_000;
+        let blocks = db.get_blocks_in_range(day_start, day_end).unwrap();
+        assert_eq!(blocks.len(), 2);
+        // 按 updated_at 降序:晚上在前
+        assert_eq!(blocks[0].content, "晚上的块");
+        assert_eq!(blocks[0].note_title, "笔记B");
+
+        // 空范围返回空
+        let empty = db.get_blocks_in_range(day + 9000_000, day + 9000_000).unwrap();
+        assert!(empty.is_empty());
     }
 }

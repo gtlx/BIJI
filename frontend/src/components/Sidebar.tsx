@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { Folder } from '../api/backend';
+import type { Folder, Note, TagCount } from '../api/backend';
 import { StrokeIcon } from '../icons';
 import './Sidebar.css';
 
@@ -24,6 +24,14 @@ interface SidebarProps {
   onNavClick: (id: string) => void;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
+  /** [M3.5a 标签树] 全部标签及计数 */
+  tags?: TagCount[];
+  /** [M3.5a 标签树] 已选标签(过滤笔记列表) */
+  selectedTag?: string | null;
+  /** [M3.5a 标签树] 点标签 → 过滤 NoteList */
+  onSelectTag?: (tag: string | null) => void;
+  /** [M3.5a 标签树] 全量笔记(展开标签下笔记用) */
+  notes?: Note[];
 }
 
 interface BreadcrumbItem {
@@ -43,8 +51,14 @@ export function Sidebar({
   onNavClick,
   collapsed = false,
   onToggleCollapse,
+  tags = [],
+  selectedTag = null,
+  onSelectTag,
+  notes = [],
 }: SidebarProps) {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+  /** [M3.5a] 展开的标签(显示其下笔记) */
+  const [expandedTag, setExpandedTag] = useState<string | null>(null);
 
   const buildBreadcrumb = (folderId: string | null): BreadcrumbItem[] => {
     const items: BreadcrumbItem[] = [{ id: null, name: '所有笔记' }];
@@ -144,6 +158,60 @@ export function Sidebar({
               ))
             ) : (
               <p className="empty-text">暂无文件夹</p>
+            )}
+          </div>
+
+          {/* [M3.5a] 标签区:列出标签,点击过滤笔记列表;可展开标签下笔记 */}
+          <div className="nav-section">
+            <div className="nav-section-header">
+              <span className="nav-section-title">标签</span>
+            </div>
+            {tags.length === 0 ? (
+              <p className="empty-text">暂无标签</p>
+            ) : (
+              tags.map(tag => {
+                const isOpen = expandedTag === tag.name;
+                const tagNotes = notes.filter(n => !n.deleted_at && n.tags.some(t => t.toLowerCase() === tag.name.toLowerCase()));
+                return (
+                  <div key={tag.name} className="tag-group">
+                    <button
+                      className={`nav-item tag-item ${selectedTag === tag.name ? 'active' : ''}`}
+                      onClick={() => {
+                        // 再点已展开标签 = 取消过滤 + 收起
+                        if (selectedTag === tag.name) { onSelectTag?.(null); setExpandedTag(null); return; }
+                        onSelectTag?.(tag.name);
+                        setExpandedTag(isOpen ? null : tag.name);
+                      }}
+                      title={tag.name}
+                    >
+                      <span className="tree-chevron">
+                        <StrokeIcon name={isOpen ? 'chevron_down' : 'chevron_right'} size={13} />
+                      </span>
+                      <StrokeIcon name="tag" size={16} />
+                      <span className="tag-name">{tag.name}</span>
+                      <span className="tree-count">{tag.count}</span>
+                    </button>
+                    {isOpen && (
+                      <div className="tag-notes">
+                        {tagNotes.length === 0 ? (
+                          <p className="empty-text">该标签下暂无笔记</p>
+                        ) : (
+                          tagNotes.map(n => (
+                            <button
+                              key={n.id}
+                              className="nav-item tag-note"
+                              onClick={() => onSelectTag?.(tag.name)}
+                              title={n.title}
+                            >
+                              <span className="tag-note-title">{n.title || '无标题'}</span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
             )}
           </div>
         </div>
