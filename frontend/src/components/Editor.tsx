@@ -17,6 +17,10 @@ interface EditorProps {
   onToggleOutline?: () => void;
   /** [M3.5a 反向链接] 打开右侧反向链接面板 */
   onOpenBacklinks?: () => void;
+  /** [M3.5b 导出] 导出 .md */
+  onExportMarkdown?: (noteId: string) => void;
+  /** [M3.5b 导出] 导出可打印 HTML(浏览器可「打印为 PDF」) */
+  onExportHtml?: (noteId: string) => void;
   scrollToHeading?: string | null;
   externalEditorMode?: string;
   externalPreviewMode?: string;
@@ -40,8 +44,8 @@ const RECENT_WINDOW_MS = 2 * 24 * 3600 * 1000;
 
 export function Editor({
   note, folders, onSelectFolder, onSave, onDelete, settings, syncEnabled, onLinkClick,
-  onTitleChange, onToggleOutline, onOpenBacklinks, scrollToHeading, externalEditorMode, externalPreviewMode,
-  onEditorModeChange, onPreviewModeChange, noteBlocks,
+  onTitleChange, onToggleOutline, onOpenBacklinks, onExportMarkdown, onExportHtml, scrollToHeading,
+  externalEditorMode, externalPreviewMode, onEditorModeChange, onPreviewModeChange, noteBlocks,
 }: EditorProps) {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -56,6 +60,7 @@ export function Editor({
     try { return localStorage.getItem('biji.show_block_timestamps') === '1'; } catch { return false; }
   });
   /** M3 演变模式:开启后块按创建时间重排(展示「先写哪段后写哪段」),退出恢复 sort_order */
+  const [showExportMenu, setShowExportMenu] = useState(false);
   const [timelineMode, setTimelineMode] = useState<boolean>(() => {
     try { return localStorage.getItem('biji.timeline_mode') === '1'; } catch { return false; }
   });
@@ -357,6 +362,37 @@ export function Editor({
               >
                 <StrokeIcon name="backlink" size={18} />
               </button>
+            )}
+            {/* [M3.5b 导出] 导出菜单:.md / HTML(可打印,浏览器「打印为 PDF」) */}
+            {note && (
+              <div className="export-menu-wrap">
+                <button
+                  className="outline-toggle-btn"
+                  onClick={() => setShowExportMenu(v => !v)}
+                  title="导出"
+                >
+                  <StrokeIcon name="download" size={18} />
+                </button>
+                {showExportMenu && (
+                  <>
+                    <div className="export-menu-backdrop" onClick={() => setShowExportMenu(false)} />
+                    <div className="export-menu">
+                      <button
+                        className="export-menu-item"
+                        onClick={() => { setShowExportMenu(false); onExportMarkdown?.(note.id); }}
+                      >
+                        <StrokeIcon name="download" size={15} /> 导出 .md
+                      </button>
+                      <button
+                        className="export-menu-item"
+                        onClick={() => { setShowExportMenu(false); onExportHtml?.(note.id); }}
+                      >
+                        <StrokeIcon name="download" size={15} /> 导出 HTML(可打印为 PDF)
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             )}
             <button
               className={`outline-toggle-btn ${timelineMode ? 'active' : ''}`}

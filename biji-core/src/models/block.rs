@@ -154,6 +154,27 @@ pub struct BlockBacklink {
     pub updated_at: i64,
 }
 
+/// [M3.5b 回收站] 回收站中的块(软删后可恢复回原笔记)
+///
+/// 块模型本身不含 deleted_at(避免大范围改字面量),回收站展示用独立结构,
+/// 携带笔记标题 + 删除时间(通常等于块 updated_at 后被软删的时间戳)。
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TrashBlock {
+    pub id: String,
+    /// 原归属笔记 id(恢复时写回 note_id)
+    pub note_id: String,
+    pub parent_id: Option<String>,
+    pub block_type: BlockType,
+    pub content: String,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub sort_order: i64,
+    /// 原笔记标题(展示用)
+    pub note_title: String,
+    /// 删除时间
+    pub deleted_at: i64,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

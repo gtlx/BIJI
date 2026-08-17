@@ -18,6 +18,61 @@ pub fn run(conn: &Connection) -> Result<(), Error> {
         migrate_to_v2(conn)?;
     }
 
+    if version < 3 {
+        migrate_to_v3(conn)?;
+    }
+
+    Ok(())
+}
+
+/// [M3.5b] 003:块软删字段 + 模板表 + 内置模板种入
+fn migrate_to_v3(conn: &Connection) -> Result<(), Error> {
+    let tx = conn.unchecked_transaction()?;
+
+    // 建表/加列/索引 + 内置模板基础种入(SQL 部分)
+    tx.execute_batch(include_str!("../../migrations/003_trash_templates.sql"))?;
+
+    // 用 Rust 补全内置模板的完整中文内容(比 SQL 内嵌长篇更易维护)
+    let now = chrono::Utc::now().timestamp_millis();
+    let builtins: [(&str, &str, &str, &str); 4] = [
+        ("blank", "空白笔记", "blank", ""),
+        (
+            "diary",
+            "日记",
+            "diary",
+            "# {{date}}\n\n## 天气\n\n## 今日要点\n\n## 明日计划\n",
+        ),
+        (
+            "meeting",
+            "会议",
+            "meeting",
+            "# {{date}} 会议纪要\n\n## 会议主题\n\n## 议程\n- \n- \n- \n\n## 讨论要点\n\n## 待办事项\n- [ ] \n- [ ] \n",
+        ),
+        (
+            "reading",
+            "读书",
+            "reading",
+            "# 《书名》读书笔记\n\n> 作者:  \n> 阅读日期: {{date}}\n\n## 内容概要\n\n## 我的笔记\n\n## 精彩摘录\n> \n",
+        ),
+    ];
+
+    for (id, name, category, content) in builtins {
+        tx.execute(
+            "INSERT INTO templates (id, name, category, content, is_builtin, created_at)
+             VALUES (?1, ?2, ?3, ?4, 1, ?5)
+             ON CONFLICT(id) DO UPDATE SET
+               name = excluded.name,
+               category = excluded.category,
+               content = excluded.content,
+               is_builtin = 1",
+            rusqlite::params![id, name, category, content, now],
+        )?;
+    }
+
+    tx.execute_batch("PRAGMA user_version = 3")?;
+    tx.commit()?;
+
+    log::info!("Migration 003 applied: blocks.deleted_at + templates table + builtins");
     Ok(())
 }
 
@@ -133,7 +188,7 @@ mod tests {
             let conn = db.conn();
             conn.query_row("PRAGMA user_version", [], |r| r.get(0)).unwrap()
         };
-        assert_eq!(version, 2);
+        assert_eq!(version, 3);
 
         let blocks = db.get_note_blocks(&note.id).unwrap();
         // frontmatter 不进块;标题/段落/列表项 = 3 块
@@ -160,7 +215,7 @@ mod tests {
         let db = Database::open(&dir.path().join("biji.db")).unwrap();
         let conn = db.conn();
         let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0)).unwrap();
-        assert_eq!(version, 2);
+        assert_eq!(version, 3);
         // 空库:没有笔记可拆,块表存在即可
         let has_blocks = conn
             .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='blocks'")

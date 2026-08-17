@@ -137,6 +137,42 @@ impl Database {
         Ok(())
     }
 
+    /// [M3.5b 回收站] 回收站中的笔记(软删未彻底删)
+    pub fn get_trash_notes(&self) -> Result<Vec<Note>, Error> {
+        let mut notes: Vec<Note> = {
+            let conn = self.conn();
+            let mut stmt = conn.prepare(
+                "SELECT * FROM notes WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC",
+            )?;
+            let rows = stmt.query_map([], |row| crate::database::note_from_row(row))?;
+            let mut out = Vec::new();
+            for row in rows {
+                out.push(row?);
+            }
+            out
+        };
+        self.load_tags_for_notes(&mut notes)?;
+        Ok(notes)
+    }
+
+    /// [M3.5b 回收站] 清空回收站:彻底删除所有软删的笔记(其块随 FK 级联删)+ 所有被软删的块
+    pub fn empty_trash(&self) -> Result<(), Error> {
+        use crate::database::connection::with_transaction;
+        let conn = self.conn();
+        with_transaction(&conn, |tx| {
+            // 删软删笔记(块/笔记标签/链接 FK 级联;块历史 block_id 置 NULL 保留审计)
+            tx.execute("DELETE FROM notes WHERE deleted_at IS NOT NULL", [])?;
+            // 删被软删的块(其历史块 block_id 置 NULL)
+            tx.execute(
+                "DELETE FROM block_history WHERE block_id IN (SELECT id FROM blocks WHERE deleted_at IS NOT NULL)",
+                [],
+            )?;
+            tx.execute("DELETE FROM blocks WHERE deleted_at IS NOT NULL", [])?;
+            Ok(())
+        })?;
+        Ok(())
+    }
+
     /// 搜索笔记
     pub fn search_notes(&self, query: &SearchQuery) -> Result<Vec<Note>, Error> {
         let mut sql = String::from("SELECT DISTINCT n.* FROM notes n");

@@ -6,6 +6,8 @@ mod plugin;
 mod publish;
 mod settings;
 mod sync;
+mod template;
+mod trash;
 mod webdav;
 
 pub use block_service::*;
@@ -16,4 +18,6 @@ pub use plugin::*;
 pub use publish::*;
 pub use settings::*;
 pub use sync::*;
+pub use template::*;
+pub use trash::*;
 pub use webdav::*;

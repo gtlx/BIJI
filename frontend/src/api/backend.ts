@@ -162,6 +162,30 @@ export interface TagCount {
   count: number;
 }
 
+/** [M3.5b 笔记模板] 新建笔记时可选的预设模板 */
+export interface NoteTemplate {
+  id: string;
+  name: string;
+  category: string;
+  content: string;
+  is_builtin: boolean;
+  created_at: number;
+}
+
+/** [M3.5b 回收站] 回收站中的块(软删,可恢复回原笔记) */
+export interface TrashBlock {
+  id: string;
+  note_id: string;
+  parent_id: string | null;
+  type: BlockType;
+  content: string;
+  created_at: number;
+  updated_at: number;
+  sort_order: number;
+  note_title: string;
+  deleted_at: number;
+}
+
 export interface SyncResult {
   success: boolean;
   uploaded: number;
@@ -291,6 +315,36 @@ export interface BackendAdapter {
   importMarkdown(path: string): Promise<ImportResult>;
   exportMarkdown(path: string): Promise<ImportResult>;
 
+  // === [M3.5b 回收站] ===
+  /** 回收站中的笔记(软删未彻底删) */
+  getTrashNotes(): Promise<Note[]>;
+  /** 回收站中的块(其笔记未被删) */
+  getTrashBlocks(): Promise<TrashBlock[]>;
+  /** 恢复一篇笔记 */
+  restoreNote(id: string): Promise<void>;
+  /** 恢复一个块回原笔记 */
+  restoreBlock(id: string): Promise<void>;
+  /** 彻底删除一篇笔记 */
+  permanentDeleteNote(id: string): Promise<void>;
+  /** 彻底删除一个块 */
+  permanentDeleteBlock(id: string): Promise<void>;
+  /** 清空回收站 */
+  emptyTrash(): Promise<void>;
+
+  // === [M3.5b 笔记模板] ===
+  /** 列出全部模板(内置在前) */
+  getTemplates(): Promise<NoteTemplate[]>;
+  /** 新增自定义模板 */
+  createTemplate(name: string, content: string): Promise<NoteTemplate>;
+  /** 删除自定义模板(内置返回 false) */
+  deleteTemplate(id: string): Promise<boolean>;
+
+  // === [M3.5b 导出增强] ===
+  /** 导出单笔记 Markdown 内容 */
+  exportNoteMarkdown(noteId: string): Promise<string>;
+  /** 导出单笔记为可打印 HTML(浏览器可「打印为 PDF」) */
+  exportNoteHtml(noteId: string): Promise<string>;
+
   // === 插件 ===
   getPlugins(): Promise<Plugin[]>;
   togglePlugin(id: string, enabled: boolean): Promise<void>;
@@ -316,10 +370,10 @@ export const DEFAULT_SHORTCUTS: ShortcutSettings = {
   toggle_editor_mode: 'Ctrl+E',
 };
 
-// 默认模板
+// 默认模板(前端兜底,真实后端以 getTemplates 为准)
 export const DEFAULT_TEMPLATES = [
-  { id: 'blank', name: '空白笔记', content: '' },
-  { id: 'meeting', name: '会议记录', content: '# 会议记录\n\n## 会议主题\n\n## 参会人员\n\n## 会议内容\n\n## 待办事项\n- [ ] \n' },
-  { id: 'daily', name: '每日日志', content: '# {{date}}\n\n## 今日完成\n\n## 遇到的问题\n\n## 明日计划\n' },
-  { id: 'todo', name: '待办清单', content: '# 待办清单\n\n- [ ] \n- [ ] \n- [ ] \n' },
+  { id: 'blank', name: '空白笔记', content: '', category: 'blank' },
+  { id: 'diary', name: '日记', content: '# {{date}}\n\n## 天气\n\n## 今日要点\n\n## 明日计划\n', category: 'diary' },
+  { id: 'meeting', name: '会议', content: '# {{date}} 会议纪要\n\n## 会议主题\n\n## 议程\n- \n- \n- \n\n## 讨论要点\n\n## 待办事项\n- [ ] \n', category: 'meeting' },
+  { id: 'reading', name: '读书', content: '# 《书名》读书笔记\n\n## 内容概要\n\n## 我的笔记\n\n## 精彩摘录\n> \n', category: 'reading' },
 ];

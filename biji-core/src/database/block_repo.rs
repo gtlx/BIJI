@@ -57,6 +57,60 @@ impl Database {
         Ok(())
     }
 
+    /// [M3.5b 回收站] 软删一个块：置 deleted_at(仍可读历史、可恢复到原笔记)
+    pub fn soft_delete_block(&self, block_id: &str, ts: i64) -> Result<(), Error> {
+        let conn = self.conn();
+        conn.execute(
+            "UPDATE blocks SET deleted_at = ?1 WHERE id = ?2",
+            rusqlite::params![ts, block_id],
+        )?;
+        Ok(())
+    }
+
+    /// [M3.5b 回收站] 恢复一个被软删的块(deleted_at 置 NULL,回到原笔记)
+    pub fn restore_block(&self, block_id: &str) -> Result<(), Error> {
+        let conn = self.conn();
+        conn.execute(
+            "UPDATE blocks SET deleted_at = NULL WHERE id = ?1",
+            rusqlite::params![block_id],
+        )?;
+        Ok(())
+    }
+
+    /// [M3.5b 回收站] 回收站中的块：块被软删且其笔记未被删(笔记若也在回收站则随笔记一并处理)
+    ///
+    /// 返回带笔记标题 + 删除时间的 TrashBlock 列表(按删除时间倒序)。
+    pub fn get_trash_blocks(&self) -> Result<Vec<crate::models::TrashBlock>, Error> {
+        let conn = self.conn();
+        let mut stmt = conn.prepare(
+            "SELECT b.id, b.note_id, b.parent_id, b.type, b.content, b.created_at, b.updated_at,
+                    b.sort_order, n.title AS note_title, b.deleted_at
+             FROM blocks b
+             INNER JOIN notes n ON b.note_id = n.id
+             WHERE b.deleted_at IS NOT NULL AND n.deleted_at IS NULL
+             ORDER BY b.deleted_at DESC",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok(crate::models::TrashBlock {
+                id: row.get("id")?,
+                note_id: row.get("note_id")?,
+                parent_id: row.get("parent_id")?,
+                block_type: crate::models::BlockType::from_str(&row.get::<_, String>("type")?),
+                content: row.get("content")?,
+                created_at: row.get("created_at")?,
+                updated_at: row.get("updated_at")?,
+                sort_order: row.get("sort_order")?,
+                note_title: row.get("note_title")?,
+                deleted_at: row.get("deleted_at")?,
+            })
+        })?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row?);
+        }
+        Ok(out)
+    }
+
     /// 删除某笔记的全部块(笔记永久删除时级联会处理,此方法用于显式重建)
     pub fn delete_all_note_blocks(&self, note_id: &str) -> Result<(), Error> {
         let conn = self.conn();
@@ -85,11 +139,11 @@ impl Database {
 
     // ==================== 块读取 ====================
 
-    /// 按 sort_order 返回笔记的块序列(含每块 created_at/updated_at)
+    /// 按 sort_order 返回笔记的块序列(含每块 created_at/updated_at;排除已删块)
     pub fn get_note_blocks(&self, note_id: &str) -> Result<Vec<Block>, Error> {
         let conn = self.conn();
         let mut stmt = conn.prepare(
-            "SELECT * FROM blocks WHERE note_id = ?1 ORDER BY sort_order ASC, created_at ASC",
+            "SELECT * FROM blocks WHERE note_id = ?1 AND deleted_at IS NULL ORDER BY sort_order ASC, created_at ASC",
         )?;
         let rows = stmt.query_map(rusqlite::params![note_id], block_from_row)?;
         let mut blocks = Vec::new();
@@ -102,7 +156,7 @@ impl Database {
     /// 根据 ID 获取单个块
     pub fn get_block(&self, block_id: &str) -> Result<Option<Block>, Error> {
         let conn = self.conn();
-        let mut stmt = conn.prepare("SELECT * FROM blocks WHERE id = ?1")?;
+        let mut stmt = conn.prepare("SELECT * FROM blocks WHERE id = ?1 AND deleted_at IS NULL")?;
         let mut rows = stmt.query_map(rusqlite::params![block_id], block_from_row)?;
         match rows.next() {
             Some(Ok(b)) => Ok(Some(b)),
@@ -114,7 +168,7 @@ impl Database {
     pub fn count_note_blocks(&self, note_id: &str) -> Result<i64, Error> {
         let conn = self.conn();
         let n: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM blocks WHERE note_id = ?1",
+            "SELECT COUNT(*) FROM blocks WHERE note_id = ?1 AND deleted_at IS NULL",
             rusqlite::params![note_id],
             |row| row.get(0),
         )?;
@@ -127,7 +181,7 @@ impl Database {
     pub fn get_note_blocks_by_created(&self, note_id: &str) -> Result<Vec<Block>, Error> {
         let conn = self.conn();
         let mut stmt = conn.prepare(
-            "SELECT * FROM blocks WHERE note_id = ?1 ORDER BY created_at ASC, sort_order ASC",
+            "SELECT * FROM blocks WHERE note_id = ?1 AND deleted_at IS NULL ORDER BY created_at ASC, sort_order ASC",
         )?;
         let rows = stmt.query_map(rusqlite::params![note_id], block_from_row)?;
         let mut blocks = Vec::new();
@@ -213,7 +267,7 @@ impl Database {
             "SELECT b.id AS block_id, b.note_id, n.title AS note_title, b.content, b.updated_at
              FROM blocks b
              INNER JOIN notes n ON b.note_id = n.id
-             WHERE b.content LIKE ?1 AND n.deleted_at IS NULL
+             WHERE b.content LIKE ?1 AND n.deleted_at IS NULL AND b.deleted_at IS NULL
              ORDER BY b.updated_at DESC",
         )?;
         let rows = stmt.query_map(rusqlite::params![pattern], |row| {
@@ -256,7 +310,7 @@ impl Database {
             let mut stmt = conn.prepare(
                 "SELECT b.created_at FROM blocks b
                  INNER JOIN notes n ON b.note_id = n.id
-                 WHERE n.deleted_at IS NULL AND b.created_at BETWEEN ?1 AND ?2",
+                 WHERE n.deleted_at IS NULL AND b.deleted_at IS NULL AND b.created_at BETWEEN ?1 AND ?2",
             )?;
             let rows = stmt.query_map(rusqlite::params![date_from, date_to], |r| r.get::<_, i64>(0))?;
             for row in rows {
@@ -268,7 +322,7 @@ impl Database {
             let mut stmt = conn.prepare(
                 "SELECT b.updated_at FROM blocks b
                  INNER JOIN notes n ON b.note_id = n.id
-                 WHERE n.deleted_at IS NULL AND b.updated_at BETWEEN ?1 AND ?2",
+                 WHERE n.deleted_at IS NULL AND b.deleted_at IS NULL AND b.updated_at BETWEEN ?1 AND ?2",
             )?;
             let rows = stmt.query_map(rusqlite::params![date_from, date_to], |r| r.get::<_, i64>(0))?;
             for row in rows {
@@ -300,7 +354,7 @@ impl Database {
             "SELECT b.id AS block_id, b.note_id, n.title AS note_title, b.content, b.updated_at
              FROM blocks b
              INNER JOIN notes n ON b.note_id = n.id
-             WHERE n.deleted_at IS NULL
+             WHERE n.deleted_at IS NULL AND b.deleted_at IS NULL
                AND (b.created_at BETWEEN ?1 AND ?2 OR b.updated_at BETWEEN ?1 AND ?2)
              ORDER BY b.updated_at DESC",
         )?;

@@ -106,7 +106,9 @@
 html, body { height: 100%; }
 
 body {
-  font-family: var(--font-family);
+  font-family: var(--app-font-family, var(--font-family));
+  font-size: var(--app-font-size, 15px);
+  line-height: 1.7;
   color: var(--ink);
   background:
     radial-gradient(1100px 560px at 88% -8%, rgba(45, 212, 191, 0.30), transparent 60%),

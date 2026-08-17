@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { backend } from './api';
-import type { Note, Folder, AppSettings, Plugin, NoteBlock, TagCount } from './api/backend';
+import type { Note, Folder, AppSettings, Plugin, NoteBlock, TagCount, NoteTemplate, TrashBlock } from './api/backend';
 import { DEFAULT_TEMPLATES } from './api/backend';
 import { Sidebar, type SidebarNavItem } from './components/Sidebar';
 import { NoteList } from './components/NoteList';
@@ -15,6 +15,8 @@ import { PublishPanel } from './components/PublishPanel';
 import { SearchModal } from './components/SearchModal';
 import { PluginManagerModal } from './components/PluginManagerModal';
 import { RightPanel } from './components/RightPanel';
+import { TrashView } from './components/TrashView';
+import { NewNoteModal } from './components/NewNoteModal';
 import { MobileTabbar, type TabItem } from './components/MobileTabbar';
 import { StrokeIcon } from './icons';
 import './App.css';
@@ -23,6 +25,24 @@ interface ToastItem {
   id: string;
   message: string;
   type?: 'success' | 'error' | 'info';
+}
+
+/** [M3.5b 导出] 触发浏览器下载一个文本文件 */
+function downloadFile(content: string, filename: string, mime: string): void {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/** 文件名安全化(去掉路径分隔符/非法字符) */
+function sanitizeName(name: string): string {
+  return (name || '未命名').replace(/[\\/:*?"<>|]/g, '_');
 }
 
 /** 应用导航(桌面左侧栏 = 移动端底部 Tab 栏的并集,商枢注册表思路) */
@@ -34,6 +54,7 @@ const NAV_ITEMS: SidebarNavItem[] = [
   { id: 'git', icon: 'git', label: 'Git' },
   { id: 'publish', icon: 'publish', label: '发布' },
   { id: 'plugins', icon: 'plugin', label: '插件' },
+  { id: 'trash', icon: 'trash', label: '回收站' },
 ];
 
 /** 移动端底部 Tab(手机 <768px;搜索/设置为模态入口) */
@@ -79,6 +100,13 @@ export default function App() {
   const [tags, setTags] = useState<TagCount[]>([]);
   /** [M3.5a 标签树] 已选标签:过滤 NoteList */
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  /** [M3.5b 笔记模板] 模板列表(内置 + 自定义) */
+  const [templates, setTemplates] = useState<NoteTemplate[]>(DEFAULT_TEMPLATES as NoteTemplate[]);
+  /** [M3.5b 笔记模板] 是否显示「新建笔记选模板」弹窗 */
+  const [showNewNoteModal, setShowNewNoteModal] = useState(false);
+  /** [M3.5b 回收站] 回收站中的笔记与块 */
+  const [trashNotes, setTrashNotes] = useState<Note[]>([]);
+  const [trashBlocks, setTrashBlocks] = useState<TrashBlock[]>([]);
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
     const id = crypto.randomUUID();
@@ -91,18 +119,20 @@ export default function App() {
 
   const loadData = useCallback(async () => {
     try {
-      const [notesData, foldersData, settingsData, pluginsData, tagsData] = await Promise.all([
+      const [notesData, foldersData, settingsData, pluginsData, tagsData, templatesData] = await Promise.all([
         backend.getNotes(),
         backend.getFolders(),
         backend.getSettings(),
         backend.getPlugins(),
         backend.getTags().catch(() => [] as TagCount[]),
+        backend.getTemplates().catch(() => DEFAULT_TEMPLATES as NoteTemplate[]),
       ]);
       setNotes(notesData);
       setFolders(foldersData);
       setSettings(settingsData);
       setPlugins(pluginsData);
       setTags(tagsData);
+      if (templatesData && templatesData.length) setTemplates(templatesData);
       applyTheme(settingsData.theme);
     } catch (error) {
       console.error('Failed to load data:', error);
@@ -111,6 +141,18 @@ export default function App() {
       setIsLoading(false);
     }
   }, [showToast]);
+
+  /** [M3.5b 回收站] 刷新回收站列表 */
+  const loadTrash = useCallback(async () => {
+    try {
+      const [tn, tb] = await Promise.all([
+        backend.getTrashNotes().catch(() => [] as Note[]),
+        backend.getTrashBlocks().catch(() => [] as TrashBlock[]),
+      ]);
+      setTrashNotes(tn);
+      setTrashBlocks(tb);
+    } catch { /* 忽略 */ }
+  }, []);
 
   const applyTheme = (theme: string) => {
     let isDark = false;
@@ -162,6 +204,26 @@ export default function App() {
     return () => el?.remove();
   }, [settings?.custom_css]);
 
+  // [M3.5b 排版] 字号/字体设置 → 全局 CSS 变量(不含自定义 CSS,避免与其冲突)
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty('--app-font-size', settings?.font_size ? `${settings.font_size}px` : '15px');
+    if (settings?.font_family && settings.font_family !== 'sans-serif') {
+      root.style.setProperty('--app-font-family', settings.font_family);
+    } else {
+      root.style.removeProperty('--app-font-family');
+    }
+  }, [settings?.font_size, settings?.font_family]);
+
+  // 更新系统断点暗色跟随(theme=system 时随系统切换)
+  useEffect(() => {
+    if (settings?.theme !== 'system') return;
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = () => applyTheme('system');
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, [settings?.theme]);
+
   /** 导航点击统一入口:桌面侧栏 + 移动底栏共用 */
   const handleNavClick = (id: string) => {
     if (id === 'notes') {
@@ -175,6 +237,10 @@ export default function App() {
     } else if (id === 'graph' || id === 'git' || id === 'publish') {
       setActiveNav(id);
       setMobileView('editor');
+    } else if (id === 'trash') {
+      setActiveNav('trash');
+      setMobileView('editor');
+      loadTrash();
     } else if (id === 'plugins') {
       setShowPluginManager(true);
     } else if (id === 'settings') {
@@ -195,12 +261,22 @@ export default function App() {
   };
 
   const handleNewNote = async () => {
-    const templateId = settings?.template || 'blank';
-    const template = DEFAULT_TEMPLATES.find(t => t.id === templateId);
-    let content = template?.content || '';
-    if (templateId === 'daily') {
-      content = content.replace('{{date}}', new Date().toLocaleDateString('zh-CN'));
+    // [M3.5b] 打开模板选择弹窗(空白/日记/会议/读书/自定义)
+    setShowNewNoteModal(true);
+  };
+
+  /** [M3.5b] 从所选模板新建笔记(替换 {{date}} 为当天日期;自定义模板先落库) */
+  const createNoteFromTemplate = async (template: NoteTemplate) => {
+    setShowNewNoteModal(false);
+    let content = template.content || '';
+    let templateId = template.id;
+    if (templateId === '__custom__') {
+      // 自定义模板:先创建保存,再以其内容新建
+      try { templateId = (await backend.createTemplate(template.name, template.content)).id; }
+      catch { /* 若后端不支持则退回直接用内容 */ }
+      setTemplates(prev => [...prev, { ...template, id: templateId }]);
     }
+    content = content.replace(/\{\{date\}\}/g, new Date().toLocaleDateString('zh-CN'));
     const newNote: Note = {
       id: crypto.randomUUID(),
       title: '无标题',
@@ -217,7 +293,7 @@ export default function App() {
     setSelectedNote(newNote);
     setActiveNav('notes');
     setMobileView('editor');
-    showToast('已创建新笔记');
+    showToast(`已用「${template.name}」模板创建笔记`);
   };
 
   const handleNewFolder = () => {
@@ -260,7 +336,66 @@ export default function App() {
     await backend.deleteNote(id);
     setNotes(prev => prev.filter(n => n.id !== id));
     if (selectedNote?.id === id) setSelectedNote(null);
-    showToast('笔记已删除');
+    showToast('笔记已删除(可到回收站恢复)');
+  };
+
+  // ==================== [M3.5b 回收站] ====================
+
+  const handleRestoreNote = async (id: string) => {
+    await backend.restoreNote(id);
+    await loadTrash();
+    // 若恢复的是当前正看的笔记,同步回列表
+    const restored = notes.find(n => n.id === id) ?? trashNotes.find(n => n.id === id);
+    if (restored) setNotes(prev => prev.some(n => n.id === id) ? prev : [restored, ...prev]);
+    showToast('笔记已恢复');
+  };
+
+  const handlePermanentDeleteNote = async (id: string) => {
+    await backend.permanentDeleteNote(id);
+    setNotes(prev => prev.filter(n => n.id !== id));
+    await loadTrash();
+    showToast('笔记已彻底删除', 'info');
+  };
+
+  const handleRestoreBlock = async (id: string) => {
+    await backend.restoreBlock(id);
+    await loadTrash();
+    // 恢复块后刷新当前选中笔记的块序列
+    if (selectedNote) {
+      try { setNoteBlocks(await backend.getNoteBlocks(selectedNote.id)); } catch { /* 忽略 */ }
+    }
+    showToast('内容片段已恢复到原文');
+  };
+
+  const handlePermanentDeleteBlock = async (id: string) => {
+    await backend.permanentDeleteBlock(id);
+    await loadTrash();
+    showToast('内容片段已彻底删除', 'info');
+  };
+
+  const handleEmptyTrash = async () => {
+    await backend.emptyTrash();
+    setTrashNotes([]);
+    setTrashBlocks([]);
+    showToast('回收站已清空', 'info');
+  };
+
+  // ==================== [M3.5b 导出] ====================
+
+  const handleExportMarkdown = async (noteId: string) => {
+    const note = notes.find(n => n.id === noteId);
+    if (!note) return;
+    const md = await backend.exportNoteMarkdown(noteId);
+    downloadFile(md, `biji-${sanitizeName(note.title)}.md`, 'text/markdown');
+    showToast('已导出 .md 文件');
+  };
+
+  const handleExportHtml = async (noteId: string) => {
+    const note = notes.find(n => n.id === noteId);
+    if (!note) return;
+    const html = await backend.exportNoteHtml(noteId);
+    downloadFile(html, `biji-${sanitizeName(note.title)}.html`, 'text/html');
+    showToast('已导出 HTML(可用浏览器打印为 PDF)');
   };
 
   const handleSettingsChange = async (patch: Partial<AppSettings>) => {
@@ -289,13 +424,14 @@ export default function App() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // ESC:关闭最上层的弹窗(搜索/设置/插件管理),避免 overlay 残留
+      // ESC:关闭最上层的弹窗(搜索/设置/插件管理/新建模板),避免 overlay 残留
       if (e.key === 'Escape') {
-        if (showSearch || showSettings || showPluginManager) {
+        if (showSearch || showSettings || showPluginManager || showNewNoteModal) {
           e.preventDefault();
           setShowSearch(false);
           setShowSettings(false);
           setShowPluginManager(false);
+          setShowNewNoteModal(false);
         }
         return;
       }
@@ -321,7 +457,7 @@ export default function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [settings, handleNewNote, handleNewFolder, activeNav, showSearch, showSettings, showPluginManager]);
+  }, [settings, handleNewNote, handleNewFolder, activeNav, showSearch, showSettings, showPluginManager, showNewNoteModal]);
 
   if (isLoading) return <div className="loading">加载中...</div>;
 
@@ -376,8 +512,24 @@ export default function App() {
         >
           <StrokeIcon name="back" size={20} />
         </button>
-        <div className="main-content-inner" data-panel={activeNav === 'graph' ? 'graph' : activeNav === 'calendar' ? 'calendar' : activeNav === 'git' ? 'git' : activeNav === 'publish' ? 'publish' : 'editor'}>
-          {activeNav === 'graph' ? (
+        <div className="main-content-inner" data-panel={activeNav === 'trash' ? 'trash' : activeNav === 'graph' ? 'graph' : activeNav === 'calendar' ? 'calendar' : activeNav === 'git' ? 'git' : activeNav === 'publish' ? 'publish' : 'editor'}>
+          {activeNav === 'trash' ? (
+            <TrashView
+              trashNotes={trashNotes}
+              trashBlocks={trashBlocks}
+              onRestoreNote={handleRestoreNote}
+              onDeleteNoteForever={handlePermanentDeleteNote}
+              onRestoreBlock={handleRestoreBlock}
+              onDeleteBlockForever={handlePermanentDeleteBlock}
+              onEmptyTrash={() => handleEmptyTrash()}
+              onClose={() => handleNavClick('notes')}
+              onOpenNote={(noteId) => {
+                const note = notes.find(n => n.id === noteId) ?? trashNotes.find(n => n.id === noteId);
+                if (note && !note.deleted_at) { setSelectedNote(note); setActiveNav('notes'); setMobileView('editor'); }
+                else if (note) showToast('该笔记在回收站中,请先恢复', 'info');
+              }}
+            />
+          ) : activeNav === 'graph' ? (
             <GraphView
               key={graphKey}
               onSelectNote={(noteId) => {
@@ -413,6 +565,8 @@ export default function App() {
                 setRightPanelOpen(true);
                 setRightPanelTab('backlinks');
               }}
+              onExportMarkdown={handleExportMarkdown}
+              onExportHtml={handleExportHtml}
             />
           )}
         </div>
@@ -467,6 +621,14 @@ export default function App() {
 
       {showPluginManager && (
         <PluginManagerModal onClose={() => setShowPluginManager(false)} onPluginChange={setPlugins} />
+      )}
+
+      {showNewNoteModal && (
+        <NewNoteModal
+          templates={templates}
+          onSelect={createNoteFromTemplate}
+          onClose={() => setShowNewNoteModal(false)}
+        />
       )}
     </div>
   );

@@ -6,6 +6,7 @@ mod migrations;
 mod note_repo;
 mod search;
 mod tag_repo;
+mod template_repo;
 
 pub use connection::*;
 pub use search::{search_by_mode, SearchModeResult};

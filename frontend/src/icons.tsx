@@ -259,6 +259,44 @@ const S_TAG = (
   </>
 );
 
+/** [M3.5b 回收站] 垃圾桶 */
+const S_TRASH = (
+  <>
+    <path d="M3 6h18" />
+    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+    <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    <path d="M10 11v6" />
+    <path d="M14 11v6" />
+  </>
+);
+
+/** [M3.5b 恢复] 撤销回退箭头 */
+const S_RESTORE = (
+  <>
+    <path d="M3 7v6h6" />
+    <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
+  </>
+);
+
+/** [M3.5b 模板] 带加号的文档 */
+const S_TEMPLATE = (
+  <>
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <path d="M14 2v6h6" />
+    <path d="M9 13h6" />
+    <path d="M12 10v6" />
+  </>
+);
+
+/** [M3.5b 导出] 下载箭头 */
+const S_DOWNLOAD = (
+  <>
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <path d="m7 10 5 5 5-5" />
+    <path d="M12 15V3" />
+  </>
+);
+
 /** Stroke 图标注册表:name → 子元素(与 ICON_PATHS 互补,供导航/工具按钮使用) */
 export const STROKE_ICONS: Record<string, React.ReactNode> = {
   notes: S_NOTES,
@@ -280,6 +318,10 @@ export const STROKE_ICONS: Record<string, React.ReactNode> = {
   calendar: S_CALENDAR,
   backlink: S_BACKLINK,
   tag: S_TAG,
+  trash: S_TRASH,
+  restore: S_RESTORE,
+  template: S_TEMPLATE,
+  download: S_DOWNLOAD,
 };
 
 /** Stroke 图标组件 — 按名称取素材,渲染为统一 stroke 风格 */

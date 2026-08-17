@@ -152,6 +152,22 @@ export class TauriBackend implements BackendAdapter {
     return invoke('export_markdown', { path });
   }
 
+  // ===== [M3.5b] 回收站 / 模板 / 导出(Tauri 命令待 M6 接入,先走 invoke 命名) =====
+  async getTrashNotes(): Promise<Note[]> { return invoke('get_trash_notes'); }
+  async getTrashBlocks(): Promise<import('./backend').TrashBlock[]> { return invoke('get_trash_blocks'); }
+  async restoreNote(id: string): Promise<void> { return invoke('restore_note', { id }); }
+  async restoreBlock(id: string): Promise<void> { return invoke('restore_block', { id }); }
+  async permanentDeleteNote(id: string): Promise<void> { return invoke('permanent_delete_note', { id }); }
+  async permanentDeleteBlock(id: string): Promise<void> { return invoke('permanent_delete_block', { id }); }
+  async emptyTrash(): Promise<void> { return invoke('empty_trash'); }
+  async getTemplates(): Promise<import('./backend').NoteTemplate[]> { return invoke('get_templates'); }
+  async createTemplate(name: string, content: string): Promise<import('./backend').NoteTemplate> {
+    return invoke('create_template', { name, content });
+  }
+  async deleteTemplate(id: string): Promise<boolean> { return invoke('delete_template', { id }); }
+  async exportNoteMarkdown(noteId: string): Promise<string> { return invoke('export_note_markdown', { noteId }); }
+  async exportNoteHtml(noteId: string): Promise<string> { return invoke('export_note_html', { noteId }); }
+
   // ===== 插件 =====
   async getPlugins(): Promise<Plugin[]> {
     return invoke('get_plugins');

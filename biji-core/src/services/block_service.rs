@@ -83,10 +83,10 @@ impl BlockService {
         Ok(updated)
     }
 
-    /// 删除块:先写 delete 历史快照(审计轨迹),再物理删除。
+    /// 删除块 → 软删除(置 deleted_at,进回收站可恢复),并写 delete 历史快照审计。
     ///
-    /// 注:blocks 表暂未设软删字段(M3 回收站再做),历史快照即恢复保障;
-    /// `permanent` 参数保留以对齐 API,当前两种取值行为一致。
+    /// [M3.5b 回收站] 由物理删除改为软删:块行保留,`deleted_at` 打点 → 进回收站,
+    /// 仍可抓历史快照 / 恢复回原笔记。`permanent` 参数保留以对齐 API(永久删走回收站)。
     pub fn delete_block(&self, block_id: &str, _permanent: bool) -> Result<(), Error> {
         let block = self
             .db
@@ -94,8 +94,23 @@ impl BlockService {
             .ok_or_else(|| Error::NotFound(format!("block {block_id}")))?;
         let ts = Self::now();
         self.record_history(block_id, &block.content, ChangeType::Delete, ts)?;
-        self.db.delete_block_row(block_id)?;
+        self.db.soft_delete_block(block_id, ts)?;
         Ok(())
+    }
+
+    /// [M3.5b 回收站] 恢复一个被软删的块：deleted_at 置 NULL,回到原笔记
+    pub fn restore_block(&self, block_id: &str) -> Result<(), Error> {
+        self.db.restore_block(block_id)
+    }
+
+    /// [M3.5b 回收站] 彻底删除一个块(物理删行,历史保留)
+    pub fn permanent_delete_block(&self, block_id: &str) -> Result<(), Error> {
+        self.db.delete_block_row(block_id)
+    }
+
+    /// [M3.5b 回收站] 回收站中的块列表
+    pub fn get_trash_blocks(&self) -> Result<Vec<crate::models::TrashBlock>, Error> {
+        self.db.get_trash_blocks()
     }
 
     /// 重排笔记内块顺序(按传入 id 顺序)
@@ -262,24 +277,42 @@ mod tests {
     }
 
     #[test]
-    fn test_delete_block_records_delete_history() {
+    fn test_delete_block_records_delete_history_and_trash() {
         let (_dir, svc) = open_service();
         let db = svc.db.clone();
         save_note(&db, "n1", "笔记", "");
         let b = svc.create_block("n1", "要删除的内容", None).unwrap();
 
+        // 软删:块进回收站、get_block 看不到、写 delete 历史
         svc.delete_block(&b.id, true).unwrap();
         assert!(svc.get_block(&b.id).unwrap().is_none());
-        // 历史保留:block_id 置 NULL,内容快照仍在
+        // 历史快照 = 被删内容;块 id 不再置 NULL(软删后块行仍在,block_id 保留)
         let conn = db.conn();
         let snap: String = conn
             .query_row("SELECT content_snapshot FROM block_history", [], |r| r.get(0))
             .unwrap();
         assert_eq!(snap, "要删除的内容");
-        let orphan: Option<String> = conn
+        let bid: Option<String> = conn
             .query_row("SELECT block_id FROM block_history", [], |r| r.get(0))
             .unwrap();
-        assert!(orphan.is_none());
+        assert_eq!(bid.as_deref(), Some(b.id.as_str()));
+        drop(conn);
+
+        // 回收站可见
+        let trash = svc.get_trash_blocks().unwrap();
+        assert_eq!(trash.len(), 1);
+        assert_eq!(trash[0].content, "要删除的内容");
+        assert_eq!(trash[0].note_title, "笔记");
+
+        // 恢复回原笔记
+        svc.restore_block(&b.id).unwrap();
+        assert_eq!(svc.get_block(&b.id).unwrap().unwrap().content, "要删除的内容");
+        assert!(svc.get_trash_blocks().unwrap().is_empty());
+
+        // 永久删除:再次软删后物理删行
+        svc.delete_block(&b.id, true).unwrap();
+        svc.permanent_delete_block(&b.id).unwrap();
+        assert!(svc.get_trash_blocks().unwrap().is_empty());
     }
 
     #[test]

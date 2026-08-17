@@ -26,6 +26,10 @@ pub struct App {
     pub plugin_mgr: services::PluginManager,
     /// M2 块级存储:块 CRUD / 历史快照 / 拆块同步
     pub block_service: services::BlockService,
+    /// M3.5b 回收站:软删笔记/块的列/恢复/彻底删除/清空
+    pub trash: services::TrashService,
+    /// M3.5b 笔记模板:内置 + 用户自定义 CRUD
+    pub templates: services::TemplateService,
 }
 
 impl App {
@@ -62,6 +66,8 @@ impl App {
         let plugins_dir = data_dir.join("plugins");
         let plugin_mgr = services::PluginManager::new(db.clone(), &plugins_dir);
         let block_service = services::BlockService::new(db.clone());
+        let trash = services::TrashService::new(db.clone());
+        let templates = services::TemplateService::new(db.clone());
 
         log::info!("Biji Note core initialized at: {}", data_dir.display());
 
@@ -74,6 +80,8 @@ impl App {
             publish,
             plugin_mgr,
             block_service,
+            trash,
+            templates,
         })
     }
 }

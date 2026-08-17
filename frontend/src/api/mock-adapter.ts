@@ -2,6 +2,7 @@ import {
   BackendAdapter, Note, Folder, AppSettings, SearchQuery, GraphData, SyncResult, SyncStatus,
   GitStatus, GitLogEntry, PublishConfig, PublishResult, Plugin, ImportResult,
   NoteBlock, BlockHistoryEntry, BlockSearchResult, BlockType, BlockActivity, BlockBacklink, TagCount,
+  NoteTemplate, TrashBlock, DEFAULT_TEMPLATES,
 } from './backend';
 
 // ============================================================
@@ -208,6 +209,10 @@ export class MockBackend implements BackendAdapter {
   private blocks: NoteBlock[] = [];
   /** M2:内存历史表(历史数组) */
   private histories: BlockHistoryEntry[] = [];
+  /** M3.5b:内存回收站块(软删,可恢复回原笔记) */
+  private trashBlocks: TrashBlock[] = [];
+  /** M3.5b:内存模板表(内置 + 自定义) */
+  private templates: NoteTemplate[] = DEFAULT_TEMPLATES.map((t, i) => ({ ...t, is_builtin: true, created_at: Date.now() - i }));
   /** 内存 id 序号 */
   private seq = 0;
   private settings: AppSettings = {
@@ -402,11 +407,26 @@ export class MockBackend implements BackendAdapter {
     return { ...block };
   }
 
-  async deleteBlock(id: string, permanent = true): Promise<void> {
+  async deleteBlock(id: string, permanent = false): Promise<void> {
     const block = this.blocks.find(b => b.id === id);
     if (!block) return;
     this.pushHistory(id, block.content, 'delete', Date.now());
     this.blocks = this.blocks.filter(b => b.id !== id);
+    if (!permanent) {
+      // M3.5b 软删:进回收站(带原笔记标题 + 删除时间)
+      this.trashBlocks.push({
+        id: block.id,
+        note_id: block.note_id,
+        parent_id: block.parent_id,
+        type: block.type,
+        content: block.content,
+        created_at: block.created_at,
+        updated_at: block.updated_at,
+        sort_order: block.sort_order,
+        note_title: this.notes.find(n => n.id === block.note_id)?.title || '',
+        deleted_at: Date.now(),
+      });
+    }
   }
 
   async reorderBlocks(noteId: string, orderedIds: string[]): Promise<void> {
@@ -573,5 +593,99 @@ export class MockBackend implements BackendAdapter {
     return this.notes
       .filter(n => !n.deleted_at && n.tags.some(t => t.toLowerCase() === lower))
       .sort((a, b) => b.updated_at - a.updated_at);
+  }
+
+  // ==================== [M3.5b 回收站] ====================
+
+  async getTrashNotes(): Promise<Note[]> {
+    return this.notes
+      .filter(n => n.deleted_at)
+      .sort((a, b) => (b.deleted_at || 0) - (a.deleted_at || 0));
+  }
+
+  async getTrashBlocks(): Promise<TrashBlock[]> {
+    return [...this.trashBlocks].sort((a, b) => b.deleted_at - a.deleted_at);
+  }
+
+  async restoreNote(id: string): Promise<void> {
+    const n = this.notes.find(n => n.id === id);
+    if (n) n.deleted_at = null;
+  }
+
+  async restoreBlock(id: string): Promise<void> {
+    const idx = this.trashBlocks.findIndex(t => t.id === id);
+    if (idx < 0) return;
+    const t = this.trashBlocks[idx];
+    this.trashBlocks.splice(idx, 1);
+    this.blocks.push({
+      id: t.id, note_id: t.note_id, parent_id: t.parent_id, type: t.type,
+      content: t.content, created_at: t.created_at, updated_at: t.updated_at, sort_order: t.sort_order,
+    });
+  }
+
+  async permanentDeleteNote(id: string): Promise<void> {
+    this.notes = this.notes.filter(n => n.id !== id);
+    this.trashBlocks = this.trashBlocks.filter(t => t.note_id !== id);
+  }
+
+  async permanentDeleteBlock(id: string): Promise<void> {
+    this.trashBlocks = this.trashBlocks.filter(t => t.id !== id);
+  }
+
+  async emptyTrash(): Promise<void> {
+    this.notes = this.notes.filter(n => !n.deleted_at);
+    this.trashBlocks = [];
+  }
+
+  // ==================== [M3.5b 笔记模板] ====================
+
+  async getTemplates(): Promise<NoteTemplate[]> {
+    return [...this.templates];
+  }
+
+  async createTemplate(name: string, content: string): Promise<NoteTemplate> {
+    const tpl: NoteTemplate = {
+      id: this.nextId('tpl'),
+      name,
+      category: 'custom',
+      content,
+      is_builtin: false,
+      created_at: Date.now(),
+    };
+    this.templates.push(tpl);
+    return tpl;
+  }
+
+  async deleteTemplate(id: string): Promise<boolean> {
+    const tpl = this.templates.find(t => t.id === id);
+    if (!tpl || tpl.is_builtin) return false;
+    this.templates = this.templates.filter(t => t.id !== id);
+    return true;
+  }
+
+  // ==================== [M3.5b 导出增强] ====================
+
+  async exportNoteMarkdown(noteId: string): Promise<string> {
+    const note = this.notes.find(n => n.id === noteId) || this.notes[0];
+    return note.content.trimStart().startsWith('# ')
+      ? note.content.trimEnd() + '\n'
+      : `# ${note.title}\n\n${note.content.trimEnd()}\n`;
+  }
+
+  async exportNoteHtml(noteId: string): Promise<string> {
+    const note = this.notes.find(n => n.id === noteId) || this.notes[0];
+    // 轻量 md → html(标题/粗体/列表/段落),仅供 Mock 预览导出
+    const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const htmlBody = esc(note.content)
+      .replace(/^### (.*)$/gm, '<h3>$1</h3>')
+      .replace(/^## (.*)$/gm, '<h2>$1</h2>')
+      .replace(/^# (.*)$/gm, '<h1>$1</h1>')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/^- (.*)$/gm, '<li>$1</li>')
+      .split(/\n\n+/).map(p => p.includes('<h') ? p : p.includes('<li>') ? `<ul>${p}</ul>` : `<p>${p}</p>`).join('\n');
+    return `<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>${esc(note.title)}</title>
+<style>body{font-family:sans-serif;max-width:820px;margin:0 auto;padding:40px;line-height:1.75}h1{border-bottom:2px solid #26a69a;padding-bottom:.3em}code{background:#f0f5f4;padding:.15em .35em;border-radius:4px}blockquote{border-left:4px solid #26a69a;padding:.2em 1em;color:#567}@media print{body{padding:0}}</style>
+</head><body><h1>${esc(note.title)}</h1><article>${htmlBody}</article></body></html>`;
   }
 }

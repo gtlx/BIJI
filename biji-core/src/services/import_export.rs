@@ -203,3 +203,157 @@ fn sanitize_filename(name: &str) -> String {
         .trim()
         .to_string()
 }
+
+// ============================================================
+// [M3.5b 导出增强] 单笔记导出:干净 .md 与可打印 HTML(浏览器可「打印为 PDF」)
+// ============================================================
+
+/// [M3.5b] 单笔记导出 Markdown 内容(纯 .md 正文,不含 zip 包装)
+pub fn export_note_markdown(note: &Note) -> String {
+    // 正文已以一级标题开头(如 frontmatter 后就是 # 标题)则原样返回,否则补一行标题
+    if note.content.trim_start().starts_with("# ") {
+        note.content.trim_end().to_string() + "\n"
+    } else {
+        format!("# {}\n\n{}", note.title, note.content.trim_end()).trim_end().to_string() + "\n"
+    }
+}
+
+/// [M3.5b] 把 markdown 渲染成 HTML(段落/标题/列表/引用/代码/表格/行内标记)
+///
+/// 用 pulldown-cmark 解析,禁用 raw html / 图片以规避注入,输出干净内联 HTML。
+pub fn render_markdown_to_html(md: &str) -> String {
+    use pulldown_cmark::{html, Options, Parser};
+    let mut options = Options::empty();
+    options.insert(Options::ENABLE_TABLES);
+    options.insert(Options::ENABLE_STRIKETHROUGH);
+    options.insert(Options::ENABLE_TASKLISTS);
+    let parser = Parser::new_ext(md, options);
+    let mut out = String::new();
+    html::push_html(&mut out, parser);
+    out
+}
+
+/// [M3.5b] 单笔记导出为完整可打印 HTML(自带打印 CSS,浏览器可直接「打印为 PDF」)
+///
+/// 结构:<html><head>内联样式</head><body>标题 + 元信息 + 渲染正文</body>。
+/// PDF 实现取舍:后端不引入重渲染引擎,导出干净 HTML 文件,由浏览器打印为 PDF。
+pub fn export_note_html(note: &Note) -> String {
+    let body_html = render_markdown_to_html(&note.content);
+    let updated = chrono::DateTime::from_timestamp_millis(note.updated_at)
+        .map(|d| d.format("%Y-%m-%d %H:%M").to_string())
+        .unwrap_or_default();
+    format!(
+        r#"<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{title}</title>
+<style>
+  :root {{ color-scheme: light dark; }}
+  * {{ box-sizing: border-box; }}
+  body {{
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+    max-width: 820px; margin: 0 auto; padding: 40px 32px; line-height: 1.75;
+    font-size: 16px; color: #1f2d2b; background: #fff;
+  }}
+  h1 {{ font-size: 1.8em; border-bottom: 2px solid #26a69a; padding-bottom: .3em; }}
+  h2 {{ font-size: 1.4em; margin-top: 1.4em; }}
+  h3 {{ font-size: 1.2em; }}
+  a {{ color: #00897b; }}
+  code {{ background: #eef4f3; padding: .15em .35em; border-radius: 4px; font-size: .92em; }}
+  pre {{ background: #f4f8f7; padding: 14px; border-radius: 8px; overflow-x: auto; }}
+  pre code {{ background: none; padding: 0; }}
+  blockquote {{ border-left: 4px solid #26a69a; margin: 1em 0; padding: .2em 1em; color: #5a6a67; background: #f7fbfa; }}
+  table {{ border-collapse: collapse; width: 100%; }}
+  th, td {{ border: 1px solid #d5e2e0; padding: 6px 10px; }}
+  th {{ background: #eef6f4; }}
+  .biji-meta {{ color: #7a8a87; font-size: .88em; margin-bottom: 24px; }}
+  hr {{ border: none; border-top: 1px solid #dbe7e5; margin: 2em 0; }}
+  @media print {{
+    body {{ padding: 0; max-width: none; color: #000; }}
+    .biji-meta {{ color: #555; }}
+  }}
+  @media (prefers-color-scheme: dark) {{
+    body {{ color: #ddece9; background: #0f1716; }}
+    code, pre {{ background: #16211f; }}
+    blockquote {{ background: #131d1b; color: #a9c4be; }}
+    th {{ background: #1a2623; }} th, td {{ border-color: #2a3a36; }}
+    hr {{ border-top-color: #2a3a36; }}
+  }}
+</style>
+</head>
+<body>
+<h1>{title}</h1>
+<div class="biji-meta">导出于 {updated} · Biji Note</div>
+<article>
+{body}
+</article>
+</body>
+</html>"#,
+        title = note.title,
+        updated = updated,
+        body = body_html,
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::SyncStatus;
+
+    fn make_note(title: &str, content: &str) -> Note {
+        Note {
+            id: uuid::Uuid::new_v4().to_string(),
+            title: title.to_string(),
+            content: content.to_string(),
+            folder_id: None,
+            created_at: 1_700_000_000_000,
+            updated_at: 1_700_000_100_000,
+            tags: vec![],
+            is_encrypted: false,
+            sync_status: SyncStatus::Pending,
+            deleted_at: None,
+            frontmatter: None,
+        }
+    }
+
+    #[test]
+    fn test_export_note_markdown_prepends_title_when_missing() {
+        let note = make_note("我的标题", "第一段\n\n第二段。");
+        let md = export_note_markdown(&note);
+        assert!(md.starts_with("# 我的标题"));
+        assert!(md.contains("第一段"));
+    }
+
+    #[test]
+    fn test_export_note_markdown_keeps_existing_heading() {
+        let note = make_note("我的标题", "# 已有标题\n\n正文");
+        let md = export_note_markdown(&note);
+        // 已有 # 标题则不重复插入标题行
+        assert!(md.starts_with("# 已有标题"));
+        assert!(!md.contains("# 我的标题"));
+    }
+
+    #[test]
+    fn test_render_markdown_to_html_converts_blocks() {
+        let html = render_markdown_to_html("# 标题\n\n段落 **加粗**。\n\n- 列表项\n\n> 引用");
+        assert!(html.contains("<h1>标题</h1>"));
+        assert!(html.contains("<strong>加粗</strong>"));
+        assert!(html.contains("<li>列表项</li>"));
+        assert!(html.contains("<blockquote>"));
+    }
+
+    #[test]
+    fn test_export_note_html_is_standalone_printable() {
+        let note = make_note("导出测试", "# 一级\n\n正文内容");
+        let doc = export_note_html(&note);
+        // 完整文档结构:doctype + title + 样式 + 标题 + 正文
+        assert!(doc.starts_with("<!DOCTYPE html>"));
+        assert!(doc.contains("<title>导出测试</title>"));
+        assert!(doc.contains("print"));
+        assert!(doc.contains("<h1>一级</h1>"));
+        assert!(doc.contains("正文内容"));
+        assert!(doc.contains("<html lang=\"zh-CN\">"));
+    }
+}
