@@ -211,3 +211,61 @@
 }
 .tag-filter-clear:hover { background: var(--danger-bg); color: var(--danger-color); }
 .tag-list { padding: 0 6px; }
+
+/* ============================================================
+   [M3.5b 回收站] 笔记右键菜单(长按同触发)
+   ============================================================ */
+.ctx-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: transparent;
+}
+.ctx-menu {
+  position: fixed;
+  z-index: 1001;
+  min-width: 176px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  animation: ctx-pop 0.12s ease;
+}
+@keyframes ctx-pop {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+.ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.12s;
+}
+.ctx-item:hover { background: var(--accent-bg); }
+.ctx-item.danger { color: var(--danger-color); }
+.ctx-item.danger:hover { background: var(--danger-bg); }
+/* 删除二次确认(菜单内展开) */
+.ctx-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  min-width: 200px;
+}
+.ctx-confirm-title { font-size: 13px; color: var(--text-primary); line-height: 1.5; }
+.ctx-confirm-ops { display: flex; gap: 8px; justify-content: flex-end; }
+.ctx-confirm-ops .btn { font-size: 13px; padding: 6px 12px; }

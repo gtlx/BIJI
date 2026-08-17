@@ -394,6 +394,14 @@ export function Editor({
                 )}
               </div>
             )}
+            {/* [M3.5b 回收站] 编辑器删除按钮(辅入口):点击弹二次确认,删除移到回收站 */}
+            <button
+              className="outline-toggle-btn editor-delete-btn"
+              onClick={() => setShowDeleteConfirm(true)}
+              title="删除笔记(移到回收站)"
+            >
+              <StrokeIcon name="trash" size={18} />
+            </button>
             <button
               className={`outline-toggle-btn ${timelineMode ? 'active' : ''}`}
               onClick={toggleTimelineMode}

@@ -99,6 +99,9 @@
 .outline-toggle-btn:hover {
   background: var(--accent-bg);
 }
+/* [M3.5b 回收站] 编辑器删除按钮(辅入口):低调灰,悬停转警示红,不喧宾夺主 */
+.editor-delete-btn { color: var(--text-tertiary); }
+.editor-delete-btn:hover { color: var(--danger-color); background: var(--danger-bg); }
 @media (max-width: 767px) {
   .outline-toggle-btn { display: none; }
 }

@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import type { Note, Folder } from '../api/backend';
 import { StrokeIcon } from '../icons';
 import './NoteList.css';
@@ -15,6 +15,8 @@ interface NoteListProps {
   selectedTag?: string | null;
   /** [M3.5a 标签树] 清除标签过滤(回到文件夹树) */
   onClearTag?: () => void;
+  /** [M3.5b 回收站] 右键菜单删除笔记(移到回收站) */
+  onDeleteNote: (id: string) => void;
 }
 
 /** 默认展开深度:根下两层(根=0,一级=1,二级=2),更深默认收起 */
@@ -23,9 +25,14 @@ const STORAGE_KEY = 'biji.tree.expanded';
 
 export function NoteList({
   notes, folders, selectedNoteId, selectedFolderId,
-  onSelectNote, onSelectFolder, onNewNote, selectedTag = null, onClearTag,
+  onSelectNote, onSelectFolder, onNewNote, selectedTag = null, onClearTag, onDeleteNote,
 }: NoteListProps) {
   const [filterText, setFilterText] = useState('');
+  /** [M3.5b 回收站] 右键菜单:目标笔记 + 弹出位置(视口坐标) + 是否进入删除确认 */
+  const [menu, setMenu] = useState<{ note: Note; x: number; y: number } | null>(null);
+  const [menuDeleting, setMenuDeleting] = useState(false);
+  /** [M3.5b 回收站] 移动端长按定时器 */
+  const pressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -117,11 +124,53 @@ export function NoteList({
     });
   };
 
+  /** [M3.5b 回收站] 打开右键菜单:记录目标笔记 + 视口坐标(右缘对齐,避免溢出视口) */
+  const openMenu = (note: Note, e: React.MouseEvent<HTMLDivElement>) => {
+    const MENU_W = 180;
+    const MENU_H = 96;
+    const x = Math.min(e.clientX, window.innerWidth - MENU_W - 8);
+    const y = Math.min(e.clientY, window.innerHeight - MENU_H - 8);
+    setMenuDeleting(false);
+    setMenu({ note, x, y });
+  };
+
+  /** [M3.5b 回收站] 移动端长按(≈600ms)弹出同一菜单(右键≈长按) */
+  const startPress = (note: Note, e: React.TouchEvent<HTMLDivElement>) => {
+    clearPress();
+    const toc = e.touches[0];
+    pressTimerRef.current = setTimeout(() => {
+      const x = Math.min(toc.clientX, window.innerWidth - 188);
+      const y = Math.min(toc.clientY, window.innerHeight - 104);
+      setMenuDeleting(false);
+      setMenu({ note, x, y });
+    }, 600);
+  };
+  const clearPress = () => {
+    if (pressTimerRef.current) { clearTimeout(pressTimerRef.current); pressTimerRef.current = null; }
+  };
+
+  /** [M3.5b 回收站] 关闭右键菜单 */
+  const closeMenu = () => { setMenu(null); setMenuDeleting(false); };
+
+  /* 右键菜单打开时:按 ESC 或滚动列表即关闭 */
+  useEffect(() => {
+    if (!menu) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeMenu(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [menu]);
+
   const renderNote = (note: Note, extraClass = '') => (
     <div
       key={note.id}
       className={`tree-note ${selectedNoteId === note.id ? 'active' : ''} ${extraClass}`}
-      onClick={() => onSelectNote(note)}
+      onClick={() => { onSelectNote(note); }}
+      onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); openMenu(note, e); }}
+      onTouchStart={(e) => startPress(note, e)}
+      onTouchMove={() => clearPress()}
+      onTouchEnd={() => clearPress()}
+      onTouchCancel={() => clearPress()}
       title={note.title}
     >
       <div className="tree-note-top">
@@ -249,6 +298,46 @@ export function NoteList({
           </div>
         )}
       </div>
+
+      {/* [M3.5b 回收站] 笔记右键菜单:打开 / 删除(移到回收站),二次确认 */}
+      {menu && (
+        <>
+          <div
+            className="ctx-backdrop"
+            onClick={closeMenu}
+            onContextMenu={(e) => { e.preventDefault(); closeMenu(); }}
+          />
+          <div className="ctx-menu" style={{ left: menu.x, top: menu.y }}>
+            {menuDeleting ? (
+              <div className="ctx-confirm">
+                <span className="ctx-confirm-title">
+                  将《{menu.note.title || '无标题'}》移到回收站?
+                </span>
+                <div className="ctx-confirm-ops">
+                  <button className="btn btn-danger" onClick={() => { onDeleteNote(menu.note.id); closeMenu(); }}>
+                    <StrokeIcon name="trash" size={14} /> 删除
+                  </button>
+                  <button className="btn btn-secondary" onClick={() => setMenuDeleting(false)}>取消</button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <button className="ctx-item" onClick={() => { onSelectNote(menu.note); closeMenu(); }}>
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/></svg>
+                  打开
+                </button>
+                <button
+                  className="ctx-item danger"
+                  onClick={() => setMenuDeleting(true)}
+                  title="移到回收站(可恢复)"
+                >
+                  <StrokeIcon name="trash" size={14} /> 删除(移到回收站)
+                </button>
+              </>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

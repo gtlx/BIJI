@@ -500,6 +500,7 @@ export default function App() {
           onNewNote={handleNewNote}
           selectedTag={selectedTag}
           onClearTag={() => setSelectedTag(null)}
+          onDeleteNote={handleDeleteNote}
         />
       </div>
 
