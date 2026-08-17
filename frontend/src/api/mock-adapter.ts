@@ -174,15 +174,36 @@ created: 2026-08-17
     created_at: Date.now() - 86400000,
     updated_at: Date.now() - 1800000,
     tags: ['日志', '待办'],
-    folder_id: null,
+    folder_id: 'mock-folder-proj',
     is_encrypted: false,
     sync_status: 'synced',
   },
 ];
 
+/**
+ * M3 嵌套文件夹示例(演示可折叠树 + 面包屑):
+ * 工作/项目/文档 与 生活/家庭 两层嵌套;部分笔记挂到嵌套文件夹下。
+ */
+const MOCK_FOLDERS: Folder[] = [
+  { id: 'mock-folder-work', name: '工作', parent_id: null, created_at: Date.now() - 30 * 86400000, color: null },
+  { id: 'mock-folder-proj', name: '项目', parent_id: 'mock-folder-work', created_at: Date.now() - 20 * 86400000, color: null },
+  { id: 'mock-folder-doc', name: '文档', parent_id: 'mock-folder-proj', created_at: Date.now() - 10 * 86400000, color: null },
+  { id: 'mock-folder-life', name: '生活', parent_id: null, created_at: Date.now() - 25 * 86400000, color: null },
+  { id: 'mock-folder-home', name: '家庭', parent_id: 'mock-folder-life', created_at: Date.now() - 12 * 86400000, color: null },
+];
+
+// 上面样例里其余笔记(欢迎/图谱)挂到「工作/项目/文档」
+function enrichMockNoteFolders(notes: Note[]): void {
+  notes.forEach(n => {
+    if (n.id === 'mock-note-daily') n.folder_id = 'mock-folder-proj';
+    else if (n.folder_id === null) n.folder_id = 'mock-folder-doc';
+  });
+}
+enrichMockNoteFolders(MOCK_NOTES);
+
 export class MockBackend implements BackendAdapter {
   private notes: Note[] = [...MOCK_NOTES];
-  private folders: Folder[] = [];
+  private folders: Folder[] = [...MOCK_FOLDERS];
   /** M2:内存块表(块数组) */
   private blocks: NoteBlock[] = [];
   /** M2:内存历史表(历史数组) */
@@ -327,23 +348,29 @@ export class MockBackend implements BackendAdapter {
     });
   }
 
-  /** 存量 mock 笔记首次访问时懒拆块(确定性 id,时间戳 = 笔记 updated_at) */
+  /** 存量 mock 笔记首次访问时懒拆块(确定性 id,时间戳 = 笔记 updated_at + 每块递增偏移) */
   private ensureBlocksForNote(noteId: string): void {
     if (this.blocks.some(b => b.note_id === noteId)) return;
     const note = this.notes.find(n => n.id === noteId);
     if (!note) return;
-    const ts = note.updated_at || Date.now();
+    const base = note.updated_at || Date.now();
     const drafts = splitContentToBlocks(note.content);
+    // 块创建时间从 base 往前错开(每块更早一点),供演变视图时间线重排演示
+    const tsBase = base - (drafts.length - 1) * 3600_000;
     this.blocks.push(...drafts.map((d, i) => ({
       id: `mock-${noteId}-${i}`,
       note_id: noteId,
       parent_id: null,
       type: d.type,
       content: d.content,
-      created_at: ts,
-      updated_at: ts,
+      created_at: tsBase + i * 3600_000,
+      updated_at: tsBase + i * 3600_000,
       sort_order: i,
     })));
+    // 每块补一条 create 历史快照,块历史弹层有内容可看
+    for (let i = 0; i < drafts.length; i++) {
+      this.pushHistory(`mock-${noteId}-${i}`, drafts[i].content, 'create', tsBase + i * 3600_000);
+    }
   }
 
   async createBlock(input: { note_id: string; content: string; parent_id?: string | null }): Promise<NoteBlock> {
@@ -404,6 +431,8 @@ export class MockBackend implements BackendAdapter {
 
   async searchBlocks(keyword: string): Promise<BlockSearchResult[]> {
     const kw = keyword.toLowerCase();
+    // 懒拆所有存量笔记的块,保证全文按块命中覆盖全部笔记
+    this.notes.forEach(n => this.ensureBlocksForNote(n.id));
     const aliveNotes = new Set(this.notes.filter(n => !n.deleted_at).map(n => n.id));
     return this.blocks
       .filter(b => b.content.toLowerCase().includes(kw) && aliveNotes.has(b.note_id))

@@ -95,3 +95,84 @@
   gap: 4px;
   flex-wrap: wrap;
 }
+
+/* ===== M3 嵌套可折叠文件夹树 ===== */
+.note-list-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 4px;
+}
+
+.tree-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 12px;
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  background: var(--accent-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-tertiary);
+}
+.tree-filter-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+.tree-filter-input::placeholder { color: var(--text-tertiary); }
+
+.tree { padding: 4px; }
+
+/* 文件夹行 */
+.tree-folder { width: 100%; }
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: background-color 0.15s;
+}
+.tree-row:hover { background: var(--accent-bg); }
+.tree-row.active {
+  background: var(--accent-bg);
+  color: var(--teal-700);
+  box-shadow: inset 0 0 0 1px rgba(13, 148, 136, 0.20);
+}
+.tree-chevron { display: flex; width: 14px; flex-shrink: 0; color: var(--text-tertiary); }
+.tree-chevron-spacer { width: 14px; }
+.tree-label {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tree-count { font-size: 11px; color: var(--text-tertiary); }
+.tree-kids { padding-left: 14px; }
+
+/* 树内笔记行(tree-note:更紧凑) */
+.tree-note {
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: background-color 0.15s;
+  margin: 1px 0;
+}
+.tree-note:hover { background: var(--accent-bg); }
+.tree-note.active {
+  background: var(--accent-bg);
+  border-left-color: var(--accent-color);
+  box-shadow: inset 0 0 0 1px rgba(13, 148, 136, 0.20);
+}
+.tree-note.active .tree-note-title { color: var(--teal-700); }
+.tree-note-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 2px; }
+.tree-note-title { font-size: 13px; font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.tree-note-preview { font-size: 12px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0; }

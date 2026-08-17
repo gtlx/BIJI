@@ -201,3 +201,17 @@
   border-radius: 4px;
   font-size: 11px;
 }
+
+/* ===== M3 搜索简化:结果标题/预览 + 内容模式块级命中 + 高亮 ===== */
+.search-result-title { font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
+.search-result-preview { font-size: 12px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.block-hit { border-left: 3px solid var(--accent-color); }
+.block-hit-note { color: var(--teal-700); }
+.block-hit-time { font-size: 11px; color: var(--text-tertiary); margin-left: 8px; font-weight: 400; }
+.block-hit-snippet { white-space: normal; line-height: 1.5; }
+mark.hit {
+  background: rgba(13, 148, 136, 0.22);
+  color: var(--text-primary);
+  border-radius: 2px;
+  padding: 0 1px;
+}

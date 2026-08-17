@@ -110,6 +110,11 @@ impl BlockService {
         self.db.get_note_blocks(note_id)
     }
 
+    /// [M3 演变视图] 按块创建时间返回块序列(时间线重排「先写哪段后写哪段」)
+    pub fn get_note_blocks_by_created(&self, note_id: &str) -> Result<Vec<Block>, Error> {
+        self.db.get_note_blocks_by_created(note_id)
+    }
+
     /// 单块详情
     pub fn get_block(&self, block_id: &str) -> Result<Option<Block>, Error> {
         self.db.get_block(block_id)
@@ -400,5 +405,23 @@ mod tests {
         assert_eq!(blocks.len(), 2);
         assert_eq!(blocks[1].content, "新增段落。");
         assert_eq!(blocks[1].sort_order, 1);
+    }
+
+    /// [M3] 演变视图:服务层时间线重排(先写 → 后写按 created_at)
+    #[test]
+    fn test_get_note_blocks_by_created_timeline() {
+        use crate::models::BlockType;
+        let (_dir, svc) = open_service();
+        let db = svc.db.clone();
+        save_note(&db, "n1", "笔记", "");
+        // 顺序创建第一段、第二段(时间递增)
+        let b1 = svc.create_block("n1", "先写第一段", None).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        let b2 = svc.create_block("n1", "后写第二段", None).unwrap();
+        assert!(b2.created_at > b1.created_at);
+
+        let timeline = svc.get_note_blocks_by_created("n1").unwrap();
+        let contents: Vec<&str> = timeline.iter().map(|b| b.content.as_str()).collect();
+        assert_eq!(contents, vec!["先写第一段", "后写第二段"]);
     }
 }

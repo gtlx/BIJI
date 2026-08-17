@@ -121,6 +121,22 @@ impl Database {
         Ok(n)
     }
 
+    /// [M3 演变视图] 按块创建时间返回笔记块序列(时间线重排的后端支撑)
+    ///
+    /// 展示「先写哪段后写哪段」:created_at 升序(同刻按 sort_order 兜底)。
+    pub fn get_note_blocks_by_created(&self, note_id: &str) -> Result<Vec<Block>, Error> {
+        let conn = self.conn();
+        let mut stmt = conn.prepare(
+            "SELECT * FROM blocks WHERE note_id = ?1 ORDER BY created_at ASC, sort_order ASC",
+        )?;
+        let rows = stmt.query_map(rusqlite::params![note_id], block_from_row)?;
+        let mut blocks = Vec::new();
+        for row in rows {
+            blocks.push(row?);
+        }
+        Ok(blocks)
+    }
+
     // ==================== 块历史 ====================
 
     /// 插入一条历史快照
@@ -402,6 +418,24 @@ mod tests {
         let results = db.search_blocks("隐藏词").unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].note_id, "n1");
+    }
+
+    /// [M3] 演变视图:按创建时间排序返回块(时间线重排后端支撑)
+    #[test]
+    fn test_get_note_blocks_by_created_timeline() {
+        let (_dir, db) = open_db();
+        save_note(&db, "n1", "笔记", "内容");
+        // 打乱 sort_order,created_at 明确区分
+        let b1 = make_block("n1", "先写", 2, 100);
+        let b2 = make_block("n1", "后写", 0, 200);
+        let b3 = make_block("n1", "最后写", 1, 300);
+        db.insert_block(&b1).unwrap();
+        db.insert_block(&b2).unwrap();
+        db.insert_block(&b3).unwrap();
+
+        let timeline = db.get_note_blocks_by_created("n1").unwrap();
+        let contents: Vec<&str> = timeline.iter().map(|b| b.content.as_str()).collect();
+        assert_eq!(contents, vec!["先写", "后写", "最后写"]);
     }
 
     #[test]

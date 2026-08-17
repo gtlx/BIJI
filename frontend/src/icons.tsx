@@ -206,6 +206,27 @@ const S_TIMER = (
   </>
 );
 
+/** 折叠展开:右箭头 */
+const S_CHEVRON_RIGHT = (
+  <>
+    <path d="m9 18 6-6-6-6" />
+  </>
+);
+
+/** 折叠展开:下箭头(展开态) */
+const S_CHEVRON_DOWN = (
+  <>
+    <path d="m6 9 6 6 6-6" />
+  </>
+);
+
+/** 折叠展开:左箭头(未用,对称补齐) */
+const S_CHEVRON_LEFT = (
+  <>
+    <path d="m15 18-6-6 6-6" />
+  </>
+);
+
 /** Stroke 图标注册表:name → 子元素(与 ICON_PATHS 互补,供导航/工具按钮使用) */
 export const STROKE_ICONS: Record<string, React.ReactNode> = {
   notes: S_NOTES,
@@ -221,6 +242,9 @@ export const STROKE_ICONS: Record<string, React.ReactNode> = {
   outline: S_OUTLINE,
   back: S_BACK,
   timer: S_TIMER,
+  chevron_right: S_CHEVRON_RIGHT,
+  chevron_down: S_CHEVRON_DOWN,
+  chevron_left: S_CHEVRON_LEFT,
 };
 
 /** Stroke 图标组件 — 按名称取素材,渲染为统一 stroke 风格 */

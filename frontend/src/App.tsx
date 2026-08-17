@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { backend } from './api';
-import type { Note, Folder, AppSettings, SearchQuery, Plugin, NoteBlock } from './api/backend';
+import type { Note, Folder, AppSettings, Plugin, NoteBlock } from './api/backend';
 import { DEFAULT_TEMPLATES } from './api/backend';
 import { Sidebar, type SidebarNavItem } from './components/Sidebar';
 import { NoteList } from './components/NoteList';
@@ -239,12 +239,6 @@ export default function App() {
     showToast('笔记已删除');
   };
 
-  const handleSearch = async (query: SearchQuery) => {
-    const results = await backend.searchNotes(query);
-    setNotes(results);
-    showToast(`找到 ${results.length} 条结果`);
-  };
-
   const handleSettingsChange = async (patch: Partial<AppSettings>) => {
     if (!settings) return;
     const updated = { ...settings, ...patch };
@@ -330,14 +324,16 @@ export default function App() {
         />
       </div>
 
-      {/* 笔记列表(桌面/平板并排;手机单栏切换) */}
+      {/* 笔记列表(桌面/平板并排;手机单栏切换)——M3 嵌套可折叠文件夹树 */}
       <div data-panel="note-list">
         <NoteList
-          notes={selectedFolderId ? notes.filter(n => n.folder_id === selectedFolderId) : notes}
+          notes={notes}
+          folders={folders}
           selectedNoteId={selectedNote?.id}
+          selectedFolderId={selectedFolderId}
           onSelectNote={(note) => { setSelectedNote(note); setMobileView('editor'); }}
+          onSelectFolder={setSelectedFolderId}
           onNewNote={handleNewNote}
-          onSearch={handleSearch}
         />
       </div>
 
@@ -368,6 +364,8 @@ export default function App() {
           ) : (
             <Editor
               note={selectedNote}
+              folders={folders}
+              onSelectFolder={setSelectedFolderId}
               onSave={handleSaveNote}
               onDelete={handleDeleteNote}
               settings={settings}
@@ -424,7 +422,6 @@ export default function App() {
           notes={notes}
           mode={searchMode}
           onModeChange={(m) => { setSearchMode(m); }}
-          onSearch={handleSearch}
           onClose={() => setShowSearch(false)}
           onSelectNote={(note) => { setSelectedNote(note); setShowSearch(false); setMobileView('editor'); }}
         />
