@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { backend } from './api';
 import type { Note, Folder, AppSettings, Plugin, NoteBlock, TagCount, NoteTemplate, TrashBlock } from './api/backend';
 import { DEFAULT_TEMPLATES } from './api/backend';
@@ -18,6 +18,11 @@ import { RightPanel } from './components/RightPanel';
 import { TrashView } from './components/TrashView';
 import { NewNoteModal } from './components/NewNoteModal';
 import { MobileTabbar, type TabItem } from './components/MobileTabbar';
+import { CommandPalette, type CommandAction } from './components/CommandPalette';
+import { TemplateInsertModal } from './components/TemplateInsertModal';
+import { PaneWorkspace } from './components/pane/PaneWorkspace';
+import { loadLayout, saveLayout } from './components/pane/layoutStore';
+import type { PaneId, PaneLayout } from './components/pane/types';
 import { StrokeIcon } from './icons';
 import './App.css';
 
@@ -107,6 +112,50 @@ export default function App() {
   /** [M3.5b 回收站] 回收站中的笔记与块 */
   const [trashNotes, setTrashNotes] = useState<Note[]>([]);
   const [trashBlocks, setTrashBlocks] = useState<TrashBlock[]>([]);
+
+  /** [Pane] 工作区面板布局(localStorage 记忆) */
+  const [paneLayout, setPaneLayout] = useState<PaneLayout>(() => loadLayout());
+  /** [Pane] 是否正在渲染画布式工作区(notes/calendar/graph)→ true;git/publish/trash 全屏视图 → false */
+  const [workspaceView, setWorkspaceView] = useState(true);
+  /** [Pane] 编辑器命令 API(save / insertAtCursor),由 Editor 通过 onRegisterApi 注册 */
+  const editorApiRef = useRef<{ save: () => void; insertAtCursor: (text: string) => void } | null>(null);
+  /** [Pane] 命令面板开关 */
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
+  /** [Pane] 模板插入弹窗开关 */
+  const [showTemplateInsert, setShowTemplateInsert] = useState(false);
+
+  // [Pane] 布局变化即落 localStorage(重启还原)
+  useEffect(() => { saveLayout(paneLayout); }, [paneLayout]);
+
+  // [Pane] 确保某面板打开(若隐藏则从隐藏区移到末尾栏)
+  const ensurePane = useCallback((id: PaneId) => {
+    setPaneLayout(prev => {
+      const has = prev.columns.some(c => c.panes.includes(id));
+      const hidden = prev.hidden.filter(p => p !== id);
+      if (has) return { columns: prev.columns, hidden };
+      const cols = prev.columns.map(c => ({ ...c, panes: [...c.panes] }));
+      if (cols.length === 0) cols.push({ id: 'col-fallback', weight: 1, panes: [id] });
+      else cols[cols.length - 1] = { ...cols[cols.length - 1]!, panes: [...cols[cols.length - 1]!.panes, id] };
+      return { columns: cols, hidden };
+    });
+  }, []);
+
+  // [Pane] 关闭某面板(移到隐藏区)
+  const closePane = useCallback((id: PaneId) => {
+    setPaneLayout(prev => {
+      const cols = prev.columns.map(c => ({ ...c, panes: c.panes.filter(p => p !== id) })).filter(c => c.panes.length > 0);
+      return {
+        columns: cols.length > 0 ? cols : [{ id: 'col-fallback', weight: 1, panes: ['editor'] }],
+        hidden: prev.hidden.includes(id) ? prev.hidden : [...prev.hidden, id],
+      };
+    });
+  }, []);
+
+  // [Pane] 切换某面板开/关
+  const togglePane = useCallback((id: PaneId) => {
+    const has = paneLayout.columns.some(c => c.panes.includes(id));
+    if (has) closePane(id); else ensurePane(id);
+  }, [paneLayout, closePane, ensurePane]);
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
     const id = crypto.randomUUID();
@@ -227,26 +276,48 @@ export default function App() {
   /** 导航点击统一入口:桌面侧栏 + 移动底栏共用 */
   const handleNavClick = (id: string) => {
     if (id === 'notes') {
+      ensurePane('editor');
+      ensurePane('files');
+      setWorkspaceView(true);
       setActiveNav('notes');
       setMobileView('list');
     } else if (id === 'search') {
       setShowSearch(true);
     } else if (id === 'calendar') {
       setActiveNav('calendar');
+      setWorkspaceView(true);
       setMobileView('editor');
-    } else if (id === 'graph' || id === 'git' || id === 'publish') {
+      if (!isMobile) togglePane('calendar');
+    } else if (id === 'graph') {
+      setActiveNav('graph');
+      setWorkspaceView(true);
+      setMobileView('editor');
+      if (!isMobile) togglePane('graph');
+    } else if (id === 'git' || id === 'publish' || id === 'trash') {
       setActiveNav(id);
+      setWorkspaceView(false);
       setMobileView('editor');
-    } else if (id === 'trash') {
-      setActiveNav('trash');
-      setMobileView('editor');
-      loadTrash();
+      if (id === 'trash') loadTrash();
     } else if (id === 'plugins') {
       setShowPluginManager(true);
     } else if (id === 'settings') {
       setShowSettings(true);
     }
   };
+
+  // [Pane 模板插入] 把模板内容插入当前笔记光标处({{date}} 等变量就地替换)
+  const handleInsertTemplate = useCallback((template: NoteTemplate) => {
+    setShowTemplateInsert(false);
+    let text = template.content || '';
+    text = text.replace(/\{\{date\}\}/g, new Date().toLocaleDateString('zh-CN'));
+    if (!selectedNote) {
+      showToast('请先选择一篇笔记再插入模板', 'info');
+      return;
+    }
+    editorApiRef.current?.insertAtCursor(text);
+    showToast(`已插入「${template.name}」模板`);
+  }, [selectedNote, showToast]);
+
 
   /** [M3.5a] 日历/反向链接的跳转入口:打开目标笔记 */
   const jumpToNote = ({ id, title }: { id: string; title: string }) => {
@@ -422,10 +493,39 @@ export default function App() {
     }
   };
 
+  // [Pane 命令面板] 可执行动作清单(Ctrl/Cmd+P 弹出)
+  const commandActions = useMemo<CommandAction[]>(() => {
+    const close = () => setShowCommandPalette(false);
+    const diary = templates.find(t => t.category === 'diary');
+    return [
+      { id: 'new-note', label: '新建笔记', icon: 'plus', hint: 'Ctrl+N', run: () => { close(); handleNewNote(); } },
+      { id: 'new-diary', label: '新建日记', icon: 'calendar', hint: '模板', run: () => { close(); if (diary) createNoteFromTemplate(diary); else handleNewNote(); } },
+      { id: 'save', label: '保存当前笔记', icon: 'download', hint: 'Ctrl+S', run: () => { close(); editorApiRef.current?.save(); } },
+      { id: 'search', label: '搜索笔记', icon: 'search', hint: 'Ctrl+K', run: () => { close(); setShowSearch(true); } },
+      { id: 'insert-template', label: '插入模板到当前笔记', icon: 'template', run: () => { close(); setShowTemplateInsert(true); } },
+      { id: 'toggle-outline', label: '切换大纲面板', icon: 'outline', run: () => { close(); setWorkspaceView(true); togglePane('outline'); } },
+      { id: 'toggle-backlinks', label: '切换反向链接面板', icon: 'backlink', run: () => { close(); setWorkspaceView(true); togglePane('backlinks'); } },
+      { id: 'toggle-files', label: '切换文件面板', icon: 'folder', run: () => { close(); setWorkspaceView(true); togglePane('files'); } },
+      { id: 'toggle-graph', label: '切换图谱面板', icon: 'graph', run: () => { close(); setWorkspaceView(true); togglePane('graph'); } },
+      { id: 'toggle-calendar', label: '切换日历面板', icon: 'calendar', run: () => { close(); setWorkspaceView(true); togglePane('calendar'); } },
+      { id: 'export-md', label: '导出当前为 .md', icon: 'download', run: () => { close(); if (selectedNote) handleExportMarkdown(selectedNote.id); } },
+      { id: 'export-html', label: '导出当前为 HTML(可打印 PDF)', icon: 'download', run: () => { close(); if (selectedNote) handleExportHtml(selectedNote.id); } },
+      { id: 'open-settings', label: '打开设置', icon: 'settings', hint: 'Ctrl+,', run: () => { close(); setShowSettings(true); } },
+    ];
+  }, [templates, handleNewNote, createNoteFromTemplate, selectedNote, handleExportMarkdown, handleExportHtml, togglePane]);
+
   useEffect(() => {
+    const isEditableTarget = (e: KeyboardEvent): boolean => {
+      const t = e.target as HTMLElement | null;
+      if (!t) return false;
+      return t.isContentEditable || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT';
+    };
+
     const handleKeyDown = (e: KeyboardEvent) => {
-      // ESC:关闭最上层的弹窗(搜索/设置/插件管理/新建模板),避免 overlay 残留
+      // ESC:关闭最上层弹窗(命令面板/模板插入/搜索/设置/插件管理/新建模板)
       if (e.key === 'Escape') {
+        if (showCommandPalette) { setShowCommandPalette(false); return; }
+        if (showTemplateInsert) { setShowTemplateInsert(false); return; }
         if (showSearch || showSettings || showPluginManager || showNewNoteModal) {
           e.preventDefault();
           setShowSearch(false);
@@ -435,6 +535,28 @@ export default function App() {
         }
         return;
       }
+      const mod = e.ctrlKey || e.metaKey;
+      const k = e.key.toLowerCase();
+
+      // Ctrl/Cmd+K 或(非输入态)`/` → 打开搜索
+      if ((mod && k === 'k') || (k === '/' && !isEditableTarget(e))) {
+        e.preventDefault();
+        setShowSearch(true);
+        return;
+      }
+      // Ctrl/Cmd+P → 命令面板
+      if (mod && k === 'p') {
+        e.preventDefault();
+        setShowCommandPalette(v => !v);
+        return;
+      }
+      // Ctrl/Cmd+S → 全局保存(输入框内由 Editor 自身处理,避免双存)
+      if (mod && k === 's' && !isEditableTarget(e)) {
+        e.preventDefault();
+        editorApiRef.current?.save();
+        return;
+      }
+
       if (!settings?.shortcuts) return;
       const s = settings.shortcuts;
       const key: string[] = [];
@@ -457,15 +579,102 @@ export default function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [settings, handleNewNote, handleNewFolder, activeNav, showSearch, showSettings, showPluginManager, showNewNoteModal]);
-
-  if (isLoading) return <div className="loading">加载中...</div>;
+  }, [settings, handleNewNote, handleNewFolder, activeNav, showSearch, showSettings, showPluginManager, showNewNoteModal, showCommandPalette, showTemplateInsert, commandActions]);
 
   const pomodoroEnabled = plugins.some(p => p.id === 'pomodoro-plugin' && p.enabled);
 
+  // [Pane] 按面板 id 渲染模块组件(编辑器/文件/大纲/反向链接/图谱/日历)
+  const renderPane = useCallback((id: PaneId) => {
+    switch (id) {
+      case 'editor':
+        return (
+          <Editor
+            note={selectedNote}
+            folders={folders}
+            onSelectFolder={setSelectedFolderId}
+            onSave={handleSaveNote}
+            onDelete={handleDeleteNote}
+            settings={settings}
+            syncEnabled={pomodoroEnabled}
+            onLinkClick={handleLinkClick}
+            onTitleChange={handleTitleChange}
+            noteBlocks={noteBlocks}
+            onRegisterApi={(api) => { editorApiRef.current = api; }}
+            onToggleOutline={() => { setWorkspaceView(true); togglePane('outline'); }}
+            onOpenBacklinks={() => { setWorkspaceView(true); togglePane('backlinks'); }}
+            onExportMarkdown={handleExportMarkdown}
+            onExportHtml={handleExportHtml}
+          />
+        );
+      case 'files':
+        return (
+          <NoteList
+            notes={notes}
+            folders={folders}
+            selectedNoteId={selectedNote?.id}
+            selectedFolderId={selectedFolderId}
+            onSelectNote={(note) => { setSelectedNote(note); setMobileView('editor'); }}
+            onSelectFolder={(id) => { setSelectedFolderId(id); setSelectedTag(null); }}
+            onNewNote={handleNewNote}
+            selectedTag={selectedTag}
+            onClearTag={() => setSelectedTag(null)}
+            onDeleteNote={handleDeleteNote}
+          />
+        );
+      case 'outline':
+        return (
+          <RightPanel
+            key="outline"
+            content={selectedNote?.content || ''}
+            defaultTab="outline"
+            pomodoroEnabled={pomodoroEnabled}
+            noteId={selectedNote?.id || null}
+            onSelectNote={(n) => { const t = notes.find(x => x.id === n.id); if (t) setSelectedNote(t); }}
+            onHeadingClick={() => {}}
+            onToggle={() => closePane('outline')}
+            onPropertiesClick={() => showToast('属性面板', 'info')}
+          />
+        );
+      case 'backlinks':
+        return (
+          <RightPanel
+            key="backlinks"
+            content={selectedNote?.content || ''}
+            defaultTab="backlinks"
+            pomodoroEnabled={pomodoroEnabled}
+            noteId={selectedNote?.id || null}
+            onSelectNote={jumpToNote}
+            onHeadingClick={() => {}}
+            onToggle={() => closePane('backlinks')}
+            onPropertiesClick={() => showToast('属性面板', 'info')}
+          />
+        );
+      case 'graph':
+        return (
+          <GraphView
+            key={graphKey}
+            onSelectNote={(noteId) => {
+              const note = notes.find(n => n.id === noteId);
+              if (note) { setSelectedNote(note); setMobileView('editor'); }
+            }}
+            currentNoteId={selectedNote?.id}
+            onRefresh={() => setGraphKey(k => k + 1)}
+          />
+        );
+      case 'calendar':
+        return <CalendarView onSelectNote={jumpToNote} />;
+      default:
+        return null;
+    }
+  }, [selectedNote, folders, handleSaveNote, handleDeleteNote, settings, pomodoroEnabled,
+      handleLinkClick, handleTitleChange, noteBlocks, notes, selectedFolderId, selectedTag,
+      handleNewNote, closePane, togglePane, jumpToNote, graphKey, showToast]);
+
+  if (isLoading) return <div className="loading">加载中...</div>;
+
   return (
     <div
-      className={`app-container ${rightPanelOpen ? 'with-right-panel' : ''} ${isMobile ? `mobile-view-${mobileView}` : ''}`}
+      className={`app-container ${isMobile ? `mobile-view-${mobileView}` : ''}`}
     >
       {/* 左侧导航栏(桌面/平板;手机隐藏) */}
       <div data-panel="left-sidebar">
@@ -504,8 +713,8 @@ export default function App() {
         />
       </div>
 
-      {/* 主区:编辑器 / 图谱 / Git / 发布 */}
-      <div className="main-content" data-panel="main-content">
+      {/* 主区:工作区 Pane(editor/files/outline/backlinks/graph/calendar)或全屏视图(Git/发布/回收站) */}
+      <div className={`main-content ${isMobile ? '' : 'pane-mode'}`} data-panel="main-content">
         <button
           className="mobile-back-btn"
           onClick={() => setMobileView('list')}
@@ -513,40 +722,49 @@ export default function App() {
         >
           <StrokeIcon name="back" size={20} />
         </button>
-        <div className="main-content-inner" data-panel={activeNav === 'trash' ? 'trash' : activeNav === 'graph' ? 'graph' : activeNav === 'calendar' ? 'calendar' : activeNav === 'git' ? 'git' : activeNav === 'publish' ? 'publish' : 'editor'}>
-          {activeNav === 'trash' ? (
-            <TrashView
-              trashNotes={trashNotes}
-              trashBlocks={trashBlocks}
-              onRestoreNote={handleRestoreNote}
-              onDeleteNoteForever={handlePermanentDeleteNote}
-              onRestoreBlock={handleRestoreBlock}
-              onDeleteBlockForever={handlePermanentDeleteBlock}
-              onEmptyTrash={() => handleEmptyTrash()}
-              onClose={() => handleNavClick('notes')}
-              onOpenNote={(noteId) => {
-                const note = notes.find(n => n.id === noteId) ?? trashNotes.find(n => n.id === noteId);
-                if (note && !note.deleted_at) { setSelectedNote(note); setActiveNav('notes'); setMobileView('editor'); }
-                else if (note) showToast('该笔记在回收站中,请先恢复', 'info');
-              }}
+        <div className="main-content-inner" data-panel={!workspaceView ? activeNav : 'workspace'}>
+          {workspaceView && !isMobile ? (
+            <PaneWorkspace
+              layout={paneLayout}
+              onLayoutChange={setPaneLayout}
+              renderPane={renderPane}
             />
-          ) : activeNav === 'graph' ? (
+          ) : !workspaceView ? (
+            activeNav === 'trash' ? (
+              <TrashView
+                trashNotes={trashNotes}
+                trashBlocks={trashBlocks}
+                onRestoreNote={handleRestoreNote}
+                onDeleteNoteForever={handlePermanentDeleteNote}
+                onRestoreBlock={handleRestoreBlock}
+                onDeleteBlockForever={handlePermanentDeleteBlock}
+                onEmptyTrash={() => handleEmptyTrash()}
+                onClose={() => handleNavClick('notes')}
+                onOpenNote={(noteId) => {
+                  const note = notes.find(n => n.id === noteId) ?? trashNotes.find(n => n.id === noteId);
+                  if (note && !note.deleted_at) { setSelectedNote(note); handleNavClick('notes'); setMobileView('editor'); }
+                  else if (note) showToast('该笔记在回收站中,请先恢复', 'info');
+                }}
+              />
+            ) : activeNav === 'git' ? (
+              <GitPanel onClose={() => handleNavClick('notes')} onOpenPublish={() => handleNavClick('publish')} />
+            ) : (
+              <PublishPanel onClose={() => handleNavClick('notes')} />
+            )
+          ) : isMobile && activeNav === 'graph' ? (
             <GraphView
               key={graphKey}
               onSelectNote={(noteId) => {
                 const note = notes.find(n => n.id === noteId);
-                if (note) { setSelectedNote(note); setActiveNav('notes'); setMobileView('editor'); }
+                if (note) { setSelectedNote(note); handleNavClick('notes'); setMobileView('editor'); }
               }}
               currentNoteId={selectedNote?.id}
               onRefresh={() => setGraphKey(k => k + 1)}
             />
-          ) : activeNav === 'calendar' ? (
+          ) : isMobile && activeNav === 'calendar' ? (
             <CalendarView onSelectNote={jumpToNote} />
-          ) : activeNav === 'git' ? (
-            <GitPanel onClose={() => handleNavClick('notes')} onOpenPublish={() => handleNavClick('publish')} />
-          ) : activeNav === 'publish' ? (
-            <PublishPanel onClose={() => handleNavClick('notes')} />
           ) : (
+            /* 手机端单栏:直接渲染编辑器(工作区 Pane 在手机隐藏,底栏切换) */
             <Editor
               note={selectedNote}
               folders={folders}
@@ -558,14 +776,9 @@ export default function App() {
               onLinkClick={handleLinkClick}
               onTitleChange={handleTitleChange}
               noteBlocks={noteBlocks}
-              onToggleOutline={() => {
-                setRightPanelOpen(prev => !prev);
-                if (rightPanelTab !== 'outline') setRightPanelTab('outline');
-              }}
-              onOpenBacklinks={() => {
-                setRightPanelOpen(true);
-                setRightPanelTab('backlinks');
-              }}
+              onRegisterApi={(api) => { editorApiRef.current = api; }}
+              onToggleOutline={() => { setWorkspaceView(true); togglePane('outline'); }}
+              onOpenBacklinks={() => { setWorkspaceView(true); togglePane('backlinks'); }}
               onExportMarkdown={handleExportMarkdown}
               onExportHtml={handleExportHtml}
             />
@@ -574,22 +787,7 @@ export default function App() {
         <StatusBar syncEnabled={plugins.some(p => p.id === 'sync-plugin' && p.enabled)} />
       </div>
 
-      {/* 右侧大纲栏:默认折叠,仅在编辑器视图可开 */}
-      {selectedNote && activeNav === 'notes' && rightPanelOpen && (
-        <div data-panel="right-sidebar">
-          <RightPanel
-            key={rightPanelTab}
-            content={selectedNote?.content || ''}
-            defaultTab={rightPanelTab}
-            pomodoroEnabled={pomodoroEnabled}
-            noteId={selectedNote?.id || null}
-            onSelectNote={jumpToNote}
-            onHeadingClick={(heading, level) => {}}
-            onToggle={() => setRightPanelOpen(false)}
-            onPropertiesClick={() => showToast('属性面板', 'info')}
-          />
-        </div>
-      )}
+      {/* 右侧大纲/反向链接已并入工作区 Pane(obsolete 右栏移除) */}
 
       {/* 移动端底部 Tab 栏(<768px 显示) */}
       <MobileTabbar
@@ -628,7 +826,23 @@ export default function App() {
         <NewNoteModal
           templates={templates}
           onSelect={createNoteFromTemplate}
+          onTemplatesChange={setTemplates}
           onClose={() => setShowNewNoteModal(false)}
+        />
+      )}
+
+      {showTemplateInsert && (
+        <TemplateInsertModal
+          templates={templates}
+          onInsert={handleInsertTemplate}
+          onClose={() => setShowTemplateInsert(false)}
+        />
+      )}
+
+      {showCommandPalette && (
+        <CommandPalette
+          actions={commandActions}
+          onClose={() => setShowCommandPalette(false)}
         />
       )}
     </div>

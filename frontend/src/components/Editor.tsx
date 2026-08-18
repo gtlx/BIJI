@@ -27,6 +27,8 @@ interface EditorProps {
   onEditorModeChange?: (mode: string) => void;
   onPreviewModeChange?: (mode: string) => void;
   noteBlocks?: NoteBlock[];
+  /** [Pane] 向父级注册命令 API(保存 / 光标处插入),供全局快捷键与模板插入调用 */
+  onRegisterApi?: (api: { save: () => void; insertAtCursor: (text: string) => void }) => void;
 }
 
 interface NoteFrontmatter {
@@ -46,6 +48,7 @@ export function Editor({
   note, folders, onSelectFolder, onSave, onDelete, settings, syncEnabled, onLinkClick,
   onTitleChange, onToggleOutline, onOpenBacklinks, onExportMarkdown, onExportHtml, scrollToHeading,
   externalEditorMode, externalPreviewMode, onEditorModeChange, onPreviewModeChange, noteBlocks,
+  onRegisterApi,
 }: EditorProps) {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -146,6 +149,36 @@ export function Editor({
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(handleSave, settings.auto_save_interval || 3000);
   }, [note, settings?.auto_save, settings?.auto_save_interval, handleSave]);
+
+  /**
+   * [Pane 模板插入] 在编辑器光标处插入一段文本;无聚焦编辑器时追加到末尾。
+   * 插入后自动切回编辑态并触发按需保存。{{date}} 等变量由调用方先行替换。
+   */
+  const insertAtCursor = useCallback((text: string) => {
+    if (!note) return;
+    const ta = textareaRef.current;
+    if (ta) {
+      const start = ta.selectionStart ?? content.length;
+      const end = ta.selectionEnd ?? start;
+      const next = content.slice(0, start) + text + content.slice(end);
+      setContent(next);
+      requestAnimationFrame(() => {
+        ta.focus();
+        const pos = start + text.length;
+        ta.setSelectionRange(pos, pos);
+      });
+    } else {
+      setContent(c => c + text);
+    }
+    if (previewMode === 'preview') setPreviewMode('live');
+    scheduleAutoSave();
+  }, [note, content, textareaRef, previewMode, scheduleAutoSave]);
+
+  // 向父级注册命令 API(供全局 Ctrl+S 保存、模板插入等调用)
+  useEffect(() => {
+    if (!onRegisterApi) return;
+    onRegisterApi({ save: handleSave, insertAtCursor });
+  }, [onRegisterApi, handleSave, insertAtCursor]);
 
   useEffect(() => () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); }, []);
 

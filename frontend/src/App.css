@@ -138,43 +138,30 @@ body {
   color: var(--text-primary);
 }
 
-/* ===== 主布局:三档响应式 ===== */
+/* ===== 主布局:三档响应式(桌面 → 侧栏 | 工作区 Pane) ===== */
 .app-container {
   display: grid;
-  /* 桌面默认三区:侧栏 + 笔记列表 + 主区 */
-  grid-template-columns: var(--sidebar-width) var(--note-list-width) minmax(0, 1fr);
+  /* 桌面默认两区:左侧导航侧栏 + 右侧工作区(Pane 面板化) */
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   height: 100dvh;
   width: 100vw;
   position: relative;
 }
 
-/* 打开右侧大纲栏时启用四区(仅桌面) */
-.app-container.with-right-panel {
-  grid-template-columns: var(--sidebar-width) var(--note-list-width) minmax(0, 1fr) var(--right-panel-width);
-}
+/* 笔记列表已并入工作区的「文件」Pane,桌面不再占独立 grid 列 */
+[data-panel='note-list'] { display: none; }
 
 /* grid 子项允许收缩到轨道宽度,防横向溢出 */
 .app-container > * { min-width: 0; }
 
-/* ---------- 平板 768-1024px:侧栏图标化 + 列表/编辑器并排 ---------- */
+/* ---------- 平板 768-1024px:侧栏图标化 ---------- */
 @media (min-width: 768px) and (max-width: 1024px) {
   .app-container {
-    grid-template-columns: 64px 240px minmax(0, 1fr);
-  }
-  .app-container.with-right-panel {
-    /* 平板右栏改为浮层抽屉,不占 grid 列 */
-    grid-template-columns: 64px 240px minmax(0, 1fr);
-  }
-  [data-panel='right-sidebar'] {
-    position: fixed;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 40;
+    grid-template-columns: 64px minmax(0, 1fr);
   }
 }
 
-/* ---------- 手机 <768px:底部 Tab 栏 + 单栏切换 ---------- */
+/* ---------- 手机 <768px:底部 Tab 栏 + 单栏切换(还原独立笔记列表) ---------- */
 @media (max-width: 767px) {
   .app-container {
     display: block;
@@ -185,6 +172,7 @@ body {
   [data-panel='right-sidebar'] {
     display: none !important;
   }
+  [data-panel='note-list'] { display: flex; }
   /* 单栏切换:列表视图 ⇄ 编辑器视图(由 App 的 mobileView 状态驱动) */
   .app-container.mobile-view-list [data-panel='note-list'] { display: flex; }
   .app-container.mobile-view-list .main-content { display: none; }
@@ -234,6 +222,13 @@ body {
   overflow-y: auto;
   padding: 24px 28px;
   min-width: 0;
+}
+
+/* [Pane 面板化] 工作区模式:主区去留白、交给 Pane 容器铺满 */
+.main-content.pane-mode .main-content-inner {
+  padding: 6px;
+  display: flex;
+  overflow: hidden;
 }
 
 /* 移动端编辑器返回列表按钮(<768px 显示,桌面隐藏) */
