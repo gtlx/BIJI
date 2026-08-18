@@ -215,6 +215,10 @@ export class MockBackend implements BackendAdapter {
   private templates: NoteTemplate[] = DEFAULT_TEMPLATES.map((t, i) => ({ ...t, is_builtin: true, created_at: Date.now() - i }));
   /** 内存 id 序号 */
   private seq = 0;
+  /** [M4] 内存 git 快照:会话内「导出并提交」产生的假提交历史(仅 Mock 展示用) */
+  private mockGitLog: GitLogEntry[] = [];
+  /** [M4] 内存 git 假哈希自增 */
+  private mockGitSeq = 0;
   private settings: AppSettings = {
     theme: 'light',
     font_size: 14,
@@ -324,10 +328,54 @@ export class MockBackend implements BackendAdapter {
   async syncStatus(): Promise<SyncStatus> { return { is_syncing: false, last_sync: 0, pending: 0 }; }
   async gitInit(): Promise<boolean> { return true; }
   async gitStatus(): Promise<GitStatus> { return { files: [], clean: true }; }
-  async gitCommit(message: string): Promise<string | null> { return null; }
-  async gitLog(count?: number): Promise<GitLogEntry[]> { return []; }
-  async publishSite(config: PublishConfig): Promise<PublishResult> { return { success: true }; }
-  async checkGenerator(generator: string): Promise<[boolean, string | null]> { return [false, null]; }
+  async gitCommit(message: string): Promise<string | null> {
+    return this.mockPushCommit(message);
+  }
+  async gitLog(count?: number): Promise<GitLogEntry[]> {
+    return this.mockGitLog.slice(0, count ?? 20);
+  }
+
+  /**
+   * [M4 导出版本] Mock:把整库导出为 Obsidian md 文件夹并在文件夹 git add/commit
+   * 真实逻辑在 biji-core(DB 取笔记与块 → 导出 md → libgit2 提交),Tauri 壳 M6 接入;
+   * 这里仅产生一条带假 hash 的提交记录,展示 GitPanel 导出→提交流程。
+   */
+  async gitExportAndCommit(message: string): Promise<string | null> {
+    if (!message.trim()) return null;
+    return this.mockPushCommit(message);
+  }
+
+  /** [M4] 生成一条带假 hash 的提交记录并压入 Mock 历史 */
+  private mockPushCommit(message: string): string {
+    this.mockGitSeq += 1;
+    const hash = `a1b2c3${this.mockGitSeq.toString(36).padStart(4, '0')}f${String(this.mockGitSeq).padStart(4, '0')}`;
+    const entry: GitLogEntry = {
+      hash,
+      message,
+      date: new Date().toISOString(),
+    };
+    this.mockGitLog.unshift(entry);
+    return hash;
+  }
+
+  /**
+   * [M4 发布] Mock:预设生成器「可用」,返回带假输出目录的发布结果。
+   * 真实静态生成跑在终端/M6 壳,此处只演练向导 UI 流程。
+   */
+  async publishSite(config: PublishConfig): Promise<PublishResult> {
+    const out = config.output_path?.replace(/\/$/, '') || '/导出/站点';
+    const dir = config.site_name || 'my-notes';
+    return { success: true, output_path: `${out}/${dir}` };
+  }
+
+  /** [M4 发布] Mock:三个生成器都预设可用,返回版本号(仅供向导「检查可用性」演示) */
+  async checkGenerator(generator: string): Promise<[boolean, string | null]> {
+    const g = (generator || '').toLowerCase();
+    if (g.includes('hugo')) return [true, 'v0.134.2'];
+    if (g.includes('astro')) return [true, 'v4.16.1'];
+    if (g.includes('vitepress')) return [true, 'v1.6.0'];
+    return [false, null];
+  }
   async importMarkdown(path: string): Promise<ImportResult> { return { success: true, count: 0 }; }
   async exportMarkdown(path: string): Promise<ImportResult> { return { success: true, count: 0 }; }
   async getPlugins(): Promise<Plugin[]> { return []; }

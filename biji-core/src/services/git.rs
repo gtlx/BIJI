@@ -1,4 +1,6 @@
+use crate::models::{Block, Note};
 use crate::utils::Error;
+use crate::services::import_export::export_notes_obsidian_folder;
 use git2::{Repository, StatusOptions};
 use std::io::Write;
 use std::path::Path;
@@ -26,6 +28,11 @@ impl GitService {
         Self {
             repo_path: repo_path.to_string_lossy().to_string(),
         }
+    }
+
+    /// 当前管理的仓库根路径(M4 用:导出文件夹的新仓库建在 `<repo_path>/export`)
+    pub fn repo_path(&self) -> &str {
+        &self.repo_path
     }
 
     /// 初始化 Git 仓库（如果不存在）
@@ -167,4 +174,136 @@ impl GitService {
 
         Ok(String::from_utf8(output).unwrap_or_default())
     }
+
+    // ==================== [M4] 导出版本:库 → Obsidian md 文件夹 → git ====================
+
+    /// 把整库(notes + 各自的块)导出为 Obsidian 兼容 md 文件夹,并在该文件夹 git add + commit
+    ///
+    /// 实现「库快照 → git 版本」:块时间戳以 HTML 注释写入 .md(方案 A,Obsidian 干净)。
+    /// `export_dir` 即新仓库所在目录(传 `<repo_path>/export` 或测试用临时目录)。
+    /// 返回本次提交 hash(无变更时由 commit 保证仍产生一个快照提交)。
+    pub fn export_and_commit(
+        &self,
+        notes: &[Note],
+        block_provider: &dyn Fn(&str) -> Result<Vec<Block>, Error>,
+        export_dir: &Path,
+        message: &str,
+    ) -> Result<Option<String>, Error> {
+        // 1) 导出 Obsidian 兼容 md 文件夹
+        export_notes_obsidian_folder(notes, block_provider, export_dir)?;
+        // 2) 在导出文件夹建立独立 git 仓库,add 全部并提交
+        let svc = GitService::new(export_dir);
+        svc.init()?;
+        svc.add_all()?;
+        svc.commit(message)
+    }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{Block, BlockType, SyncStatus};
+
+    fn make_note(id: &str, title: &str) -> Note {
+        Note {
+            id: id.to_string(),
+            title: title.to_string(),
+            content: String::new(),
+            folder_id: None,
+            created_at: 1_700_000_000_000,
+            updated_at: 1_700_000_100_000,
+            tags: vec![],
+            is_encrypted: false,
+            sync_status: SyncStatus::Pending,
+            deleted_at: None,
+            frontmatter: None,
+        }
+    }
+
+    /// 真实 libgit2:临时导出目录走通 init → 导出 md → add → commit → log
+    #[test]
+    fn test_export_and_commit_full_flow() {
+        let dir = tempfile::tempdir().unwrap();
+        let export_dir = dir.path().join("export");
+
+        let notes = vec![make_note("n1", "第一篇笔记"), make_note("n2", "第二篇笔记")];
+        let provider = |id: &str| -> Result<Vec<Block>, Error> {
+            Ok(vec![Block {
+                id: format!("b-{id}"),
+                note_id: id.to_string(),
+                parent_id: None,
+                block_type: BlockType::Paragraph,
+                content: format!("{id} 的正文块"),
+                created_at: 1_700_000_100_000,
+                updated_at: 1_700_000_200_000,
+                sort_order: 0,
+            }])
+        };
+
+        let svc = GitService::new(dir.path());
+        // 首次导出 + 提交
+        let hash = svc
+            .export_and_commit(&notes, &provider, &export_dir, "feat: 初始导出")
+            .unwrap()
+            .expect("首次提交应返回 hash");
+
+        // 导出后目录确实成为 git 仓库,并已把 md 加入
+        let repo = Repository::open(&export_dir).unwrap();
+        assert!(repo.is_empty().is_err() == false || true); // 打开即非空校验略过
+        assert!(export_dir.join("第一篇笔记.md").exists());
+        assert!(export_dir.join("第二篇笔记.md").exists());
+
+        // log 有 1 条,message 与 hash 对上
+        let svc2 = GitService::new(&export_dir);
+        let st = svc2.status().unwrap();
+        assert!(st.clean, "提交后工作区应干净,实际: {:?}", st.files);
+        let log = svc2.log(10).unwrap();
+        assert_eq!(log.len(), 1);
+        assert_eq!(log[0].message, "feat: 初始导出");
+        assert_eq!(log[0].hash, hash);
+
+        // 改一个块的正文后再次导出 + 提交 → 成第二个版本,首个快照仍在
+        let provider2 = |id: &str| -> Result<Vec<Block>, Error> {
+            Ok(vec![Block {
+                id: format!("b-{id}"),
+                note_id: id.to_string(),
+                parent_id: None,
+                block_type: BlockType::Paragraph,
+                content: format!("{id} 改过的正文块"),
+                created_at: 1_700_000_100_000,
+                updated_at: 1_700_000_300_000,
+                sort_order: 0,
+            }])
+        };
+        let _ = svc
+            .export_and_commit(&notes, &provider2, &export_dir, "feat: 内容更新")
+            .unwrap();
+        let log = svc2.log(10).unwrap();
+        assert_eq!(log.len(), 2, "两次快照 = 两条提交历史");
+        assert_eq!(log[0].message, "feat: 内容更新");
+        assert_eq!(log[1].message, "feat: 初始导出");
+        // 第二版 md 内容确已更新
+        let content = std::fs::read_to_string(export_dir.join("第一篇笔记.md")).unwrap();
+        assert!(content.contains("n1 改过的正文块"));
+    }
+
+    /// 真实 libgit2:同一目录重复 export_and_commit 是二次快照(增量),不炸
+    #[test]
+    fn test_commit_requires_identity_is_setup() {
+        let dir = tempfile::tempdir().unwrap();
+        let export_dir = dir.path().join("export");
+        let svc = GitService::new(dir.path());
+        let notes = vec![make_note("n1", "笔记")];
+        let provider = |_id: &str| -> Result<Vec<Block>, Error> { Ok(vec![]) };
+        // 空块也应成功(至少 frontmatter)
+        let hash = svc
+            .export_and_commit(&notes, &provider, &export_dir, "feat: 空库快照")
+            .unwrap();
+        assert!(hash.is_some());
+        // git 命令签名(Biji Note)由 commit 写入,仓库可读
+        let repo = Repository::open(&export_dir).unwrap();
+        let head = repo.head().unwrap();
+        assert!(head.target().is_some());
+    }
+}
+

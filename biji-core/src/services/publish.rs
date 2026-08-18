@@ -22,6 +22,26 @@ pub enum StaticSiteGenerator {
     VitePress,
 }
 
+impl StaticSiteGenerator {
+    /// 展示名(中文,前端向导/错误提示用)
+    pub fn name(&self) -> &'static str {
+        match self {
+            StaticSiteGenerator::Hugo => "Hugo",
+            StaticSiteGenerator::Astro => "Astro",
+            StaticSiteGenerator::VitePress => "VitePress",
+        }
+    }
+
+    /// 对应可执行命令名
+    pub fn command(&self) -> &'static str {
+        match self {
+            StaticSiteGenerator::Hugo => "hugo",
+            StaticSiteGenerator::Astro => "astro",
+            StaticSiteGenerator::VitePress => "vitepress",
+        }
+    }
+}
+
 impl PublishService {
     pub fn new(notes_path: &Path) -> Self {
         Self {
@@ -34,11 +54,7 @@ impl PublishService {
         &self,
         generator: &StaticSiteGenerator,
     ) -> Result<(bool, Option<String>), Error> {
-        let cmd = match generator {
-            StaticSiteGenerator::Hugo => "hugo",
-            StaticSiteGenerator::Astro => "astro",
-            StaticSiteGenerator::VitePress => "vitepress",
-        };
+        let cmd = generator.command();
 
         let output = if cfg!(target_os = "windows") {
             Command::new("where").arg(cmd).output()?
@@ -62,7 +78,23 @@ impl PublishService {
     }
 
     /// 执行发布
+    ///
+    /// [M4] 先检查生成器可用性:缺失时降级返回(不崩溃、不残留半成品),错误信息提示如何安装。
     pub fn publish(&self, config: &PublishConfig) -> Result<PublishResult, Error> {
+        // 生成器缺失:直接降级失败返回,避免 "Command not found" 崩溃,也说明真实生成需 M6/终端执行
+        match self.check_generator(&config.generator)? {
+            (false, _) => {
+                return Ok(PublishResult {
+                    success: false,
+                    output_path: None,
+                    error: Some(format!(
+                        "静态站点生成器 {} 未安装或不在 PATH。请先安装后重试(真实生成依赖 M6/Tauri 壳或终端执行)。",
+                        config.generator.name()
+                    )),
+                });
+            }
+            _ => {}
+        }
         match config.generator {
             StaticSiteGenerator::Hugo => self.publish_hugo(config),
             StaticSiteGenerator::Astro => self.publish_astro(config),
@@ -211,6 +243,19 @@ theme = "ananke"
         Ok(notes)
     }
 
+    /// [M4] 把导出 md 文件夹的笔记写入站点内容子目录(纯文件逻辑,可单测,无需真实生成器)
+    ///
+    /// 返回写入的笔记数;已存在的同名文件会被覆盖(增量重新导出)。
+    pub fn write_notes_to(&self, dir: &Path) -> Result<usize, Error> {
+        std::fs::create_dir_all(dir)?;
+        let notes = self.get_all_notes()?;
+        for note in &notes {
+            let filename = format!("{}.md", crate::utils::slugify(&note.title));
+            std::fs::write(dir.join(&filename), &note.content)?;
+        }
+        Ok(notes.len())
+    }
+
     fn walk_dir(&self, dir: &Path, notes: &mut Vec<SimpleNote>) -> Result<(), Error> {
         if !dir.exists() {
             return Ok(());
@@ -243,6 +288,75 @@ pub struct PublishResult {
 struct SimpleNote {
     title: String,
     content: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn write_sample_md(dir: &Path) {
+        std::fs::create_dir_all(dir).unwrap();
+        std::fs::write(
+            dir.join("第一篇.md"),
+            "# 第一篇\n\n正文内容。\n",
+        )
+        .unwrap();
+        std::fs::write(dir.join("第二篇.md"), "# 第二篇\n\n另一篇正文。\n").unwrap();
+    }
+
+    /// 生成器未安装时 check_generator 返回 (false, None),不崩溃
+    #[test]
+    fn test_check_generator_absent_returns_false() {
+        let dir = tempfile::tempdir().unwrap();
+        let svc = PublishService::new(dir.path());
+        for gen in [StaticSiteGenerator::Hugo, StaticSiteGenerator::Astro, StaticSiteGenerator::VitePress] {
+            let (available, _version) = svc.check_generator(&gen).unwrap();
+            // arch 虚拟机未装这三个生成器,应如实报未可用
+            assert_eq!(available, false);
+        }
+    }
+
+    /// 生成器缺失时 publish 降级返回(不崩溃、报错提示),而不是触发 "Command not found" panic
+    #[test]
+    fn test_publish_degrades_gracefully_when_generator_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        write_sample_md(dir.path());
+        let svc = PublishService::new(dir.path());
+        let config = PublishConfig {
+            output_path: dir.path().join("out").to_string_lossy().to_string(),
+            generator: StaticSiteGenerator::Hugo,
+            site_name: Some("测试".into()),
+            base_url: None,
+        };
+        let result = svc.publish(&config).unwrap();
+        assert_eq!(result.success, false);
+        assert!(result.output_path.is_none());
+        let err = result.error.expect("缺生成器应返回错误信息");
+        assert!(err.contains("Hugo"), "错误应带生成器名: {err}");
+        assert!(err.contains("未安装"), "错误应提示未安装: {err}");
+    }
+
+    /// write_notes_to:把导出 md 文件夹写入站点内容子目录(纯文件逻辑,无需真实生成器)
+    #[test]
+    fn test_write_notes_to_output_subdir() {
+        let dir = tempfile::tempdir().unwrap();
+        write_sample_md(dir.path());
+        let svc = PublishService::new(dir.path());
+        let out = dir.path().join("site/content");
+        let n = svc.write_notes_to(&out).unwrap();
+        assert_eq!(n, 2);
+        assert!(out.join("第一篇.md").exists());
+        assert!(out.join("第二篇.md").exists());
+    }
+
+    /// name()/command() 必成对可用(前端向导/错误提示依赖)
+    #[test]
+    fn test_generator_name_and_command() {
+        assert_eq!(StaticSiteGenerator::Hugo.name(), "Hugo");
+        assert_eq!(StaticSiteGenerator::Hugo.command(), "hugo");
+        assert_eq!(StaticSiteGenerator::Astro.command(), "astro");
+        assert_eq!(StaticSiteGenerator::VitePress.command(), "vitepress");
+    }
 }
 
 

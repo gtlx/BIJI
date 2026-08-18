@@ -135,6 +135,9 @@ export class TauriBackend implements BackendAdapter {
   async gitLog(count = 20): Promise<GitLogEntry[]> {
     return invoke('git_log', { count });
   }
+  async gitExportAndCommit(message: string): Promise<string | null> {
+    return invoke('git_export_commit', { message });
+  }
 
   // ===== 发布 =====
   async publishSite(config: PublishConfig): Promise<PublishResult> {

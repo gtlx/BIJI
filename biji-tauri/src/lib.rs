@@ -52,6 +52,7 @@ pub fn run() {
             commands::git::git_status,
             commands::git::git_commit,
             commands::git::git_log,
+            commands::git::git_export_commit,
             // 发布
             commands::publish::publish_site,
             commands::publish::check_generator,

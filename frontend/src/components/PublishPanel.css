@@ -187,3 +187,162 @@
   justify-content: flex-end;
   gap: 8px;
 }
+
+/* ===== [M4] 发布向导(Hugo / Astro / VitePress)===== */
+.publish-panel .panel-header {
+  padding: 12px 16px;
+}
+.publish-hint {
+  margin: 0;
+  padding: 12px 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  border-bottom: 1px solid var(--border-color);
+}
+.publish-hint em {
+  display: block;
+  color: var(--text-tertiary);
+  font-style: normal;
+  margin-top: 2px;
+}
+.publish-step {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+.publish-step-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+.publish-step-title span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent-color);
+  color: #fff;
+  font-size: 11px;
+}
+.gen-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.gen-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+  transition: all .15s;
+}
+.gen-card:hover {
+  border-color: var(--accent-color);
+}
+.gen-card.active {
+  border-color: var(--accent-color);
+  background: var(--accent-bg, rgba(38, 166, 154, .1));
+  box-shadow: 0 0 0 1px var(--accent-color);
+}
+.gen-card svg {
+  color: var(--accent-color);
+}
+.gen-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+.gen-desc {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+.gen-check {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+}
+.gen-check.ok {
+  background: var(--success-bg, rgba(40, 167, 69, .1));
+  color: var(--success-color, #1a7f37);
+}
+.gen-check.fail {
+  background: var(--danger-bg, rgba(220, 53, 69, .1));
+  color: var(--danger-color, #c0392b);
+}
+.gen-check .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+.publish-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.publish-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.publish-form input {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+.publish-form input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+.publish-form .btn {
+  align-self: flex-start;
+}
+.publish-tip {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+.publish-result {
+  margin: 12px 16px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.publish-result.ok {
+  background: var(--success-bg, rgba(40, 167, 69, .1));
+  color: var(--success-color, #1a7f37);
+}
+.publish-result.fail {
+  background: var(--danger-bg, rgba(220, 53, 69, .1));
+  color: var(--danger-color, #c0392b);
+}
+.publish-result code {
+  background: var(--bg-tertiary);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 12px;
+}

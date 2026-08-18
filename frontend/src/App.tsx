@@ -543,7 +543,7 @@ export default function App() {
           ) : activeNav === 'calendar' ? (
             <CalendarView onSelectNote={jumpToNote} />
           ) : activeNav === 'git' ? (
-            <GitPanel onClose={() => handleNavClick('notes')} />
+            <GitPanel onClose={() => handleNavClick('notes')} onOpenPublish={() => handleNavClick('publish')} />
           ) : activeNav === 'publish' ? (
             <PublishPanel onClose={() => handleNavClick('notes')} />
           ) : (

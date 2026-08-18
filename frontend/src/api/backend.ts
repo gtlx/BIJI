@@ -306,6 +306,8 @@ export interface BackendAdapter {
   gitStatus(): Promise<GitStatus>;
   gitCommit(message: string): Promise<string | null>;
   gitLog(count?: number): Promise<GitLogEntry[]>;
+  /** [M4 导出版本] 把库导出为 Obsidian md 文件夹并在该文件夹 git add+commit,返回本次提交 hash */
+  gitExportAndCommit(message: string): Promise<string | null>;
 
   // === 发布 ===
   publishSite(config: PublishConfig): Promise<PublishResult>;
