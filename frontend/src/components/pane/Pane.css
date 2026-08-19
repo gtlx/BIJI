@@ -1,78 +1,93 @@
 /* ============================================================
-   [Pane 面板化] 工作区 Pane 容器样式(薄荷绿/teal 毛玻璃,商枢风)
-   多栏并存 · 面板卡 · 分栏分隔条拖拽 · 面板拖动重排落点指引
+   [Pane 面板化 v2] 工作区布局 —— 固定左 dock + 固定主区 + 可切分右 dock
+   左 dock(文件) | 主区(编辑器) | 右 dock(可上下分栏 + tab + 拖拽)
+   薄荷绿/teal 毛玻璃,商枢风
    ============================================================ */
 
 .pane-workspace {
   position: relative;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   width: 100%;
   height: 100%;
   min-width: 0;
   overflow: hidden;
+  gap: 3px;
+  padding: 3px;
+  box-sizing: border-box;
 }
 
-.pane-columns {
+/* ---------------- 左 dock(固定) ---------------- */
+.pane-left {
   display: flex;
-  flex-direction: row;
-  align-items: stretch;
+  flex-direction: column;
+  width: 240px;
+  min-width: 180px;
+  flex-shrink: 0;
+  min-height: 0;
+}
+
+/* ---------------- 主区(固定编辑器) ---------------- */
+.pane-main {
   flex: 1;
   min-width: 0;
   min-height: 0;
-  gap: 2px;
-}
-
-/* 每一栏:内部纵向叠面板 */
-.pane-column {
   display: flex;
   flex-direction: column;
-  min-width: 0;
+}
+.pane-main-body {
+  height: 100%;
+}
+
+/* ---------------- 右 dock(可切分) ---------------- */
+.pane-right {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 300px;
+  min-width: 220px;
+  flex-shrink: 0;
   min-height: 0;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.pane-right-rows {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 右 dock 的一块(可上下分栏) */
+.pane-row {
+  display: flex;
+  flex-direction: column;
+  min-height: 80px;
+  min-width: 0;
   position: relative;
 }
 
-/* 单个面板卡:毛玻璃 + 圆角 + 顶部标题栏 */
+/* ---------------- 面板卡通用 ---------------- */
 .pane {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
   min-width: 0;
-  margin: 3px;
+  margin: 2px;
   background: var(--glass-bg);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   overflow: hidden;
-  transition: box-shadow 0.15s ease, border-color 0.15s ease;
 }
-.pane:hover {
-  border-color: rgba(20, 184, 166, 0.35);
-}
-.pane.dragging {
-  opacity: 0.45;
-  box-shadow: var(--shadow-lg);
-}
-/* 落点指引:插入到某面板前 / 后 */
-.pane.target-before::after,
-.pane.target-after::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 4px;
-  border-radius: 3px;
-  background: var(--teal-500);
-  box-shadow: 0 0 8px rgba(20, 184, 166, 0.6);
-  z-index: 5;
-}
-.pane.target-before::after { left: -4px; }
-.pane.target-after::after { right: -4px; }
+.pane-fixed { background: transparent; border-color: transparent; box-shadow: none; }
+.pane-right-pane { margin: 2px; }
+.pane.dragging { opacity: 0.45; }
 
-/* 面板标题栏:整条可拖动 */
+/* 面板标题栏 */
 .pane-header {
   display: flex;
   align-items: center;
@@ -86,173 +101,135 @@
   flex-shrink: 0;
 }
 .pane-header:active { cursor: grabbing; }
-.pane-head-icon {
-  display: inline-flex;
-  color: var(--accent-color);
-}
+.pane-head-icon { display: inline-flex; color: var(--accent-color); }
 .pane-head-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
-  flex: 1;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 13px; font-weight: 600; color: var(--text-primary);
+  flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .pane-close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all 0.15s;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border: none; border-radius: var(--radius-sm);
+  background: none; color: var(--text-secondary); cursor: pointer; transition: all 0.15s;
 }
 .pane-close:hover { background: var(--danger-bg); color: var(--danger-color); }
 
-/* 面板内容区:滚动 + 内容适配(各模块自带滚动则覆盖) */
-.pane-body {
-  flex: 1;
-  min-height: 0;
-  min-width: 0;
-  overflow: auto;
-}
+/* 面板内容区 */
+.pane-body { flex: 1; min-height: 0; min-width: 0; overflow: auto; }
+.pane-body-tabbed { border-radius: 0 0 var(--radius) var(--radius); }
 
-/* 分栏分隔条(拖拽调宽) */
-.pane-divider {
+/* ---------------- 右 dock tab ---------------- */
+.pane-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 5px 5px 0 5px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.pane-tab {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 10px; font-size: 12px; color: var(--text-secondary);
+  background: transparent; border: 1px solid transparent; border-bottom: none;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  cursor: pointer; user-select: none; -webkit-user-select: none;
+  white-space: nowrap; flex-shrink: 0; transition: all 0.15s;
+}
+.pane-tab:hover { background: var(--accent-bg); color: var(--text-primary); }
+.pane-tab.active { background: var(--glass-bg); border-color: var(--glass-border); color: var(--text-primary); font-weight: 600; }
+.pane-tab.dragging { opacity: 0.5; }
+.pane-tab svg { color: var(--accent-color); }
+.pane-tab-title { max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
+.pane-tab-close {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border: none; border-radius: 4px;
+  background: none; color: var(--text-tertiary); cursor: pointer; transition: all 0.15s;
+}
+.pane-tab-close:hover { background: var(--danger-bg); color: var(--danger-color); }
+
+/* ---------------- 上下分栏分隔条(右 dock 内) ---------------- */
+.pane-hdivider {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 5px;
-  right: -3px;
+  left: 0; right: 0;
+  bottom: -1px;
+  height: 8px;
   z-index: 10;
-  cursor: col-resize;
+  cursor: row-resize;
   background: transparent;
   transition: background 0.15s;
 }
-.pane-divider:hover,
-.pane-divider.active {
+.pane-hdivider:hover, .pane-hdivider.active {
   background: rgba(20, 184, 166, 0.45);
 }
 
-/* 面板拖动时禁用全局选中 */
+/* 拖拽禁用选中 */
 body.pane-dragging {
   user-select: none !important;
   -webkit-user-select: none !important;
   cursor: grabbing !important;
 }
 
-/* 拖拽幽灵(跟随指针的小标签) */
+/* 拖拽幽灵 */
 .pane-drag-ghost {
-  position: fixed;
-  z-index: 200;
-  pointer-events: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  font-size: 12px;
-  color: #fff;
+  position: fixed; z-index: 200; pointer-events: none;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 10px; font-size: 12px; color: #fff;
   background: linear-gradient(135deg, var(--teal-500), var(--teal-600));
-  border-radius: 8px;
-  box-shadow: var(--shadow-md);
+  border-radius: 8px; box-shadow: var(--shadow-md);
   transform: translate(-50%, -130%);
 }
 
-/* 拖到左/右边缘 → 新栏落点 */
+/* 拖到上/下边缘 → 新块落点 */
 .pane-edge-zone {
-  position: absolute;
-  top: 8px;
-  bottom: 8px;
-  width: 46px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  color: var(--teal-700);
+  position: absolute; left: 8px; right: 8px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: var(--teal-700);
   background: rgba(20, 184, 166, 0.28);
   border: 2px dashed var(--teal-500);
   border-radius: var(--radius);
-  z-index: 20;
-  pointer-events: none;
+  z-index: 20; pointer-events: none;
 }
-.pane-edge-zone.left { left: 8px; }
-.pane-edge-zone.right { right: 8px; }
+.pane-edge-zone.top { top: 8px; }
+.pane-edge-zone.bottom { bottom: 8px; }
 
-/* 添加面板按钮 */
-.pane-add-menu-wrap {
-  position: absolute;
-  right: 16px;
-  bottom: 14px;
-  z-index: 30;
-}
+/* 添加面板 */
 .pane-add-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 50%;
   border: 1px solid var(--glass-border);
-  background: var(--glass-strong);
-  color: var(--teal-700);
-  cursor: pointer;
-  box-shadow: var(--shadow-md);
-  transition: all 0.15s;
+  background: var(--glass-strong); color: var(--teal-700);
+  cursor: pointer; box-shadow: var(--shadow-md); transition: all 0.15s;
 }
 .pane-add-btn:hover { background: var(--accent-bg); transform: scale(1.06); }
 .pane-add-btn.open { background: var(--accent-bg); color: var(--teal-600); }
 .pane-add-menu {
-  display: none;
-  position: absolute;
-  right: 0;
-  bottom: 42px;
-  min-width: 150px;
-  background: var(--glass-strong);
-  backdrop-filter: blur(18px);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-lg);
-  padding: 6px;
+  display: none; position: absolute; right: 0; bottom: 42px;
+  min-width: 150px; background: var(--glass-strong);
+  backdrop-filter: blur(18px); border: 1px solid var(--glass-border);
+  border-radius: var(--radius); box-shadow: var(--shadow-lg); padding: 6px;
   flex-direction: column;
 }
 .pane-add-menu.open { display: flex; }
 .pane-add-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border: none;
-  background: none;
-  border-radius: var(--radius-sm);
-  font: inherit;
-  font-size: 13px;
-  color: var(--text-primary);
-  cursor: pointer;
-  text-align: left;
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border: none; background: none;
+  border-radius: var(--radius-sm); font: inherit; font-size: 13px;
+  color: var(--text-primary); cursor: pointer; text-align: left;
 }
 .pane-add-item:hover { background: var(--accent-bg); color: var(--teal-700); }
 .pane-add-item svg { color: var(--accent-color); }
 
-/* 手机端:工作区隐藏(底栏单栏),Pane 面板不参与移动布局 */
+/* 手机端:工作区隐藏(底栏单栏) */
 @media (max-width: 767px) {
   .pane-workspace { display: none; }
 }
 
-/* 图谱/日历等大模块套进面板后的高度收敛 */
+/* 大模块套进面板后高度收敛 */
 .pane-body .graph-view { min-height: 0; height: 100%; }
 .pane-body .calendar-view { height: 100%; }
 .pane-body .pomodoro-timer { height: 100%; box-sizing: border-box; }
-
-/* [Pane] 番茄钟插件未启用时的占位提示 */
 .pomodoro-disabled {
-  padding: 20px 16px;
-  font-size: 13px;
-  color: var(--text-secondary);
-  text-align: center;
+  padding: 20px 16px; font-size: 13px; color: var(--text-secondary); text-align: center;
 }

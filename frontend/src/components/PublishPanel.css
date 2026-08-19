@@ -206,6 +206,39 @@
   font-style: normal;
   margin-top: 2px;
 }
+/* ===== [2026-08-19] 发布方式切换:已有博客目录(主) / 自建站点(高级) ===== */
+.publish-mode-switch {
+  display: flex;
+  gap: 6px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+.publish-mode-btn {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.publish-mode-btn:hover {
+  border-color: var(--accent-color);
+}
+.publish-mode-btn.active {
+  border-color: var(--accent-color);
+  background: var(--accent-bg, rgba(38, 166, 154, .1));
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.publish-sub-hint {
+  margin: 0 0 10px 0;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  line-height: 1.6;
+}
 .publish-step {
   padding: 12px 16px;
   border-bottom: 1px solid var(--border-color);

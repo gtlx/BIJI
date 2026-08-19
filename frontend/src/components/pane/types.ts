@@ -1,72 +1,103 @@
 /**
- * [Pane 面板化] 工作区面板布局类型定义(Obsidian 式多栏并存)
+ * [Pane 面板化] 工作区布局 —— Obsidian 式「固定主区 + 可切分 dock」
  *
- * 布局模型:一「行」横向多栏(column),每栏内可纵向叠多个面板(pane)。
- * - 分栏:多栏并存(如 编辑器+大纲 并排)
- * - 宽度调整:拖分栏分隔条 → 改相邻两栏 flex 权重
- * - 拖动重排:拖面板标题栏 ↔ 同栏换位 / 跨栏移动 / 拖到边缘新增一栏
- * - 布局记忆:整体结构与每栏权重持久化 localStorage
+ * 布局形态(2026-08-19 用户拍板):
+ *   左 dock(固定)  |  主编辑器(固定)  |  右 dock(可分栏)
+ *   - 左 dock:文件导航树 —— 固定,不参与分栏(它的位置和逻辑已经很好)
+ *   - 主区:编辑器 —— 固定,不参与分栏(不被拖走/关闭/拆栏)
+ *   - 右 dock:大纲/反向链接/标签/图谱/日历/番茄钟 —— 可「上下分栏」+「tab 标签页」+「拖拽」
+ *
+ * 数据模型:
+ *   PaneLayout = {
+ *     main: 'editor'                    // 固定主区
+ *     left: PaneId[]                    // 左 dock(固定面板组,默认 ['files'])
+ *     right: PaneRow[]                  // 右 dock:多「块」,每块可上下分栏 + 内部 tab
+ *     hidden: PaneId[]                  // 被关闭、可恢复的面板
+ *   }
+ *   PaneRow = { id, panes: PaneId[], active }  // 右 dock 的一块;该块内多面板 = tab 组
+ *
+ * 右 dock 能力:
+ *  - 上下分栏:right 有多个 row → 上下堆叠
+ *  - tab:同一 row 内多面板 → 标签页(点切换)
+ *  - 拖拽:面板可在 row 内换位、拖到另一 row 合并、拖到 dock 边缘新建 row
  */
 
 /** 可用面板模块 id */
 export type PaneId = 'editor' | 'files' | 'outline' | 'backlinks' | 'graph' | 'calendar' | 'tags' | 'pomodoro';
 
-/** 单栏:内可纵向叠多个面板,weight 为该栏相对宽度(flex-grow 语义) */
-export interface PaneColumn {
-  /** 栏稳定 id(重排也不变,用于 React key) */
+/** 右 dock 的一块:一组 tab(同块内面板可切换) */
+export interface PaneRow {
   id: string;
-  /** 相对宽度权重 */
-  weight: number;
-  /** 纵向叠放的面板(上→下) */
+  /** 该块内叠放的面板(tab 顺序) */
   panes: PaneId[];
+  /** 当前激活的 tab 下标 */
+  active: number;
 }
 
 /** 整张工作区布局 */
 export interface PaneLayout {
-  /** 横向分栏(左→右) */
-  columns: PaneColumn[];
-  /** 被关闭/暂不显示的面板(可在「添加面板」里再打开) */
+  /** 主编辑器(固定,不参与分栏) */
+  main: PaneId;
+  /** 左 dock(固定面板组,默认文件树) */
+  left: PaneId[];
+  /** 右 dock:可上下分栏的多块(tab 组) */
+  right: PaneRow[];
+  /** 被关闭/暂不显示的面板(可在「添加面板」里恢复) */
   hidden: PaneId[];
 }
 
-/** 面板元信息(标题 / 图标 / 最小宽度等) */
+/** 面板元信息 */
 export interface PaneMeta {
   id: PaneId;
-  /** 面板名(Display 用) */
   label: string;
-  /** StrokeIcon 名 */
   icon: string;
-  /** 面板最小宽度占比(拖窄下限) */
-  minWeight: number;
+  /** 默认归类:left 固定 dock / main 主区 / right 可切分 dock */
+  zone: 'left' | 'main' | 'right';
 }
 
 /** 全部面板注册表(顺序即「添加面板」菜单顺序) */
 export const PANE_REGISTRY: PaneMeta[] = [
-  { id: 'editor', label: '编辑器', icon: 'notes', minWeight: 0.25 },
-  { id: 'files', label: '文件', icon: 'folder', minWeight: 0.12 },
-  { id: 'outline', label: '大纲', icon: 'outline', minWeight: 0.1 },
-  { id: 'backlinks', label: '反向链接', icon: 'backlink', minWeight: 0.1 },
-  { id: 'graph', label: '图谱', icon: 'graph', minWeight: 0.16 },
-  { id: 'calendar', label: '日历', icon: 'calendar', minWeight: 0.16 },
-  { id: 'tags', label: '标签', icon: 'tag', minWeight: 0.1 },
-  { id: 'pomodoro', label: '番茄钟', icon: 'timer', minWeight: 0.1 },
+  { id: 'editor', label: '编辑器', icon: 'notes', zone: 'main' },
+  { id: 'files', label: '文件', icon: 'folder', zone: 'left' },
+  { id: 'outline', label: '大纲', icon: 'outline', zone: 'right' },
+  { id: 'backlinks', label: '反向链接', icon: 'backlink', zone: 'right' },
+  { id: 'graph', label: '图谱', icon: 'graph', zone: 'right' },
+  { id: 'calendar', label: '日历', icon: 'calendar', zone: 'right' },
+  { id: 'tags', label: '标签', icon: 'tag', zone: 'right' },
+  { id: 'pomodoro', label: '番茄钟', icon: 'timer', zone: 'right' },
 ];
 
 export const PANE_META: Record<PaneId, PaneMeta> = Object.fromEntries(
   PANE_REGISTRY.map(m => [m.id, m]),
 ) as Record<PaneId, PaneMeta>;
 
-/** 默认布局:文件 | 编辑器 | (大纲 / 反向链接) */
-export const DEFAULT_LAYOUT: PaneLayout = {
-  columns: [
-    { id: `col-${'files'}`, weight: 0.24, panes: ['files'] },
-    { id: `col-${'editor'}`, weight: 1, panes: ['editor'] },
-    { id: `col-${'right'}`, weight: 0.22, panes: ['outline', 'backlinks'] },
-  ],
-  hidden: ['graph', 'calendar', 'tags', 'pomodoro'],
-};
+/** 右 dock 可切分的面板集合 */
+export const RIGHT_PANES: PaneId[] = PANE_REGISTRY.filter(m => m.zone === 'right').map(m => m.id);
 
-/** 生成新面板布局 */
+let seq = 0;
+const nid = () => `row-${Date.now().toString(36)}-${seq++}`;
+
+/** 默认布局:左文件 | 主编辑器 | 右 dock(大纲+反向链接 同块 tab) */
 export function defaultLayout(): PaneLayout {
-  return JSON.parse(JSON.stringify(DEFAULT_LAYOUT)) as PaneLayout;
+  return {
+    main: 'editor',
+    left: ['files'],
+    right: [{ id: nid(), panes: ['outline', 'backlinks'], active: 0 }],
+    hidden: ['graph', 'calendar', 'tags', 'pomodoro'],
+  };
+}
+
+/** 收集右 dock 全部已显示面板(去重) */
+export function collectRightPanes(layout: PaneLayout): PaneId[] {
+  const seen = new Set<PaneId>();
+  const out: PaneId[] = [];
+  layout.right.forEach(r => r.panes.forEach(p => {
+    if (!seen.has(p)) { seen.add(p); out.push(p); }
+  }));
+  return out;
+}
+
+/** 右 dock 是否有某面板 */
+export function rightHas(layout: PaneLayout, id: PaneId): boolean {
+  return collectRightPanes(layout).includes(id);
 }

@@ -359,10 +359,15 @@ export class MockBackend implements BackendAdapter {
   }
 
   /**
-   * [M4 发布] Mock:预设生成器「可用」,返回带假输出目录的发布结果。
-   * 真实静态生成跑在终端/M6 壳,此处只演练向导 UI 流程。
+   * [M4 发布] Mock:主路径走 target_dir(把笔记导出到该目录);否则预设生成器可用返回假目录。
+   * 真实静态生成跑在终端/M6 壳,此处演练向导 UI 流程。
    */
   async publishSite(config: PublishConfig): Promise<PublishResult> {
+    // 主路径:发布到用户指定的现有博客目录(不绑生成器)
+    const target = config.target_dir?.trim();
+    if (target) {
+      return { success: true, output_path: target };
+    }
     const out = config.output_path?.replace(/\/$/, '') || '/导出/站点';
     const dir = config.site_name || 'my-notes';
     return { success: true, output_path: `${out}/${dir}` };

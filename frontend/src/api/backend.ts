@@ -225,8 +225,12 @@ export interface GitLogEntry {
 }
 
 export interface PublishConfig {
-  output_path: string;
-  generator: 'Hugo' | 'Astro' | 'VitePress';
+  /** 发布目标目录(运行时填入)。提供时把笔记导出为 md 写入该目录,不绑生成器。 */
+  target_dir?: string;
+  /** 旧字段:自建站点输出父目录(仅当走生成器构建时用) */
+  output_path?: string;
+  /** 旧字段:自建站点的生成器;target_dir 提供时忽略 */
+  generator?: 'Hugo' | 'Astro' | 'VitePress';
   site_name?: string;
   base_url?: string;
 }

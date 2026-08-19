@@ -25,6 +25,7 @@ import { TagsPane } from './components/TagsPane';
 import { PomodoroTimer } from './components/PomodoroTimer';
 import { loadLayout, saveLayout } from './components/pane/layoutStore';
 import type { PaneId, PaneLayout } from './components/pane/types';
+import { PANE_META } from './components/pane/types';
 import { StrokeIcon } from './icons';
 import './App.css';
 
@@ -129,33 +130,53 @@ export default function App() {
   // [Pane] 布局变化即落 localStorage(重启还原)
   useEffect(() => { saveLayout(paneLayout); }, [paneLayout]);
 
-  // [Pane] 确保某面板打开(若隐藏则从隐藏区移到末尾栏)
+  // [Pane] 确保某面板打开(editor/files 归固定区;右侧面板加入右 dock 末尾行)
   const ensurePane = useCallback((id: PaneId) => {
     setPaneLayout(prev => {
-      const has = prev.columns.some(c => c.panes.includes(id));
       const hidden = prev.hidden.filter(p => p !== id);
-      if (has) return { columns: prev.columns, hidden };
-      const cols = prev.columns.map(c => ({ ...c, panes: [...c.panes] }));
-      if (cols.length === 0) cols.push({ id: 'col-fallback', weight: 1, panes: [id] });
-      else cols[cols.length - 1] = { ...cols[cols.length - 1]!, panes: [...cols[cols.length - 1]!.panes, id] };
-      return { columns: cols, hidden };
+      const meta = PANE_META[id];
+      // 主区/左 dock:固定,不参与分栏
+      if (meta.zone === 'main') {
+        return { ...prev, main: id, hidden };
+      }
+      if (meta.zone === 'left') {
+        const left = prev.left.includes(id) ? prev.left : [...prev.left, id];
+        return { ...prev, left, hidden };
+      }
+      // 右 dock:已显示则不动,否则追加到末尾 row
+      const already = prev.right.some(r => r.panes.includes(id));
+      if (already) return { ...prev, hidden };
+      const right = prev.right.map(r => ({ ...r, panes: [...r.panes] }));
+      if (right.length > 0) {
+        right[right.length - 1] = { ...right[right.length - 1]!, panes: [...right[right.length - 1]!.panes, id] };
+      } else {
+        right.push({ id: `row-${Date.now().toString(36)}`, panes: [id], active: 0 });
+      }
+      return { ...prev, right, hidden };
     });
   }, []);
 
-  // [Pane] 关闭某面板(移到隐藏区)
+  // [Pane] 关闭某面板(右 dock → 移到隐藏区;主/左固定区不可关)
   const closePane = useCallback((id: PaneId) => {
     setPaneLayout(prev => {
-      const cols = prev.columns.map(c => ({ ...c, panes: c.panes.filter(p => p !== id) })).filter(c => c.panes.length > 0);
-      return {
-        columns: cols.length > 0 ? cols : [{ id: 'col-fallback', weight: 1, panes: ['editor'] }],
-        hidden: prev.hidden.includes(id) ? prev.hidden : [...prev.hidden, id],
-      };
+      const meta = PANE_META[id];
+      // 主区/左 dock 固定,不允许关闭
+      if (meta.zone === 'main' || meta.zone === 'left') {
+        return prev;
+      }
+      const right = prev.right
+        .map(r => ({ ...r, panes: r.panes.filter(p => p !== id) }))
+        .filter(r => r.panes.length > 0);
+      const hidden = prev.hidden.includes(id) ? prev.hidden : [...prev.hidden, id];
+      return { ...prev, right, hidden };
     });
   }, []);
 
-  // [Pane] 切换某面板开/关
+  // [Pane] 切换某面板开/关(仅右 dock 面板可切换;主/左固定)
   const togglePane = useCallback((id: PaneId) => {
-    const has = paneLayout.columns.some(c => c.panes.includes(id));
+    const meta = PANE_META[id];
+    if (meta.zone === 'main' || meta.zone === 'left') return;
+    const has = paneLayout.right.some(r => r.panes.includes(id));
     if (has) closePane(id); else ensurePane(id);
   }, [paneLayout, closePane, ensurePane]);
 

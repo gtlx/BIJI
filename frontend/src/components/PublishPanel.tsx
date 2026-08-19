@@ -6,6 +6,7 @@ interface PublishPanelProps {
   onClose: () => void;
 }
 
+/** 可选的高级项:自建站点用的生成器(仅 target_dir 为空时走) */
 interface GeneratorMeta {
   id: string;
   label: string;
@@ -36,6 +37,10 @@ function GenIcon({ id }: { id: string }) {
 }
 
 export function PublishPanel({ onClose }: PublishPanelProps) {
+  // 主路径:发布到现有博客目录(target_dir 运行时填入,不绑框架)
+  const [targetDir, setTargetDir] = useState('');
+  // 高级项:自建站点 + 生成器构建(target_dir 为空时走)
+  const [advanced, setAdvanced] = useState(false);
   const [gen, setGen] = useState('hugo');
   const [checks, setChecks] = useState<Record<string, GeneratorMeta>>({});
   const [outputPath, setOutputPath] = useState('/导出/站点');
@@ -43,7 +48,6 @@ export function PublishPanel({ onClose }: PublishPanelProps) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ success: boolean; output_path?: string; error?: string } | null>(null);
 
-  /** [M4] 检查可用性:Web/Mock 走假实现(预设可用),真实后端 check_generator 查 PATH */
   const handleCheck = async () => {
     const meta: GeneratorMeta = { ...GENERATORS.find(g => g.id === gen)!, available: false, checked: false };
     try {
@@ -57,17 +61,29 @@ export function PublishPanel({ onClose }: PublishPanelProps) {
     setChecks(prev => ({ ...prev, [gen]: meta }));
   };
 
-  /** [M4] 确认发布:Mock 返回假输出目录;真实静态生成跑在终端/M6 壳 */
   const handlePublish = async () => {
     setBusy(true);
     setResult(null);
     try {
-      const r = await backend.publishSite({
-        output_path: outputPath,
-        generator: gen as any,
-        site_name: siteName,
-      });
-      setResult(r);
+      // 主路径:发布到用户指定目录
+      if (!advanced) {
+        if (!targetDir.trim()) {
+          setResult({ success: false, error: '发布目标目录为空。请填写你现有博客的 content/md 目录路径。' });
+          setBusy(false);
+          return;
+        }
+        const r = await backend.publishSite({ target_dir: targetDir.trim() });
+        setResult(r);
+      } else {
+        // 高级项:自建站点 + 生成器
+        const r = await backend.publishSite({
+          target_dir: undefined,
+          output_path: outputPath,
+          generator: gen as any,
+          site_name: siteName,
+        });
+        setResult(r);
+      }
     } catch (e: any) {
       setResult({ success: false, error: String(e?.message || e) });
     } finally {
@@ -76,7 +92,6 @@ export function PublishPanel({ onClose }: PublishPanelProps) {
   };
 
   const check = checks[gen];
-  const canPublish = check?.available === true;
 
   return (
     <div className="publish-panel">
@@ -86,65 +101,105 @@ export function PublishPanel({ onClose }: PublishPanelProps) {
       </div>
 
       <p className="publish-hint">
-        把库(已导出 md 文件夹)交给生成器构建成静态站点。向导流程:选生成器 → 检查可用性 → 确认发布。
-        <em>Web/Mock 为演练流程;真实构建需生成器安装于运行环境(M6/Tauri 壳)。</em>
+        把笔记导出为 md 发布到你自己的博客目录 —— <strong>不绑定任何博客框架</strong>,
+        导出后由你现有的框架(博客/Astro/Hugo/VitePress 等)自行构建部署。
+        <em>Web/Mock 为演练流程;真实写盘依赖 Tauri 壳(需在桌面 App 或后端服务里运行)。</em>
       </p>
 
-      {/* 步骤 1:选生成器 */}
-      <div className="publish-step">
-        <div className="publish-step-title"><span>1</span>选择生成器</div>
-        <div className="gen-cards">
-          {GENERATORS.map(g => (
-            <button
-              key={g.id}
-              className={`gen-card ${gen === g.id ? 'active' : ''}`}
-              onClick={() => { setGen(g.id); setResult(null); setChecks(prev => ({ ...prev, [g.id]: { ...prev[g.id], available: false, checked: false } })); }}
-            >
-              <GenIcon id={g.id} />
-              <span className="gen-name">{g.label}</span>
-              <span className="gen-desc">{g.desc}</span>
-            </button>
-          ))}
-        </div>
-        {check?.checked && (
-          <div className={`gen-check ${check.available ? 'ok' : 'fail'}`}>
-            <span className="dot" />
-            {check.available
-              ? `与 ${check.label} 正常通信(${check.version || '版本未知'}) — Mock 预设可用`
-              : `${check.label} 未检测到 — Mock 预设可用,忽略此提示`}
-          </div>
-        )}
-      </div>
-
-      {/* 步骤 2:检查可用性 */}
-      <div className="publish-step">
-        <div className="publish-step-title"><span>2</span>检查可用性</div>
-        <button onClick={handleCheck} className="btn btn-ghost" disabled={busy}>
-          {check?.checked ? '重新检查' : '检查可用性'} {GENERATORS.find(g => g.id === gen)?.label}
+      {/* ===== 方式选择 ===== */}
+      <div className="publish-mode-switch">
+        <button
+          className={`publish-mode-btn ${!advanced ? 'active' : ''}`}
+          onClick={() => { setAdvanced(false); setResult(null); }}
+        >
+          发布到已有博客目录
+        </button>
+        <button
+          className={`publish-mode-btn ${advanced ? 'active' : ''}`}
+          onClick={() => { setAdvanced(true); setResult(null); }}
+        >
+          高级:自建站点 + 生成器
         </button>
       </div>
 
-      {/* 步骤 3:确认发布 */}
-      <div className="publish-step">
-        <div className="publish-step-title"><span>3</span>确认发布</div>
-        <div className="publish-form">
-          <label>站点名称
-            <input type="text" value={siteName} onChange={e => setSiteName(e.target.value)} />
-          </label>
-          <label>输出目录
-            <input type="text" value={outputPath} onChange={e => setOutputPath(e.target.value)} />
-          </label>
-          <button onClick={handlePublish} disabled={busy || !canPublish} className="btn btn-primary">
-            {busy ? '发布中…' : '确认发布'}
-          </button>
-          {!check?.checked && <span className="publish-tip">请先「检查可用性」再发布。</span>}
+      {!advanced ? (
+        /* ===== 主路径:发布到已有博客目录 ===== */
+        <div className="publish-step">
+          <div className="publish-step-title"><span>①</span>目标目录</div>
+          <p className="publish-sub-hint">
+            填你现有博客的 content/md 目录绝对路径,笔记会以 .md 导出到那里,再交给你博客自己的构建。
+          </p>
+          <div className="publish-form">
+            <label>博客内容目录路径
+              <input
+                type="text"
+                value={targetDir}
+                onChange={e => setTargetDir(e.target.value)}
+                placeholder="如 /path/to/blog/src/content/posts 或 /path/to/hugo/content"
+              />
+            </label>
+            <button onClick={handlePublish} disabled={busy} className="btn btn-primary">
+              {busy ? '发布中…' : '发布到该目录'}
+            </button>
+          </div>
         </div>
-      </div>
+      ) : (
+        /* ===== 高级项:自建站点 + 生成器构建 ===== */
+        <>
+          <div className="publish-step">
+            <div className="publish-step-title"><span>1</span>选择生成器</div>
+            <div className="gen-cards">
+              {GENERATORS.map(g => (
+                <button
+                  key={g.id}
+                  className={`gen-card ${gen === g.id ? 'active' : ''}`}
+                  onClick={() => { setGen(g.id); setResult(null); setChecks(prev => ({ ...prev, [g.id]: { ...prev[g.id], available: false, checked: false } })); }}
+                >
+                  <GenIcon id={g.id} />
+                  <span className="gen-name">{g.label}</span>
+                  <span className="gen-desc">{g.desc}</span>
+                </button>
+              ))}
+            </div>
+            {check?.checked && (
+              <div className={`gen-check ${check.available ? 'ok' : 'fail'}`}>
+                <span className="dot" />
+                {check.available
+                  ? `与 ${check.label} 正常通信(${check.version || '版本未知'}) — Mock 预设可用`
+                  : `${check.label} 未检测到 — Mock 预设可用,忽略此提示`}
+              </div>
+            )}
+          </div>
+
+          <div className="publish-step">
+            <div className="publish-step-title"><span>2</span>检查可用性</div>
+            <button onClick={handleCheck} className="btn btn-ghost" disabled={busy}>
+              {check?.checked ? '重新检查' : '检查可用性'} {GENERATORS.find(g => g.id === gen)?.label}
+            </button>
+          </div>
+
+          <div className="publish-step">
+            <div className="publish-step-title"><span>3</span>确认发布</div>
+            <div className="publish-form">
+              <label>站点名称
+                <input type="text" value={siteName} onChange={e => setSiteName(e.target.value)} />
+              </label>
+              <label>输出目录
+                <input type="text" value={outputPath} onChange={e => setOutputPath(e.target.value)} />
+              </label>
+              <button onClick={handlePublish} disabled={busy || !check?.checked} className="btn btn-primary">
+                {busy ? '发布中…' : '确认发布'}
+              </button>
+              {!check?.checked && <span className="publish-tip">请先「检查可用性」再发布。</span>}
+            </div>
+          </div>
+        </>
+      )}
 
       {result && (
         <div className={`publish-result ${result.success ? 'ok' : 'fail'}`}>
           {result.success
-            ? <>发布成功！输出目录:<code>{result.output_path}</code>(Mock)</>
+            ? <>发布成功！输出目录:<code>{result.output_path}</code>{advanced && '(Mock)'}</>
             : <>发布失败:<code>{result.error}</code></>}
         </div>
       )}

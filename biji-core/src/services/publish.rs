@@ -9,9 +9,19 @@ pub struct PublishService {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct PublishConfig {
-    pub output_path: String,
-    pub generator: StaticSiteGenerator,
+    /// 发布目标目录(运行时填入)。若提供,则把笔记导出为 md 写入该目录,
+    /// 交给用户自己的博客框架构建 —— 不绑定任何生成器。
+    #[serde(default)]
+    pub target_dir: Option<String>,
+    /// 旧字段:自建站点时的输出父目录(仅当 target_dir 为空且走生成器构建时用)
+    #[serde(default)]
+    pub output_path: Option<String>,
+    /// 旧字段:自建站点用的生成器;target_dir 提供时忽略
+    #[serde(default)]
+    pub generator: Option<StaticSiteGenerator>,
+    #[serde(default)]
     pub site_name: Option<String>,
+    #[serde(default)]
     pub base_url: Option<String>,
 }
 
@@ -79,31 +89,69 @@ impl PublishService {
 
     /// 执行发布
     ///
-    /// [M4] 先检查生成器可用性:缺失时降级返回(不崩溃、不残留半成品),错误信息提示如何安装。
+    /// - 若 `config.target_dir` 提供:把笔记导出为 md 写入该目录,交给用户
+    ///   自己的博客框架构建 —— **不绑定任何生成器**(2026-08-19 新增)。
+    /// - 否则走旧的「自建站点 + 生成器构建」流程(兼容 M4)。
     pub fn publish(&self, config: &PublishConfig) -> Result<PublishResult, Error> {
-        // 生成器缺失:直接降级失败返回,避免 "Command not found" 崩溃,也说明真实生成需 M6/终端执行
-        match self.check_generator(&config.generator)? {
+        // ① 主路径:发布到用户指定的现有博客目录(通用,不绑框架)
+        if let Some(target) = config.target_dir.as_deref() {
+            if target.trim().is_empty() {
+                return Ok(PublishResult {
+                    success: false,
+                    output_path: None,
+                    error: Some("发布目标目录为空。请填写你现有博客的 content/md 目录路径。".into()),
+                });
+            }
+            let dir = Path::new(target);
+            let _n = self.write_notes_to(dir)?;
+            return Ok(PublishResult {
+                success: true,
+                output_path: Some(dir.to_string_lossy().to_string()),
+                error: None,
+            });
+        }
+
+        // ② 兼容旧路径:自建站点 + 生成器构建
+        let gen = match &config.generator {
+            Some(g) => g.clone(),
+            None => {
+                return Ok(PublishResult {
+                    success: false,
+                    output_path: None,
+                    error: Some("未指定发布方式:请提供 target_dir(发布到现有博客目录)或 generator(自建站点构建)。".into()),
+                });
+            }
+        };
+        match self.check_generator(&gen)? {
             (false, _) => {
                 return Ok(PublishResult {
                     success: false,
                     output_path: None,
                     error: Some(format!(
-                        "静态站点生成器 {} 未安装或不在 PATH。请先安装后重试(真实生成依赖 M6/Tauri 壳或终端执行)。",
-                        config.generator.name()
+                        "静态站点生成器 {} 未安装或不在 PATH。请先安装后重试,或改用 target_dir 发布到现有博客目录。",
+                        gen.name()
                     )),
                 });
             }
             _ => {}
         }
-        match config.generator {
-            StaticSiteGenerator::Hugo => self.publish_hugo(config),
-            StaticSiteGenerator::Astro => self.publish_astro(config),
-            StaticSiteGenerator::VitePress => self.publish_vitepress(config),
+        let out = config.output_path.as_deref().unwrap_or_default();
+        let legacy = PublishConfig {
+            target_dir: None,
+            output_path: Some(out.to_string()),
+            generator: Some(gen.clone()),
+            site_name: config.site_name.clone(),
+            base_url: config.base_url.clone(),
+        };
+        match gen {
+            StaticSiteGenerator::Hugo => self.publish_hugo(&legacy),
+            StaticSiteGenerator::Astro => self.publish_astro(&legacy),
+            StaticSiteGenerator::VitePress => self.publish_vitepress(&legacy),
         }
     }
 
     fn publish_hugo(&self, config: &PublishConfig) -> Result<PublishResult, Error> {
-        let site_path = Path::new(&config.output_path).join("site");
+        let site_path = Path::new(config.output_path.as_deref().unwrap_or_default()).join("site");
         if !site_path.exists() {
             Command::new("hugo")
                 .args(["new", "site"])
@@ -154,7 +202,7 @@ theme = "ananke"
     }
 
     fn publish_astro(&self, config: &PublishConfig) -> Result<PublishResult, Error> {
-        let site_path = Path::new(&config.output_path).join("site");
+        let site_path = Path::new(config.output_path.as_deref().unwrap_or_default()).join("site");
         if !site_path.exists() {
             std::fs::create_dir_all(&site_path)?;
             // 简化：创建基本的 Astro 项目结构
@@ -195,7 +243,7 @@ theme = "ananke"
     }
 
     fn publish_vitepress(&self, config: &PublishConfig) -> Result<PublishResult, Error> {
-        let site_path = Path::new(&config.output_path).join("site");
+        let site_path = Path::new(config.output_path.as_deref().unwrap_or_default()).join("site");
         let docs_path = site_path.join("docs");
         std::fs::create_dir_all(&docs_path)?;
 
@@ -323,8 +371,9 @@ mod tests {
         write_sample_md(dir.path());
         let svc = PublishService::new(dir.path());
         let config = PublishConfig {
-            output_path: dir.path().join("out").to_string_lossy().to_string(),
-            generator: StaticSiteGenerator::Hugo,
+            target_dir: None,
+            output_path: Some(dir.path().join("out").to_string_lossy().to_string()),
+            generator: Some(StaticSiteGenerator::Hugo),
             site_name: Some("测试".into()),
             base_url: None,
         };
@@ -334,6 +383,60 @@ mod tests {
         let err = result.error.expect("缺生成器应返回错误信息");
         assert!(err.contains("Hugo"), "错误应带生成器名: {err}");
         assert!(err.contains("未安装"), "错误应提示未安装: {err}");
+    }
+
+    /// [2026-08-19] 主路径:提供 target_dir 时,把笔记导出为 md 写入该目录,不绑生成器
+    #[test]
+    fn test_publish_to_target_dir_writes_md_without_generator() {
+        let dir = tempfile::tempdir().unwrap();
+        write_sample_md(dir.path());
+        let svc = PublishService::new(dir.path());
+        let target = dir.path().join("blog/content");
+        let config = PublishConfig {
+            target_dir: Some(target.to_string_lossy().to_string()),
+            output_path: None,
+            generator: None,
+            site_name: None,
+            base_url: None,
+        };
+        let result = svc.publish(&config).unwrap();
+        assert_eq!(result.success, true, "target_dir 发布应成功: {:?}", result.error);
+        assert!(result.error.is_none());
+        let out = result.output_path.expect("应返回输出目录");
+        assert_eq!(out, target.to_string_lossy());
+        // md 已写入目标目录
+        assert!(target.join("第一篇.md").exists());
+        assert!(target.join("第二篇.md").exists());
+    }
+
+    /// [2026-08-19] target_dir 为空/缺失 → 报错,给用户明确指引
+    #[test]
+    fn test_publish_empty_target_dir_returns_guidance() {
+        let dir = tempfile::tempdir().unwrap();
+        write_sample_md(dir.path());
+        let svc = PublishService::new(dir.path());
+        let config = PublishConfig {
+            target_dir: Some("   ".to_string()),
+            output_path: None,
+            generator: None,
+            site_name: None,
+            base_url: None,
+        };
+        let result = svc.publish(&config).unwrap();
+        assert_eq!(result.success, false);
+        let err = result.error.expect("空目录应报错");
+        assert!(err.contains("发布目标目录为空"), "应提示目标目录为空: {err}");
+        // None + 无 target_dir → 提示二选一
+        let config2 = PublishConfig {
+            target_dir: None,
+            output_path: None,
+            generator: None,
+            site_name: None,
+            base_url: None,
+        };
+        let result2 = svc.publish(&config2).unwrap();
+        assert_eq!(result2.success, false);
+        assert!(result2.error.as_deref().unwrap_or("").contains("未指定发布方式"));
     }
 
     /// write_notes_to:把导出 md 文件夹写入站点内容子目录(纯文件逻辑,无需真实生成器)
