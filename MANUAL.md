@@ -106,6 +106,25 @@ BIJI-rust/
 ### `biji-core/` — 核心库
 不依赖任何 GUI 框架，可独立编译和测试。所有数据持久化、业务逻辑、加密、同步、发布等功能都在这里。
 
+#### 插件化能力架构(2026-08-19 定稿,克制版)
+
+**基调**:核心定义「能力接口 trait」,插件注册时声明"我提供这个能力";业务功能(发布/同步/将来的 AI)以**能力适配器**形式接入,核心只认 trait 契约、不认具体实现。——这是**面向接口、不面向实现**。
+
+**现状分层**:
+- `services/plugin.rs`:`PluginManager` 只管**插件元数据的开关**(`get_all`/`toggle`/`is_enabled`),`Plugin` 模型预留 `entry_point`/`provides` 字段但未接线——它是"插件名册",不是执行引擎。内置插件含 **`publish-plugin`**(`provides: ["publish"]`)。
+- `services/blog_adapter.rs`(发布能力核心):真正的**能力接口**。
+  - `PublishAdapter` trait(`Send + Sync`):每个博客框架(astro/hugo/vitepress...)一个实现,含 `detect`(识别目标目录)/`detect_info`/`map`(把笔记 `BijiNoteMeta` 映射成目标文件计划 `PublishFilePlan`)/`safety_note`(写盘安全提示)。
+  - `PublishCapability` trait:发布能力声明自身提供哪些框架适配器。
+  - `CapabilityRegistry`:注册表,静态注册 `AstroAdapter`。
+  - 数据模型 `BijiNoteMeta`(待发布笔记)、`PublishFilePlan`(映射结果:相对路径+完整内容含 frontmatter)、`FrameworkDetect`(识别结果)。
+- **发布闭环(2026-08-19)**:`PublishService::publish(config, registry)` 的 `target_dir` 主路径**已走能力路径**——`registry.get("astro")` → `detect_info` 识别 → `get_all_notes_meta` 产笔记元数据(`BijiNoteMeta`)→ `adapter.map` 生成文件计划 → 写盘(自动建相对子目录,如 `posts/xxx.md`,带 frontmatter)。无适配器时回退平铺导出。tauri 命令 `publish_site` 锁一次取 `core.capabilities` 传入(勿二次 `.lock()` 死锁)。
+
+**映射口径**(用户拍板):BIJI 文件夹 → 博客子目录(如 posts);标签 → frontmatter `tags`;标题/时间 → `title`/`published`/`updated`。Astro profile 以真实博客为准(`content.config.ts` glob loader + `./blog` collection)。
+
+**彻底版接缝(重要,勿破坏)**:能力注册表用「注册函数 + 可枚举」而非写死 `match`(`CapabilityRegistry::register`)。将来升级彻底版(动态加载插件包),只往注册表加条目、或新增 `PluginCapability` 实现注册,核心调度代码不改。**克制版→彻底版是平滑演进,不是推倒**(trait 契约/适配器全复用,只需补"动态加载器"+前端注册机制)。
+
+**安全底线**:发布能力写盘只**新增/覆盖同名 md,绝不删除博客其它文件**;走 `PublishAdapter::safety_note` 提示。
+
 ### `biji-tauri/` — Tauri 桌面壳
 只负责：
 - 注册 Tauri 命令（暴露给前端）

@@ -1,3 +1,4 @@
+use crate::services::CapabilityRegistry;
 use crate::utils::Error;
 use std::path::Path;
 use std::process::Command;
@@ -89,11 +90,12 @@ impl PublishService {
 
     /// 执行发布
     ///
-    /// - 若 `config.target_dir` 提供:把笔记导出为 md 写入该目录,交给用户
-    ///   自己的博客框架构建 —— **不绑定任何生成器**(2026-08-19 新增)。
+    /// - 若 `config.target_dir` 提供:通过**能力注册表**找博客框架适配器,
+    ///   识别目标目录结构 → `map` 生成文件计划 → 写盘(不绑定数字生成器)。
+    ///   `registry`:能力注册表(持有 PublishAdapter,如 Astro)。
     /// - 否则走旧的「自建站点 + 生成器构建」流程(兼容 M4)。
-    pub fn publish(&self, config: &PublishConfig) -> Result<PublishResult, Error> {
-        // ① 主路径:发布到用户指定的现有博客目录(通用,不绑框架)
+    pub fn publish(&self, config: &PublishConfig, registry: &CapabilityRegistry) -> Result<PublishResult, Error> {
+        // ① 主路径:发布到用户指定的现有博客目录(走框架适配器能力路径)
         if let Some(target) = config.target_dir.as_deref() {
             if target.trim().is_empty() {
                 return Ok(PublishResult {
@@ -103,7 +105,33 @@ impl PublishService {
                 });
             }
             let dir = Path::new(target);
-            let _n = self.write_notes_to(dir)?;
+            // 用能力注册表识别框架:优先 astro(当前唯一内置),自动检测
+            let adapter = registry.get("astro");
+            let (framework, plans) = match adapter {
+                Some(ad) => {
+                    let detect = ad.detect_info(dir);
+                    let notes = self.get_all_notes_meta()?;
+                    let plans = ad.map(&notes);
+                    (ad.framework().to_string(), plans)
+                }
+                None => {
+                    // 无适配器:回退平铺导出(仍可用,但不带主题结构能力)
+                    let _n = self.write_notes_to(dir)?;
+                    return Ok(PublishResult {
+                        success: true,
+                        output_path: Some(dir.to_string_lossy().to_string()),
+                        error: None,
+                    });
+                }
+            };
+            // 写盘:计划 → 目标目录
+            for plan in &plans {
+                let dest = dir.join(&plan.rel_path);
+                if let Some(parent) = dest.parent() {
+                    std::fs::create_dir_all(parent)?;
+                }
+                std::fs::write(&dest, &plan.content)?;
+            }
             return Ok(PublishResult {
                 success: true,
                 output_path: Some(dir.to_string_lossy().to_string()),
@@ -291,6 +319,51 @@ theme = "ananke"
         Ok(notes)
     }
 
+    /// [2026-08-19 插件化] 取全部笔记为 `BijiNoteMeta`(供 PublishAdapter::map 用)。
+    /// 文件名/相对路径 → title/folder;frontmatter 里若有 tags/date 顺带解析。
+    fn get_all_notes_meta(&self) -> Result<Vec<crate::services::BijiNoteMeta>, Error> {
+        use crate::services::BijiNoteMeta;
+        let mut out = Vec::new();
+        self.walk_meta(Path::new(&self.notes_path), String::new(), &mut out)?;
+        let _ = out.len();
+        Ok(out)
+    }
+
+    /// [插件化] 递归收集笔记元数据,`rel_dir` 为相对父目录(从 notes_path 起)。
+    fn walk_meta(&self, dir: &Path, rel_dir: String, out: &mut Vec<crate::services::BijiNoteMeta>) -> Result<(), Error> {
+        use crate::services::BijiNoteMeta;
+        if !dir.exists() {
+            return Ok(());
+        }
+        for entry in std::fs::read_dir(dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_dir() {
+                let sub = if rel_dir.is_empty() {
+                    entry.file_name().to_string_lossy().to_string()
+                } else {
+                    format!("{}/{}", rel_dir, entry.file_name().to_string_lossy())
+                };
+                self.walk_meta(&path, sub, out)?;
+            } else if path.extension().map(|e| e == "md").unwrap_or(false) {
+                let content = std::fs::read_to_string(&path)?;
+                let title = path
+                    .file_stem()
+                    .map(|s| s.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                out.push(BijiNoteMeta {
+                    title,
+                    content,
+                    folder: if rel_dir.is_empty() { None } else { Some(rel_dir.clone()) },
+                    tags: Vec::new(),
+                    published: None,
+                    updated: None,
+                });
+            }
+        }
+        Ok(())
+    }
+
     /// [M4] 把导出 md 文件夹的笔记写入站点内容子目录(纯文件逻辑,可单测,无需真实生成器)
     ///
     /// 返回写入的笔记数;已存在的同名文件会被覆盖(增量重新导出)。
@@ -370,6 +443,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         write_sample_md(dir.path());
         let svc = PublishService::new(dir.path());
+        let registry = CapabilityRegistry::new();
         let config = PublishConfig {
             target_dir: None,
             output_path: Some(dir.path().join("out").to_string_lossy().to_string()),
@@ -377,7 +451,7 @@ mod tests {
             site_name: Some("测试".into()),
             base_url: None,
         };
-        let result = svc.publish(&config).unwrap();
+        let result = svc.publish(&config, &registry).unwrap();
         assert_eq!(result.success, false);
         assert!(result.output_path.is_none());
         let err = result.error.expect("缺生成器应返回错误信息");
@@ -391,6 +465,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         write_sample_md(dir.path());
         let svc = PublishService::new(dir.path());
+        let registry = CapabilityRegistry::new();
         let target = dir.path().join("blog/content");
         let config = PublishConfig {
             target_dir: Some(target.to_string_lossy().to_string()),
@@ -399,14 +474,14 @@ mod tests {
             site_name: None,
             base_url: None,
         };
-        let result = svc.publish(&config).unwrap();
+        let result = svc.publish(&config, &registry).unwrap();
         assert_eq!(result.success, true, "target_dir 发布应成功: {:?}", result.error);
         assert!(result.error.is_none());
         let out = result.output_path.expect("应返回输出目录");
         assert_eq!(out, target.to_string_lossy());
-        // md 已写入目标目录
-        assert!(target.join("第一篇.md").exists());
-        assert!(target.join("第二篇.md").exists());
+        // 走 Astro 适配器:md 写入 posts/ 子目录(带 frontmatter)
+        assert!(target.join("posts/第一篇.md").exists());
+        assert!(target.join("posts/第二篇.md").exists());
     }
 
     /// [2026-08-19] target_dir 为空/缺失 → 报错,给用户明确指引
@@ -415,6 +490,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         write_sample_md(dir.path());
         let svc = PublishService::new(dir.path());
+        let registry = CapabilityRegistry::new();
         let config = PublishConfig {
             target_dir: Some("   ".to_string()),
             output_path: None,
@@ -422,7 +498,7 @@ mod tests {
             site_name: None,
             base_url: None,
         };
-        let result = svc.publish(&config).unwrap();
+        let result = svc.publish(&config, &registry).unwrap();
         assert_eq!(result.success, false);
         let err = result.error.expect("空目录应报错");
         assert!(err.contains("发布目标目录为空"), "应提示目标目录为空: {err}");
@@ -434,7 +510,7 @@ mod tests {
             site_name: None,
             base_url: None,
         };
-        let result2 = svc.publish(&config2).unwrap();
+        let result2 = svc.publish(&config2, &registry).unwrap();
         assert_eq!(result2.success, false);
         assert!(result2.error.as_deref().unwrap_or("").contains("未指定发布方式"));
     }

@@ -1,4 +1,5 @@
 mod block_service;
+mod blog_adapter;
 mod encryption;
 mod git;
 mod import_export;
@@ -11,6 +12,7 @@ mod trash;
 mod webdav;
 
 pub use block_service::*;
+pub use blog_adapter::*;
 pub use encryption::*;
 pub use git::*;
 pub use import_export::*;

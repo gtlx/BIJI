@@ -7,12 +7,9 @@ pub fn publish_site(
     state: State<AppState>,
     config: PublishConfig,
 ) -> Result<PublishResult, String> {
-    state
-        .core
-        .lock()
-        .map_err(|e| e.to_string())?
-        .publish
-        .publish(&config)
+    let core = state.core.lock().map_err(|e| e.to_string())?;
+    core.publish
+        .publish(&config, &core.capabilities)
         .map_err(|e| e.to_string())
 }
 

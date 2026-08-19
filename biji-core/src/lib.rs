@@ -30,6 +30,8 @@ pub struct App {
     pub trash: services::TrashService,
     /// M3.5b 笔记模板:内置 + 用户自定义 CRUD
     pub templates: services::TemplateService,
+    /// [2026-08-19 插件化] 能力注册表:管理各能力插件(如发布的多博客框架适配器)
+    pub capabilities: services::CapabilityRegistry,
 }
 
 impl App {
@@ -68,6 +70,8 @@ impl App {
         let block_service = services::BlockService::new(db.clone());
         let trash = services::TrashService::new(db.clone());
         let templates = services::TemplateService::new(db.clone());
+        // [2026-08-19 插件化] 能力注册表:持有各能力插件(发布 → Astro 等框架适配器)
+        let capabilities = services::CapabilityRegistry::new();
 
         log::info!("Biji Note core initialized at: {}", data_dir.display());
 
@@ -82,6 +86,7 @@ impl App {
             block_service,
             trash,
             templates,
+            capabilities,
         })
     }
 }
