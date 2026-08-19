@@ -206,6 +206,7 @@ body.pane-dragging {
   transition: all 0.15s;
 }
 .pane-add-btn:hover { background: var(--accent-bg); transform: scale(1.06); }
+.pane-add-btn.open { background: var(--accent-bg); color: var(--teal-600); }
 .pane-add-menu {
   display: none;
   position: absolute;
@@ -246,3 +247,12 @@ body.pane-dragging {
 /* 图谱/日历等大模块套进面板后的高度收敛 */
 .pane-body .graph-view { min-height: 0; height: 100%; }
 .pane-body .calendar-view { height: 100%; }
+.pane-body .pomodoro-timer { height: 100%; box-sizing: border-box; }
+
+/* [Pane] 番茄钟插件未启用时的占位提示 */
+.pomodoro-disabled {
+  padding: 20px 16px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-align: center;
+}

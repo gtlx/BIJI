@@ -378,7 +378,12 @@ export class MockBackend implements BackendAdapter {
   }
   async importMarkdown(path: string): Promise<ImportResult> { return { success: true, count: 0 }; }
   async exportMarkdown(path: string): Promise<ImportResult> { return { success: true, count: 0 }; }
-  async getPlugins(): Promise<Plugin[]> { return []; }
+  async getPlugins(): Promise<Plugin[]> {
+    // [web Mock 默认] 内置一个已启用的番茄钟插件,便于在「添加面板」里体验番茄钟分栏面板
+    return [
+      { id: 'pomodoro-plugin', name: '番茄钟', version: '0.1.0', description: '专注计时(可作分栏面板)', author: '内置', enabled: true, built_in: true },
+    ];
+  }
   async togglePlugin(id: string, enabled: boolean): Promise<void> {}
   onMenuEvent(event: string, callback: () => void): () => void { return () => {}; }
 

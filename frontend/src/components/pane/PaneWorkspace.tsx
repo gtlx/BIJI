@@ -55,6 +55,24 @@ export function PaneWorkspace({ layout, onLayoutChange, renderPane }: PaneWorksp
   /** 分栏宽度拖拽状态:正在拖的分隔条下标 */
   const [sizing, setSizing] = useState<number | null>(null);
 
+  /** [打磨] 「添加面板」菜单是否展开(状态化,替代 DOM classList 切换) */
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // [打磨] 点击面板区域外 → 收起「添加面板」菜单
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDocDown = (ev: PointerEvent) => {
+      const t = ev.target as Node | null;
+      if (t && containerRef.current) {
+        const wrap = containerRef.current.querySelector('.pane-add-menu-wrap');
+        if (wrap && wrap.contains(t)) return;
+      }
+      setMenuOpen(false);
+    };
+    document.addEventListener('pointerdown', onDocDown);
+    return () => document.removeEventListener('pointerdown', onDocDown);
+  }, [menuOpen]);
+
   // ---------------- 面板拖动 ----------------
 
   const findTarget = (x: number, y: number): { t: DropTarget | null; e: EdgeTarget | null } => {
@@ -286,19 +304,24 @@ export function PaneWorkspace({ layout, onLayoutChange, renderPane }: PaneWorksp
         })}
       </div>
 
-      {/* 添加面板按钮 */}
+      {/* 添加面板按钮:列出未展示面板,点击恢复(含 标签/番茄钟) */}
       {canAdd && (
         <div className="pane-add-menu-wrap">
-          <button className="pane-add-btn" title="添加面板" onClick={(e) => {
-            e.stopPropagation();
-            const menu = e.currentTarget.nextElementSibling as HTMLElement;
-            menu!.classList.toggle('open');
-          }}>
+          <button
+            className={`pane-add-btn ${menuOpen ? 'open' : ''}`}
+            title="添加面板"
+            aria-expanded={menuOpen}
+            onClick={(e) => { e.stopPropagation(); setMenuOpen(v => !v); }}
+          >
             <StrokeIcon name="plus" size={16} />
           </button>
-          <div className="pane-add-menu">
+          <div className={`pane-add-menu ${menuOpen ? 'open' : ''}`}>
             {PANE_REGISTRY.filter(m => layout.hidden.includes(m.id)).map(m => (
-              <button key={m.id} className="pane-add-item" onClick={() => addPane(m.id)}>
+              <button
+                key={m.id}
+                className="pane-add-item"
+                onClick={() => { addPane(m.id); setMenuOpen(false); }}
+              >
                 <StrokeIcon name={m.icon} size={15} />
                 <span>{m.label}</span>
               </button>

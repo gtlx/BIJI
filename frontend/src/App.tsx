@@ -21,6 +21,8 @@ import { MobileTabbar, type TabItem } from './components/MobileTabbar';
 import { CommandPalette, type CommandAction } from './components/CommandPalette';
 import { TemplateInsertModal } from './components/TemplateInsertModal';
 import { PaneWorkspace } from './components/pane/PaneWorkspace';
+import { TagsPane } from './components/TagsPane';
+import { PomodoroTimer } from './components/PomodoroTimer';
 import { loadLayout, saveLayout } from './components/pane/layoutStore';
 import type { PaneId, PaneLayout } from './components/pane/types';
 import { StrokeIcon } from './icons';
@@ -508,6 +510,8 @@ export default function App() {
       { id: 'toggle-files', label: '切换文件面板', icon: 'folder', run: () => { close(); setWorkspaceView(true); togglePane('files'); } },
       { id: 'toggle-graph', label: '切换图谱面板', icon: 'graph', run: () => { close(); setWorkspaceView(true); togglePane('graph'); } },
       { id: 'toggle-calendar', label: '切换日历面板', icon: 'calendar', run: () => { close(); setWorkspaceView(true); togglePane('calendar'); } },
+      { id: 'toggle-tags', label: '切换标签面板', icon: 'tag', run: () => { close(); setWorkspaceView(true); togglePane('tags'); } },
+      { id: 'toggle-pomodoro', label: '切换番茄钟面板', icon: 'timer', run: () => { close(); setWorkspaceView(true); togglePane('pomodoro'); } },
       { id: 'export-md', label: '导出当前为 .md', icon: 'download', run: () => { close(); if (selectedNote) handleExportMarkdown(selectedNote.id); } },
       { id: 'export-html', label: '导出当前为 HTML(可打印 PDF)', icon: 'download', run: () => { close(); if (selectedNote) handleExportHtml(selectedNote.id); } },
       { id: 'open-settings', label: '打开设置', icon: 'settings', hint: 'Ctrl+,', run: () => { close(); setShowSettings(true); } },
@@ -663,12 +667,23 @@ export default function App() {
         );
       case 'calendar':
         return <CalendarView onSelectNote={jumpToNote} />;
+      case 'tags':
+        return (
+          <TagsPane
+            tags={tags}
+            notes={notes}
+            selectedTag={selectedTag}
+            onSelectTag={setSelectedTag}
+          />
+        );
+      case 'pomodoro':
+        return pomodoroEnabled ? <PomodoroTimer /> : <div className="pomodoro-disabled">番茄钟插件未启用,请到设置开启</div>;
       default:
         return null;
     }
   }, [selectedNote, folders, handleSaveNote, handleDeleteNote, settings, pomodoroEnabled,
       handleLinkClick, handleTitleChange, noteBlocks, notes, selectedFolderId, selectedTag,
-      handleNewNote, closePane, togglePane, jumpToNote, graphKey, showToast]);
+      tags, handleNewNote, closePane, togglePane, jumpToNote, graphKey, showToast]);
 
   if (isLoading) return <div className="loading">加载中...</div>;
 

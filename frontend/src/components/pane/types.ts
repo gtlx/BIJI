@@ -9,7 +9,7 @@
  */
 
 /** 可用面板模块 id */
-export type PaneId = 'editor' | 'files' | 'outline' | 'backlinks' | 'graph' | 'calendar';
+export type PaneId = 'editor' | 'files' | 'outline' | 'backlinks' | 'graph' | 'calendar' | 'tags' | 'pomodoro';
 
 /** 单栏:内可纵向叠多个面板,weight 为该栏相对宽度(flex-grow 语义) */
 export interface PaneColumn {
@@ -48,6 +48,8 @@ export const PANE_REGISTRY: PaneMeta[] = [
   { id: 'backlinks', label: '反向链接', icon: 'backlink', minWeight: 0.1 },
   { id: 'graph', label: '图谱', icon: 'graph', minWeight: 0.16 },
   { id: 'calendar', label: '日历', icon: 'calendar', minWeight: 0.16 },
+  { id: 'tags', label: '标签', icon: 'tag', minWeight: 0.1 },
+  { id: 'pomodoro', label: '番茄钟', icon: 'timer', minWeight: 0.1 },
 ];
 
 export const PANE_META: Record<PaneId, PaneMeta> = Object.fromEntries(
@@ -61,7 +63,7 @@ export const DEFAULT_LAYOUT: PaneLayout = {
     { id: `col-${'editor'}`, weight: 1, panes: ['editor'] },
     { id: `col-${'right'}`, weight: 0.22, panes: ['outline', 'backlinks'] },
   ],
-  hidden: ['graph', 'calendar'],
+  hidden: ['graph', 'calendar', 'tags', 'pomodoro'],
 };
 
 /** 生成新面板布局 */

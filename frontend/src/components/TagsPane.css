@@ -1,0 +1,111 @@
+/* [Pane 标签面板] 独立「标签」分栏面板样式(与侧栏标签树互补,多点选过滤) */
+
+.tags-pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 10px;
+  gap: 10px;
+  box-sizing: border-box;
+}
+
+.tags-pane-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+.tags-pane-search svg { flex-shrink: 0; }
+.tags-pane-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  outline: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+.tags-pane-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+}
+.tags-pane-clear:hover { background: var(--bg-tertiary); color: var(--danger-color); }
+
+.tags-pane-active-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 4px 8px;
+  border: 1px solid var(--teal-500);
+  border-radius: 999px;
+  background: var(--accent-bg);
+  color: var(--teal-700);
+  font-size: 13px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.tags-pane-active-tag:hover { background: var(--accent-strong); }
+
+.tags-pane-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.tags-pane-empty {
+  color: var(--text-tertiary);
+  font-size: 13px;
+  text-align: center;
+  padding: 20px 0;
+}
+
+.tags-pane-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s;
+}
+.tags-pane-item svg { color: var(--accent-color); flex-shrink: 0; }
+.tags-pane-item:hover { background: var(--accent-bg); }
+.tags-pane-item.active { background: var(--accent-bg); color: var(--teal-700); }
+.tags-pane-name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tags-pane-count {
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  border-radius: 999px;
+  padding: 1px 7px;
+  flex-shrink: 0;
+}
+.tags-pane-item.active .tags-pane-count { background: var(--accent-bg); color: var(--teal-700); }
