@@ -11,6 +11,7 @@ import {
   GitLogEntry,
   PublishConfig,
   PublishResult,
+  PublishPreviewResult,
   Plugin,
   ImportResult,
   BlockActivity,
@@ -142,6 +143,9 @@ export class TauriBackend implements BackendAdapter {
   // ===== 发布 =====
   async publishSite(config: PublishConfig): Promise<PublishResult> {
     return invoke('publish_site', { config });
+  }
+  async previewSite(config: PublishConfig): Promise<PublishPreviewResult> {
+    return invoke('preview_site', { config });
   }
   async checkGenerator(generator: string): Promise<[boolean, string | null]> {
     return invoke('check_generator', { generator });

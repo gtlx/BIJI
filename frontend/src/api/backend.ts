@@ -241,6 +241,23 @@ export interface PublishResult {
   error?: string;
 }
 
+/** [发布映射预览] 生成的文件计划(单个) */
+export interface PublishFilePreview {
+  rel_path: string;
+  content: string;
+}
+/** [发布映射预览] 预览结果 */
+export interface PublishPreviewResult {
+  success: boolean;
+  /** 识别到的框架 */
+  framework?: string;
+  /** 生成的文件计划列表 */
+  files?: PublishFilePreview[];
+  /** 安全提示 */
+  safety_note?: string;
+  error?: string;
+}
+
 export interface ImportResult {
   success: boolean;
   count: number;
@@ -315,6 +332,8 @@ export interface BackendAdapter {
 
   // === 发布 ===
   publishSite(config: PublishConfig): Promise<PublishResult>;
+  /** [发布映射预览] 先看到会生成哪些文件/路径/frontmatter,确认再写盘 */
+  previewSite(config: PublishConfig): Promise<PublishPreviewResult>;
   checkGenerator(generator: string): Promise<[boolean, string | null]>;
 
   // === 导入导出 ===

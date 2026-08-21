@@ -1,6 +1,6 @@
 import {
   BackendAdapter, Note, Folder, AppSettings, SearchQuery, GraphData, SyncResult, SyncStatus,
-  GitStatus, GitLogEntry, PublishConfig, PublishResult, Plugin, ImportResult,
+  GitStatus, GitLogEntry, PublishConfig, PublishResult, PublishPreviewResult, Plugin, ImportResult,
   NoteBlock, BlockHistoryEntry, BlockSearchResult, BlockType, BlockActivity, BlockBacklink, TagCount,
   NoteTemplate, TrashBlock, DEFAULT_TEMPLATES,
 } from './backend';
@@ -371,6 +371,34 @@ export class MockBackend implements BackendAdapter {
     const out = config.output_path?.replace(/\/$/, '') || '/导出/站点';
     const dir = config.site_name || 'my-notes';
     return { success: true, output_path: `${out}/${dir}` };
+  }
+
+  /**
+   * [发布映射预览] 展示会生成哪些文件/路径/frontmatter(Mock:用内存笔记模拟 Astro adapter 的 map)。
+   * 真实桌面端走后端 CapabilityRegistry 的 PublishAdapter。
+   */
+  async previewSite(config: PublishConfig): Promise<PublishPreviewResult> {
+    const target = config.target_dir?.trim();
+    if (!target) {
+      return { success: false, error: '发布目标目录为空。请填写你现有博客的 content/md 目录路径。' };
+    }
+    const notes = this.notes.filter(n => !n.deleted_at);
+    const files = notes.map(n => {
+      const title = n.title || '未命名';
+      // 剥离已有 frontmatter 作为正文
+      const body = n.content.replace(/^---\n[\s\S]*?\n---\n?/, '');
+      const fm = `---\ntitle: "${title}"\n${n.tags && n.tags.length ? `tags: [${n.tags.map(t => `"${t}"`).join(', ')}]\n` : ''}---\n\n`;
+      return {
+        rel_path: `posts/${title}.md`,
+        content: fm + (body.trimStart()),
+      };
+    });
+    return {
+      success: true,
+      framework: 'astro',
+      files,
+      safety_note: '发布仅新增/覆盖同名 md,绝不删除博客其它文件。请确认你的 Astro 项目用 glob loader 收集该目录。',
+    };
   }
 
   /** [M4 发布] Mock:三个生成器都预设可用,返回版本号(仅供向导「检查可用性」演示) */

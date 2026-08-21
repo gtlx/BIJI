@@ -47,7 +47,28 @@ export function PublishPanel({ onClose }: PublishPanelProps) {
   const [siteName, setSiteName] = useState('My Notes');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ success: boolean; output_path?: string; error?: string } | null>(null);
+  // [映射预览] 预览结果
+  const [preview, setPreview] = useState<{ framework?: string; files?: { rel_path: string; content: string }[]; safety_note?: string; error?: string } | null>(null);
+  const [previewing, setPreviewing] = useState(false);
 
+  // [发布映射预览] 先看会生成哪些文件/路径/frontmatter
+  const handlePreview = async () => {
+    setPreviewing(true);
+    setPreview(null);
+    try {
+      if (!targetDir.trim()) {
+        setPreview({ error: '发布目标目录为空。请填写你现有博客的 content/md 目录路径。' });
+        setPreviewing(false);
+        return;
+      }
+      const p = await backend.previewSite({ target_dir: targetDir.trim() });
+      setPreview(p);
+    } catch (e: any) {
+      setPreview({ error: String(e?.message || e) });
+    } finally {
+      setPreviewing(false);
+    }
+  };
   const handleCheck = async () => {
     const meta: GeneratorMeta = { ...GENERATORS.find(g => g.id === gen)!, available: false, checked: false };
     try {
@@ -138,6 +159,35 @@ export function PublishPanel({ onClose }: PublishPanelProps) {
                 placeholder="如 /path/to/blog/src/content/posts 或 /path/to/hugo/content"
               />
             </label>
+            <button onClick={handlePreview} disabled={previewing} className="btn btn-ghost">
+              {previewing ? '生成预览中…' : '映射预览'}
+            </button>
+            {/* 映射预览:先看到会生成哪些文件/路径/frontmatter */}
+            {preview && (
+              <div className="publish-preview">
+                {preview.error ? (
+                  <div className="publish-result fail">{preview.error}</div>
+                ) : (
+                  <>
+                    <div className="publish-preview-head">
+                      识别框架:<code>{preview.framework || '?'}</code>
+                      <span className="publish-tip">将生成 {preview.files?.length ?? 0} 个文件</span>
+                    </div>
+                    <div className="publish-preview-files">
+                      {preview.files?.map(f => (
+                        <details key={f.rel_path} className="publish-preview-file">
+                          <summary><code>{f.rel_path}</code></summary>
+                          <pre>{f.content}</pre>
+                        </details>
+                      ))}
+                    </div>
+                    {preview.safety_note && (
+                      <div className="publish-safety-note">⚠️ {preview.safety_note}</div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
             <button onClick={handlePublish} disabled={busy} className="btn btn-primary">
               {busy ? '发布中…' : '发布到该目录'}
             </button>
