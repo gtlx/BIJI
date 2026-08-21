@@ -19,7 +19,8 @@
  * 右 dock 能力:
  *  - 上下分栏:right 有多个 row → 上下堆叠
  *  - tab:同一 row 内多面板 → 标签页(点切换)
- *  - 拖拽:面板可在 row 内换位、拖到另一 row 合并、拖到 dock 边缘新建 row
+ *  - 拖拽:面板可在 row 内换位、拖到另一 row 合并、拖到 dock 上/下边缘新建 row
+ *  - 默认布局:每个右 dock 模块各自独立成一块(不堆在一个 tab 组里),可自由上下分块/移动
  */
 
 /** 可用面板模块 id */
@@ -77,13 +78,14 @@ export const RIGHT_PANES: PaneId[] = PANE_REGISTRY.filter(m => m.zone === 'right
 let seq = 0;
 const nid = () => `row-${Date.now().toString(36)}-${seq++}`;
 
-/** 默认布局:左文件 | 主编辑器 | 右 dock(大纲+反向链接 同块 tab) */
+/** 默认布局:左文件 | 主编辑器 | 右 dock(每个右 dock 模块各自独立成一块,不堆 tab 组) */
 export function defaultLayout(): PaneLayout {
   return {
     main: 'editor',
     left: ['files'],
-    right: [{ id: nid(), panes: ['outline', 'backlinks'], active: 0 }],
-    hidden: ['graph', 'calendar', 'tags', 'pomodoro'],
+    // 每个右 dock 模块默认独立一个 group(块),可自由上下分块/移动/合并
+    right: RIGHT_PANES.map(id => ({ id: nid(), panes: [id], active: 0 })),
+    hidden: [],
   };
 }
 

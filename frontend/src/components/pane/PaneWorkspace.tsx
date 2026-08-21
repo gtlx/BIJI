@@ -5,9 +5,9 @@
  *   左 dock(固定文件) | 主区(固定编辑器) | 右 dock(可上下分栏 + tab + 拖拽)
  *
  * 右 dock:
- *  - 多 row = 上下分栏(块)
+ *  - 多 row = 上下分栏(块);默认每个模块独立成一块(不堆 tab 组)
  *  - 每 row 多 panel = tab 标签页
- *  - 拖拽:拖 tab → row 内换位 / 跨 row 合并 / 拖到 dock 边缘新增 row
+ *  - 拖拽:拖 tab → row 内换位 / 跨 row 合并 / 拖到 dock 上/下边缘新增 row
  *
  * 主区/左 dock 固定:不参与分栏、不可被拖走/关闭。
  * 实现:全部 pointer events + 原生 flex,不引第三方布局库。
@@ -117,7 +117,18 @@ export function PaneWorkspace({ layout, onLayoutChange, renderPane }: PaneWorksp
       }
     });
 
-    // ② 其次:命中某 group 的空白区 → 追加到该 group 末尾(合并)
+    // ② 其次:拖到右 dock 上/下边缘 → 新开一块(上下分块)
+    //    必须在 dock 边缘之前判定:否则 group 空白区会先命中,上/下边缘永远提示「合并」而非「分块」。
+    //    横向限定在 dock 范围内(±12px 容差):避免拖出 dock(向左/向右)时误触发「分块」提示。
+    if (!best) {
+      const rect = dock.getBoundingClientRect();
+      const inX = x >= rect.left - 12 && x <= rect.right + 12;
+      if (inX) {
+        if (y - rect.top < EDGE_ZONE) return { t: null, e: { side: 'top' } };
+        if (rect.bottom - y < EDGE_ZONE) return { t: null, e: { side: 'bottom' } };
+      }
+    }
+    // ③ 最后:命中某 group 的空白区 → 追加到该 group 末尾(合并)
     if (!best) {
       const rowEls = dock.querySelectorAll<HTMLElement>('.pane-row');
       for (let i = 0; i < rowEls.length; i++) {
@@ -128,12 +139,6 @@ export function PaneWorkspace({ layout, onLayoutChange, renderPane }: PaneWorksp
           break;
         }
       }
-    }
-    // ③ 最后:都没命中(拖到组间空隙/ dock 上下边缘)→ 新开 group
-    if (!best) {
-      const rect = dock.getBoundingClientRect();
-      if (y - rect.top < EDGE_ZONE) return { t: null, e: { side: 'top' } };
-      if (rect.bottom - y < EDGE_ZONE) return { t: null, e: { side: 'bottom' } };
     }
     return { t: best, e: null };
   };
@@ -165,13 +170,14 @@ export function PaneWorkspace({ layout, onLayoutChange, renderPane }: PaneWorksp
 
     const rows = layout.right.map(r => ({ ...r, panes: [...r.panes], active: activeOverride[r.id] ?? r.active ?? 0 }));
     if (edgeFinal) {
-      // 上下边缘 → 新块
+      // 上/下边缘 → 新块
       const moving = rows[fromRow]!.panes.splice(fromIdx, 1)[0];
       if (!moving) return;
       const newRow: PaneRow = { id: nextRowId(), panes: [moving], active: 0 };
       const next = [...rows];
       next.splice(edgeFinal.side === 'top' ? 0 : next.length, 0, newRow);
-      onLayoutChange({ ...layout, right: next });
+      // 原块被拖空后移除,避免留下空白块
+      onLayoutChange({ ...layout, right: next.filter(r => r.panes.length > 0) });
       return;
     }
     if (targetFinal) {
@@ -246,14 +252,15 @@ export function PaneWorkspace({ layout, onLayoutChange, renderPane }: PaneWorksp
   const addPane = (pane: PaneId) => {
     const hidden = layout.hidden.filter(p => p !== pane);
     const already = layout.right.some(r => r.panes.includes(pane));
-    let right = layout.right.map(r => ({ ...r, panes: [...r.panes], active: activeOverride[r.id] ?? r.active ?? 0 }));
-    if (!already) {
-      if (right.length > 0) {
-        right[right.length - 1] = { ...right[right.length - 1]!, panes: [...right[right.length - 1]!.panes, pane] };
-      } else {
-        right = [{ id: nextRowId(), panes: [pane], active: 0 }];
-      }
+    if (already) {
+      // 已在右 dock,仅从 hidden 移除
+      onLayoutChange({ ...layout, hidden });
+      return;
     }
+    const right = layout.right.map(r => ({ ...r, panes: [...r.panes], active: activeOverride[r.id] ?? r.active ?? 0 }));
+    // 新增面板默认独立成一块(自己一个 group,不并入最后一个 tab 组),
+    // 之后可自由拖动到 dock 任意位置/与其他 group 合并
+    right.push({ id: nextRowId(), panes: [pane], active: 0 });
     onLayoutChange({ ...layout, right, hidden });
   };
 
@@ -297,10 +304,14 @@ export function PaneWorkspace({ layout, onLayoutChange, renderPane }: PaneWorksp
                       const meta = PANE_META[paneId];
                       const isActive = pi === active;
                       const isDragging = drag?.pane === paneId && drag.fromRow === ri;
+                      // 拖拽合并落点指示:插到某 tab 前(标记该 tab 左缘)
+                      const dropHere =
+                        !!target && target.rowIndex === ri &&
+                        ((target.before && target.tabIndex === pi) || (!target.before && target.tabIndex === pi - 1));
                       return (
                         <div
                           key={paneId}
-                          className={`pane-tab ${isActive ? 'active' : ''} ${isDragging ? 'dragging' : ''} ${target && target.rowIndex === ri && target.tabIndex === pi && !target.before ? 'target-before' : ''}`}
+                          className={`pane-tab ${isActive ? 'active' : ''} ${isDragging ? 'dragging' : ''} ${dropHere ? 'drop-before' : ''}`}
                           role="tab"
                           aria-selected={isActive}
                           data-row={ri}
@@ -309,7 +320,7 @@ export function PaneWorkspace({ layout, onLayoutChange, renderPane }: PaneWorksp
                           onPointerMove={onTabMove}
                           onPointerUp={onTabUp}
                           onClick={() => { if (!drag) setActiveOverride(prev => ({ ...prev, [row.id]: pi })); }}
-                          title="点击切换;按住拖动可重排/上下分栏"
+                          title="点击切换;按住拖动可重排/上下分块"
                         >
                           <StrokeIcon name={meta.icon} size={14} />
                           <span className="pane-tab-title">{meta.label}</span>
@@ -323,14 +334,19 @@ export function PaneWorkspace({ layout, onLayoutChange, renderPane }: PaneWorksp
                         </div>
                       );
                     })}
+                    {/* 追加到本组末尾的落点指示(插到最后一个 tab 之后) */}
+                    {target && target.rowIndex === ri && !target.before && target.tabIndex === row.panes.length && (
+                      <div className="pane-tab-drop-end" />
+                    )}
                   </div>
                 )}
                 {/* 内容区:显示激活的 tab(多面板)或唯一面板 */}
                 {row.panes.map((paneId, pi) => {
                   if (showTabs && pi !== active) return null;
                   const meta = PANE_META[paneId];
+                  const isDragging = drag?.pane === paneId && drag.fromRow === ri;
                   return (
-                    <div key={paneId} className="pane pane-right-pane" data-pane={paneId}>
+                    <div key={paneId} className={`pane pane-right-pane ${isDragging ? 'dragging' : ''}`} data-pane={paneId}>
                       {showTabs ? (
                         <div className="pane-body pane-body-tabbed">{renderPane(paneId)}</div>
                       ) : (
@@ -342,7 +358,7 @@ export function PaneWorkspace({ layout, onLayoutChange, renderPane }: PaneWorksp
                             onPointerDown={(e) => onTabDown(e, paneId, ri, pi)}
                             onPointerMove={onTabMove}
                             onPointerUp={onTabUp}
-                            title="按住拖动可重排/上下分栏"
+                            title="按住拖动可重排/上下分块"
                           >
                             <span className="pane-head-icon"><StrokeIcon name={meta.icon} size={16} /></span>
                             <span className="pane-head-title">{meta.label}</span>
@@ -403,9 +419,10 @@ export function PaneWorkspace({ layout, onLayoutChange, renderPane }: PaneWorksp
           <span>{PANE_META[drag.pane].label}</span>
         </div>
       )}
+      {/* 拖到上/下边缘的「分块」落点提示(方向:上/下) */}
       {edge && (
         <div className={`pane-edge-zone ${edge.side}`}>
-          <span>分块</span>
+          <span>{edge.side === 'top' ? '▲ 向上分块' : '▼ 向下分块'}</span>
         </div>
       )}
     </div>

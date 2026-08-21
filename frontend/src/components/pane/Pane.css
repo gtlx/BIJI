@@ -58,6 +58,9 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
+  /* 默认每模块一块(多块堆叠),块太多时允许纵向滚动兜底 */
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 /* 右 dock 的一块(可上下分栏) */
@@ -136,12 +139,32 @@
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
   cursor: pointer; user-select: none; -webkit-user-select: none;
   white-space: nowrap; flex-shrink: 0; transition: all 0.15s;
+  position: relative;
 }
 .pane-tab:hover { background: var(--accent-bg); color: var(--text-primary); }
 .pane-tab.active { background: var(--glass-bg); border-color: var(--glass-border); color: var(--text-primary); font-weight: 600; }
 .pane-tab.dragging { opacity: 0.5; }
 .pane-tab svg { color: var(--accent-color); }
 .pane-tab-title { max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
+
+/* 拖拽合并落点指示:插到该 tab 之前(左缘竖条) */
+.pane-tab.drop-before::before {
+  content: '';
+  position: absolute;
+  left: -2px; top: 5px; bottom: 5px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--teal-500);
+}
+/* 拖拽合并到本组末尾的落点指示(最后一个 tab 之后) */
+.pane-tab-drop-end {
+  align-self: stretch;
+  width: 2px;
+  margin: 6px 2px;
+  border-radius: 1px;
+  background: var(--teal-500);
+  flex-shrink: 0;
+}
 .pane-tab-close {
   display: inline-flex; align-items: center; justify-content: center;
   width: 18px; height: 18px; border: none; border-radius: 4px;
