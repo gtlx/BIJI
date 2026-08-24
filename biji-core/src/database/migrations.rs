@@ -13,6 +13,14 @@ pub fn run(conn: &Connection) -> Result<(), Error> {
     // 001:初始 schema(幂等)
     conn.execute_batch(include_str!("../../migrations/001_init.sql"))?;
 
+    // 插件启用状态持久化表(幂等,不参与 user_version 门控以保持迁移测试稳定)
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS plugin_state (
+            id      TEXT PRIMARY KEY,
+            enabled INTEGER NOT NULL DEFAULT 1
+        );",
+    )?;
+
     let version: i64 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
     if version < 2 {
         migrate_to_v2(conn)?;
