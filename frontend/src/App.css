@@ -141,8 +141,8 @@ body {
 /* ===== 主布局:三档响应式(桌面 → 侧栏 | 工作区 Pane) ===== */
 .app-container {
   display: grid;
-  /* 桌面默认两区:左侧导航侧栏 + 右侧工作区(Pane 面板化) */
-  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  /* 桌面默认两区:左侧导航侧栏 + 右侧工作区(Pane 面板化);中间留 6px 给拖拽调宽分隔线 */
+  grid-template-columns: var(--sidebar-width) 6px minmax(0, 1fr);
   height: 100dvh;
   width: 100vw;
   position: relative;
@@ -154,11 +154,47 @@ body {
 /* grid 子项允许收缩到轨道宽度,防横向溢出 */
 .app-container > * { min-width: 0; }
 
+/* ===== [拖拽调宽] 左侧栏调宽手柄(桌面显示) ===== */
+.sidebar-resizer {
+  width: 6px;
+  cursor: col-resize;
+  position: relative;
+  z-index: 30;
+  background: transparent;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+/* 分隔线指示(细条,悬浮/拖动时高亮加粗) */
+.sidebar-resizer::before {
+  content: '';
+  position: absolute;
+  left: 50%; top: 0; bottom: 0;
+  width: 1px;
+  transform: translateX(-50%);
+  background: var(--glass-border);
+  transition: background 0.15s, width 0.15s;
+}
+.sidebar-resizer:hover::before,
+.sidebar-resizer.active::before {
+  background: var(--teal-500);
+  width: 3px;
+}
+/* 拖拽期间禁用文本选中 + 全局 col-resize 光标 */
+body.biji-resizing {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  cursor: col-resize;
+}
+body.biji-resizing * { cursor: col-resize !important; }
+
 /* ---------- 平板 768-1024px:侧栏图标化 ---------- */
 @media (min-width: 768px) and (max-width: 1024px) {
   .app-container {
     grid-template-columns: 64px minmax(0, 1fr);
   }
+  /* 平板侧栏图标化固定 64px,不提供拖拽调宽 */
+  .sidebar-resizer { display: none; }
 }
 
 /* ---------- 手机 <768px:底部 Tab 栏 + 单栏切换(还原独立笔记列表) ---------- */
@@ -167,6 +203,8 @@ body {
     display: block;
     height: 100dvh;
   }
+  /* 拖拽调宽手柄手机端隐藏 */
+  .sidebar-resizer { display: none; }
   /* 侧栏 / 右栏手机端隐藏 */
   [data-panel='left-sidebar'],
   [data-panel='right-sidebar'] {

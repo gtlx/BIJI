@@ -187,6 +187,34 @@
   background: rgba(20, 184, 166, 0.45);
 }
 
+/* ---------------- [拖拽调宽] 右 dock 调宽分隔线(主区/右 dock 之间) ---------------- */
+.pane-vresizer {
+  position: relative;
+  width: 6px;
+  flex-shrink: 0;
+  align-self: stretch;
+  cursor: col-resize;
+  z-index: 30;
+  background: transparent;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.pane-vresizer::before {
+  content: '';
+  position: absolute;
+  left: 50%; top: 0; bottom: 0;
+  width: 1px;
+  transform: translateX(-50%);
+  background: var(--glass-border);
+  transition: background 0.15s, width 0.15s;
+}
+.pane-vresizer:hover::before,
+.pane-vresizer.active::before {
+  background: var(--teal-500);
+  width: 3px;
+}
+
 /* 拖拽禁用选中 */
 body.pane-dragging {
   user-select: none !important;

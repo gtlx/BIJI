@@ -32,6 +32,26 @@ interface PaneWorkspaceProps {
    * (如看板 kanban)在该插件被禁用时从「添加面板」菜单消失,与导航/渲染行为一致。
    */
   paneEnabled?: (id: PaneId) => boolean;
+  /**
+   * [拖拽调宽] 右 dock 整体展开/收起(由 App 的 toggle_right_sidebar / Ctrl+] 控制)。
+   * false 时不渲染右 dock(主区占满),宽度状态仍在组件内保留,重新展开时宽度不变。
+   * 默认为 true(若不传则始终显示)。
+   */
+  rightOpen?: boolean;
+}
+
+/** [拖拽调宽] 右 dock 宽记忆(localStorage);resizer 拖动 clamp 上下限 */
+const RIGHT_DOCK_WIDTH_KEY = 'biji.rightDockWidth';
+const RIGHT_DOCK_WIDTH_MIN = 200;
+const RIGHT_DOCK_WIDTH_MAX = 560;
+
+function readRightDockWidth(def: number): number {
+  try {
+    const raw = localStorage.getItem(RIGHT_DOCK_WIDTH_KEY);
+    if (raw === null) return def;
+    const v = Number(raw);
+    return Number.isFinite(v) ? Math.min(RIGHT_DOCK_WIDTH_MAX, Math.max(RIGHT_DOCK_WIDTH_MIN, Math.round(v))) : def;
+  } catch { return def; }
 }
 
 /** 拖动中的目标:插入到某 row 某 tab 前/后 */
@@ -48,7 +68,7 @@ interface EdgeTarget {
 let rowSeq = 0;
 const nextRowId = () => `row-${Date.now().toString(36)}-${rowSeq++}`;
 
-export function PaneWorkspace({ layout, onLayoutChange, renderPane, paneEnabled }: PaneWorkspaceProps) {
+export function PaneWorkspace({ layout, onLayoutChange, renderPane, paneEnabled, rightOpen = true }: PaneWorkspaceProps) {
   const dockRef = useRef<HTMLDivElement>(null);
 
   /** 正在拖拽的面板 + 来源 row */
@@ -66,6 +86,36 @@ export function PaneWorkspace({ layout, onLayoutChange, renderPane, paneEnabled 
 
   /** 「添加面板」菜单 */
   const [menuOpen, setMenuOpen] = useState(false);
+
+  /** [拖拽调宽] 右 dock 宽(localStorage 记忆;resizer 拖动 Clamp 200~560) */
+  const [rightWidth, setRightWidth] = useState<number>(() => readRightDockWidth(300));
+
+  /** 右 dock 宽记忆落库(重启保持) */
+  useEffect(() => {
+    try { localStorage.setItem(RIGHT_DOCK_WIDTH_KEY, String(rightWidth)); } catch { /* 忽略 */ }
+  }, [rightWidth]);
+
+  /** 右 dock 左缘分隔线 → 拖动调右栏宽(向左拖变宽,向右拖变窄) */
+  const onRightResizerDown = (e: React.PointerEvent<HTMLElement>) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = rightWidth;
+    const el = e.currentTarget;
+    try { el.setPointerCapture(e.pointerId); } catch { /* 无指针捕获环境忽略 */ }
+    document.body.classList.add('biji-resizing');
+    const onMove = (ev: PointerEvent) => {
+      const next = startWidth + (startX - ev.clientX);
+      setRightWidth(Math.min(RIGHT_DOCK_WIDTH_MAX, Math.max(RIGHT_DOCK_WIDTH_MIN, next)));
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      document.body.classList.remove('biji-resizing');
+      try { el.releasePointerCapture(e.pointerId); } catch { /* 忽略 */ }
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  };
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -294,8 +344,12 @@ export function PaneWorkspace({ layout, onLayoutChange, renderPane, paneEnabled 
         <div className="pane-body pane-main-body">{renderPane(layout.main)}</div>
       </div>
 
-      {/* 右 dock(可上下分栏 + tab + 拖拽) */}
-      <div className="pane-right" ref={dockRef}>
+      {/* [拖拽调宽] 右 dock:调宽分隔线(vresizer)+ 右栏(整体随 rightOpen=false 收起;宽度记忆 localStorage) */}
+      {rightOpen ? (
+        <>
+          <div className="pane-vresizer" onPointerDown={onRightResizerDown} title="拖拽调整右栏宽度" />
+          {/* 右 dock(可上下分栏 + tab + 拖拽) */}
+          <div className="pane-right" ref={dockRef} style={{ width: `${rightWidth}px` }}>
         <div className="pane-right-rows">
           {layout.right.map((row, ri) => {
             const active = activeOf(row);
@@ -424,6 +478,8 @@ export function PaneWorkspace({ layout, onLayoutChange, renderPane, paneEnabled 
           </div>
         )}
       </div>
+        </>
+      ) : null}
 
       {/* 拖拽幽灵 */}
       {drag && (

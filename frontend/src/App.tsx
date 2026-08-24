@@ -75,8 +75,21 @@ const MOBILE_TABS: TabItem[] = [
   { id: 'settings', icon: 'settings', label: '设置' },
 ];
 
-/** 右侧栏标签页 */
-type RightTab = 'outline' | 'properties' | 'pomodoro' | 'backlinks';
+/** [拖拽调宽] 左侧栏宽记忆(localStorage);resizer 拖动 clamp 上下限 */
+const SIDEBAR_WIDTH_KEY = 'biji.sidebarWidth';
+const SIDEBAR_WIDTH_MIN = 160;
+const SIDEBAR_WIDTH_MAX = 420;
+
+/** 读本地存储整数值;无该 key(首次)或非法回退默认值,越界 clamp */
+function readStoredInt(key: string, def: number, min: number, max: number): number {
+  try {
+    // 注意:getItem 返回 null 表示「无此 key」,不能用 Number(null)=0(否则首次加载被误 clamp 到 min)
+    const raw = localStorage.getItem(key);
+    if (raw === null) return def;
+    const v = Number(raw);
+    return Number.isFinite(v) ? Math.min(max, Math.max(min, Math.round(v))) : def;
+  } catch { return def; }
+}
 
 export default function App() {
   const [notes, setNotes] = useState<Note[]>([]);
@@ -91,9 +104,48 @@ export default function App() {
   /** 当前主区视图:notes(编辑器)/ graph / git / publish */
   const [activeNav, setActiveNav] = useState<string>('notes');
   const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
-  /** 右侧大纲栏(默认折叠,减少视觉噪音;由编辑器大纲按钮/番茄钟打开) */
-  const [rightPanelOpen, setRightPanelOpen] = useState(false);
-  const [rightPanelTab, setRightPanelTab] = useState<RightTab>('outline');
+  /** [拖拽调宽] 右侧 dock 整体展开/收起(由 Ctrl+] toggle_right_sidebar 控制) */
+  const [rightDockOpen, setRightDockOpen] = useState(true);
+  /**
+   * [拖拽调宽] 左侧栏宽(存 localStorage;拖动 app-container 的 sidebar-resizer 更新 --sidebar-width)。
+   * 桌面默认 224px,--sidebar-width 即 app-container 网格首列轨道宽度。
+   */
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() =>
+    readStoredInt(SIDEBAR_WIDTH_KEY, 224, SIDEBAR_WIDTH_MIN, SIDEBAR_WIDTH_MAX),
+  );
+  const sidebarResizerRef = useRef<HTMLDivElement>(null);
+
+  /** 左侧栏宽 → 全局 CSS 变量(布局网格首列) */
+  useEffect(() => {
+    document.documentElement.style.setProperty('--sidebar-width', `${sidebarWidth}px`);
+  }, [sidebarWidth]);
+
+  /** 左侧栏宽记忆落库(重启保持) */
+  useEffect(() => {
+    try { localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth)); } catch { /* 忽略 */ }
+  }, [sidebarWidth]);
+
+  /** 左栏拖拽调宽(resizer onPointerDown;window 监听随指针移动更新宽度) */
+  const onSidebarResizerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+    const el = e.currentTarget;
+    try { el.setPointerCapture(e.pointerId); } catch { /* 无指针捕获环境忽略 */ }
+    document.body.classList.add('biji-resizing');
+    const onMove = (ev: PointerEvent) => {
+      const next = startWidth + (ev.clientX - startX);
+      setSidebarWidth(Math.min(SIDEBAR_WIDTH_MAX, Math.max(SIDEBAR_WIDTH_MIN, next))); 
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      document.body.classList.remove('biji-resizing');
+      try { el.releasePointerCapture(e.pointerId); } catch { /* 忽略 */ }
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  };
   /** 手机端视图:列表 ⇄ 编辑器单栏切换 */
   const [mobileView, setMobileView] = useState<'list' | 'editor'>('list');
   /** 是否处于手机视口(<768px):mobile-view-* 类只在手机视口下挂载 */
@@ -690,7 +742,9 @@ export default function App() {
         [s.search]: () => { e.preventDefault(); setShowSearch(true); },
         [s.toggle_graph]: () => { e.preventDefault(); handleNavClick(activeNav === 'graph' ? 'notes' : 'graph'); },
         [s.toggle_left_sidebar]: () => { e.preventDefault(); setLeftSidebarCollapsed(prev => !prev); },
-        [s.toggle_right_sidebar]: () => { e.preventDefault(); setRightPanelOpen(prev => !prev); },
+        // [拖拽调宽] 修复:原 toggle_right_sidebar 切废弃布尔 rightPanelOpen,对真实右 dock 无效;
+        // 改为切换 rightDockOpen,控制 PaneWorkspace 右 dock 整体展开/收起(与左栏 Ctrl+[ 对称)。
+        [s.toggle_right_sidebar]: () => { e.preventDefault(); setRightDockOpen(prev => !prev); },
       };
       shortcuts[pressed]?.();
     };
@@ -819,6 +873,14 @@ export default function App() {
         />
       </div>
 
+      {/* [拖拽调宽] 左侧栏调宽分隔线(桌面显示;拖动改 --sidebar-width,已记忆 localStorage) */}
+      <div
+        ref={sidebarResizerRef}
+        className="sidebar-resizer"
+        onPointerDown={onSidebarResizerDown}
+        title="拖拽调整左侧栏宽度"
+      />
+
       {/* 笔记列表(桌面/平板并排;手机单栏切换)——M3 嵌套可折叠文件夹树 */}
       <div data-panel="note-list">
         <NoteList
@@ -851,6 +913,7 @@ export default function App() {
               onLayoutChange={setPaneLayout}
               renderPane={renderPane}
               paneEnabled={isPaneAddable}
+              rightOpen={rightDockOpen}
             />
           ) : !workspaceView ? (
             activeNav === 'trash' ? (
