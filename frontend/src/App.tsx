@@ -27,7 +27,7 @@ import type { PaneId, PaneLayout } from './components/pane/types';
 import { PANE_META } from './components/pane/types';
 import { StrokeIcon } from './icons';
 import { KanbanPane } from './components/KanbanPane';
-import { getFrontendPlugin, getViewPlugin, getNavPlugins, subscribeFrontendPlugins } from './plugins/registry';
+import { getFrontendPlugin, getViewPlugin, getNavPlugins, subscribeFrontendPlugins, isPaneAddable } from './plugins/registry';
 import { withKanbanStatus } from './utils/frontmatter';
 import './App.css';
 
@@ -485,6 +485,34 @@ export default function App() {
     showToast(`看板:已移至「${status}」`);
   }, [selectedNote?.id, showToast]);
 
+  /** [M11 收尾] 看板「新建卡片」= 新建一条带目标列 status 的空笔记(复用保存管线,新建即落库) */
+  const handleCreateKanbanCard = useCallback(async (status: string) => {
+    const content = withKanbanStatus('', status);
+    const newNote: Note = {
+      id: crypto.randomUUID(),
+      title: '无标题',
+      content,
+      created_at: Date.now(),
+      updated_at: Date.now(),
+      tags: [],
+      folder_id: selectedFolderId,
+      is_encrypted: false,
+      sync_status: 'pending',
+    };
+    await backend.saveNote(newNote);
+    setNotes(prev => [newNote, ...prev]);
+    showToast(`已在「${status}」新建卡片`);
+  }, [selectedFolderId, showToast]);
+
+  /** [M11 收尾] 看板「改标题」= 改笔记标题并持久化(复用编辑/保存流程) */
+  const handleRenameKanbanCard = useCallback(async (note: Note, title: string) => {
+    const updated = { ...note, title, updated_at: Date.now(), sync_status: 'pending' as const };
+    await backend.saveNote(updated);
+    setNotes(prev => prev.map(n => n.id === note.id ? updated : n));
+    if (selectedNote?.id === note.id) setSelectedNote(updated);
+    showToast('卡片标题已更新');
+  }, [selectedNote?.id, showToast]);
+
   // ==================== [M3.5b 回收站] ====================
 
   const handleRestoreNote = async (id: string) => {
@@ -757,6 +785,8 @@ export default function App() {
             notes={notes}
             onSetStatus={handleSetKanbanStatus}
             onOpenNote={(noteId) => jumpToNote({ id: noteId, title: '' })}
+            onNewCard={handleCreateKanbanCard}
+            onRename={handleRenameKanbanCard}
           />
         );
       default:
@@ -764,7 +794,8 @@ export default function App() {
     }
   }, [selectedNote, folders, handleSaveNote, handleDeleteNote, settings, pomodoroEnabled,
       handleLinkClick, handleTitleChange, noteBlocks, notes, selectedFolderId, selectedTag,
-      tags, handleNewNote, closePane, togglePane, jumpToNote, graphKey, showToast, handleSetKanbanStatus]);
+      tags, handleNewNote, closePane, togglePane, jumpToNote, graphKey, showToast, handleSetKanbanStatus,
+      handleCreateKanbanCard, handleRenameKanbanCard]);
 
   if (isLoading) return <div className="loading">加载中...</div>;
 
@@ -824,6 +855,7 @@ export default function App() {
               layout={paneLayout}
               onLayoutChange={setPaneLayout}
               renderPane={renderPane}
+              paneEnabled={isPaneAddable}
             />
           ) : !workspaceView ? (
             activeNav === 'trash' ? (
@@ -871,6 +903,8 @@ export default function App() {
               notes={notes}
               onSetStatus={handleSetKanbanStatus}
               onOpenNote={(noteId) => jumpToNote({ id: noteId, title: '' })}
+              onNewCard={handleCreateKanbanCard}
+              onRename={handleRenameKanbanCard}
             />
           ) : (
             /* 手机端单栏:直接渲染编辑器(工作区 Pane 在手机隐藏,底栏切换) */

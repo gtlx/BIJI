@@ -172,3 +172,26 @@ export function getFrontendPluginsForManager(): {
     enabled: isFrontendPluginEnabled(p.id),
   }));
 }
+
+/* ------------------------------------------------------------------ */
+/* [M11 收尾] 「添加面板」候选与插件 enable 衔接                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 按分栏面板 id 反查提供它的前端插件(pane 型插件的 paneId 与之对应)。
+ * 无则返回 undefined —— 该面板为核心内置面板,不依赖任何前端插件。
+ */
+export function getFrontendPluginByPane(paneId: PaneId): FrontendPlugin | undefined {
+  return FRONTEND_PLUGINS.find(p => p.paneId === paneId);
+}
+
+/**
+ * 判断某分栏面板当前是否应出现在「添加面板」菜单里:
+ * - 核心内置面板(无对应前端插件,如 outline/calendar 等)→ 恒可添加;
+ * - 由前端插件提供(如 kanban)→ 仅当该插件已启用才可添加(关闭插件后标题不再入菜单)。
+ * 「添加面板」候选列表由 PANE_META 驱动(非插件注册表),这里补上 enable 关注,与导航/渲染一致。
+ */
+export function isPaneAddable(paneId: PaneId): boolean {
+  const plugin = getFrontendPluginByPane(paneId);
+  return plugin ? isFrontendPluginEnabled(plugin.id) : true;
+}

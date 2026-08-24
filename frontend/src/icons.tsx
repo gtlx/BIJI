@@ -306,6 +306,21 @@ const S_KANBAN = (
   </>
 );
 
+/** [M11 看板] 列内排序:上移箭头 */
+const S_CHEVRON_UP = (
+  <>
+    <path d="m18 15-6-6-6 6" />
+  </>
+);
+
+/** [M11 看板] 重命名卡片:铅笔 */
+const S_EDIT = (
+  <>
+    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+    <path d="m15 5 4 4" />
+  </>
+);
+
 /** Stroke 图标注册表:name → 子元素(与 ICON_PATHS 互补,供导航/工具按钮使用) */
 export const STROKE_ICONS: Record<string, React.ReactNode> = {
   notes: S_NOTES,
@@ -333,6 +348,10 @@ export const STROKE_ICONS: Record<string, React.ReactNode> = {
   download: S_DOWNLOAD,
   /** [M11 看板] 看板:三列卡片 */
   kanban: S_KANBAN,
+  /** [M11 看板] 列内排序上移 */
+  chevron_up: S_CHEVRON_UP,
+  /** [M11 看板] 重命名卡片铅笔 */
+  edit: S_EDIT,
 };
 
 /** Stroke 图标组件 — 按名称取素材,渲染为统一 stroke 风格 */

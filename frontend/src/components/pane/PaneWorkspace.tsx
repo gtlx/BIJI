@@ -26,6 +26,12 @@ interface PaneWorkspaceProps {
   onLayoutChange: (l: PaneLayout) => void;
   /** 渲染某个面板的内容(模块组件由父级按 id 分发) */
   renderPane: (id: PaneId) => React.ReactNode;
+  /**
+   * [M11 收尾] 判断某分栏面板可否被「添加面板」菜单恢复(默认恒可)。
+   * 用于把 PANE_META 驱动的候选列表对接前端插件 enable:插件提供的面板
+   * (如看板 kanban)在该插件被禁用时从「添加面板」菜单消失,与导航/渲染行为一致。
+   */
+  paneEnabled?: (id: PaneId) => boolean;
 }
 
 /** 拖动中的目标:插入到某 row 某 tab 前/后 */
@@ -42,7 +48,7 @@ interface EdgeTarget {
 let rowSeq = 0;
 const nextRowId = () => `row-${Date.now().toString(36)}-${rowSeq++}`;
 
-export function PaneWorkspace({ layout, onLayoutChange, renderPane }: PaneWorkspaceProps) {
+export function PaneWorkspace({ layout, onLayoutChange, renderPane, paneEnabled }: PaneWorkspaceProps) {
   const dockRef = useRef<HTMLDivElement>(null);
 
   /** 正在拖拽的面板 + 来源 row */
@@ -267,7 +273,10 @@ export function PaneWorkspace({ layout, onLayoutChange, renderPane }: PaneWorksp
   // ---------------- 渲染 ----------------
 
   const activeOf = (r: PaneRow) => activeOverride[r.id] ?? r.active ?? 0;
-  const canAdd = layout.hidden.length > 0;
+  // [M11 收尾] 「添加面板」只列「已关闭且当前可恢复」的面板:
+  // 插件提供的面板若其插件被禁用,则不再出现在候选里(避免关了插件还把它加回来)。
+  const addableHidden = layout.hidden.filter(id => paneEnabled ? paneEnabled(id) : true);
+  const canAdd = addableHidden.length > 0;
 
   return (
     <div className="pane-workspace">
@@ -400,7 +409,7 @@ export function PaneWorkspace({ layout, onLayoutChange, renderPane }: PaneWorksp
               <StrokeIcon name="plus" size={16} />
             </button>
             <div className={`pane-add-menu ${menuOpen ? 'open' : ''}`}>
-              {PANE_REGISTRY.filter(m => layout.hidden.includes(m.id)).map(m => (
+              {PANE_REGISTRY.filter(m => addableHidden.includes(m.id)).map(m => (
                 <button key={m.id} className="pane-add-item"
                   onClick={() => { addPane(m.id); setMenuOpen(false); }}>
                   <StrokeIcon name={m.icon} size={15} />
