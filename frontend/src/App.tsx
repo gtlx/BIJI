@@ -32,6 +32,13 @@ import { StrokeIcon } from './icons';
 import { KanbanPane } from './components/KanbanPane';
 import { getFrontendPlugin, getViewPlugin, getNavPlugins, subscribeFrontendPlugins, isPaneAddable } from './plugins/registry';
 import { withKanbanStatus } from './utils/frontmatter';
+import {
+  type FolderPresetConfig,
+  PRESET_LABELS,
+  findTopLevelFolder,
+  getPresetForFolder,
+  resolvePreset,
+} from './utils/folderPresets';
 import './App.css';
 
 interface ToastItem {
@@ -113,6 +120,23 @@ function readTabPosition(): NoteTabPosition {
   try { return localStorage.getItem(NOTE_TAB_POS_KEY) === 'left' ? 'left' : 'top'; } catch { return 'top'; }
 }
 
+/** [顶层目录预设] 顶层目录 → 预设映射的本地存储键 */
+const FOLDER_PRESETS_KEY = 'biji.folderPresets';
+
+/** 读「顶层目录预设」配置(JSON 数组;非法/异常回退空) */
+function readFolderPresets(): FolderPresetConfig[] {
+  try {
+    const raw = localStorage.getItem(FOLDER_PRESETS_KEY);
+    if (!raw) return [];
+    const p = JSON.parse(raw);
+    if (!Array.isArray(p)) return [];
+    return p.filter((x: unknown) =>
+      x && typeof (x as FolderPresetConfig).folderId === 'string' &&
+      typeof (x as FolderPresetConfig).type === 'string',
+    ) as FolderPresetConfig[];
+  } catch { return []; }
+}
+
 export default function App() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -185,6 +209,8 @@ export default function App() {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   /** [M3.5b 笔记模板] 模板列表(内置 + 自定义) */
   const [templates, setTemplates] = useState<NoteTemplate[]>(DEFAULT_TEMPLATES as NoteTemplate[]);
+  /** [顶层目录预设] 顶层目录 → 用途预设 映射(localStorage 记忆;单库内分类,不引入多 vault) */
+  const [folderPresets, setFolderPresets] = useState<FolderPresetConfig[]>(() => readFolderPresets());
   /** [M3.5b 笔记模板] 是否显示「新建笔记选模板」弹窗 */
   const [showNewNoteModal, setShowNewNoteModal] = useState(false);
   /** [M3.5b 回收站] 回收站中的笔记与块 */
@@ -328,6 +354,11 @@ export default function App() {
   useEffect(() => {
     try { localStorage.setItem(NOTE_TAB_POS_KEY, tabPosition); } catch { /* 忽略 */ }
   }, [tabPosition]);
+
+  // [顶层目录预设] 顶层目录 → 预设 映射落 localStorage(设置里即时生效)
+  useEffect(() => {
+    try { localStorage.setItem(FOLDER_PRESETS_KEY, JSON.stringify(folderPresets)); } catch { /* 忽略 */ }
+  }, [folderPresets]);
 
   // 标签标题:从 notes 解析(未知名回退「未命名」)
   const tabTitles = useMemo(() => {
@@ -550,11 +581,41 @@ export default function App() {
   };
 
   const handleNewNote = async () => {
-    // [M3.5b] 打开模板选择弹窗(空白/日记/会议/读书/自定义)
-    setShowNewNoteModal(true);
+    // [顶层目录预设] 若当前目录所属顶层目录绑定了预设 → 直接按预设自动新建(模板+命名),
+    // 否则打开模板选择弹窗(空白/日记/会议/读书/自定义)。
+    const top = findTopLevelFolder(folders, selectedFolderId);
+    const preset = getPresetForFolder(folderPresets, top?.id ?? null);
+    if (preset && preset.type !== 'none') {
+      await createNoteFromPreset(preset);
+    } else {
+      setShowNewNoteModal(true);
+    }
   };
 
-  /** [M3.5b] 从所选模板新建笔记(替换 {{date}} 为当天日期;自定义模板先落库) */
+  /** [顶层目录预设] 按顶层目录绑定的预设自动新建:套用预设模板 + 按命名规则生成标题 */
+  const createNoteFromPreset = async (preset: FolderPresetConfig) => {
+    setShowNewNoteModal(false);
+    const resolved = resolvePreset(preset, templates, new Date());
+    const newNote: Note = {
+      id: crypto.randomUUID(),
+      title: resolved.title,
+      content: resolved.content,
+      created_at: Date.now(),
+      updated_at: Date.now(),
+      tags: [],
+      folder_id: selectedFolderId,
+      is_encrypted: false,
+      sync_status: 'pending',
+    };
+    await backend.saveNote(newNote);
+    setNotes(prev => [newNote, ...prev]);
+    setSelectedNote(newNote);
+    setActiveNav('notes');
+    setMobileView('editor');
+    showToast(`已用「${PRESET_LABELS[preset.type]}」预设创建笔记`);
+  };
+
+  /** [M3.5b] 从所选模板新建笔记(替换 {{date}}/{{title}};自定义模板先落库) */
   const createNoteFromTemplate = async (template: NoteTemplate) => {
     setShowNewNoteModal(false);
     let content = template.content || '';
@@ -566,6 +627,7 @@ export default function App() {
       setTemplates(prev => [...prev, { ...template, id: templateId }]);
     }
     content = content.replace(/\{\{date\}\}/g, new Date().toLocaleDateString('zh-CN'));
+    content = content.replace(/\{\{title\}\}/g, '无标题');
     const newNote: Note = {
       id: crypto.randomUUID(),
       title: '无标题',
@@ -1127,6 +1189,9 @@ export default function App() {
       {showSettings && settings && (
         <SettingsModal
           settings={settings}
+          folders={folders}
+          folderPresets={folderPresets}
+          onFolderPresetsChange={setFolderPresets}
           plugins={plugins}
           onClose={() => setShowSettings(false)}
           onSave={handleSettingsChange}

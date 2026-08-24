@@ -1,11 +1,26 @@
 import { useState, useEffect } from 'react';
 import { backend } from '../api';
-import type { Note, AppSettings, Plugin, NoteTemplate } from '../api/backend';
+import type { Note, AppSettings, Plugin, NoteTemplate, Folder } from '../api/backend';
 import { DEFAULT_TEMPLATES } from '../api/backend';
+import {
+  type FolderPresetConfig,
+  PRESET_LABELS,
+  PRESET_DEFAULT_TEMPLATE_ID,
+  PRESET_DEFAULT_NAMING,
+  upsertPreset,
+  removePreset,
+  getPresetForFolder,
+} from '../utils/folderPresets';
 import './SettingsModal.css';
 
 interface SettingsModalProps {
   settings: AppSettings;
+  /** [顶层目录预设] 全部文件夹(含嵌套;只对顶层目录配置用途预设) */
+  folders: Folder[];
+  /** [顶层目录预设] 顶层目录 → 预设 映射 */
+  folderPresets: FolderPresetConfig[];
+  /** [顶层目录预设] 变更预设即即时生效(localStorage) */
+  onFolderPresetsChange: (p: FolderPresetConfig[]) => void;
   plugins: Plugin[];
   onClose: () => void;
   onSave: (settings: Partial<AppSettings>) => Promise<void>;
@@ -13,6 +28,16 @@ interface SettingsModalProps {
   /** [M11 收尾] 恢复默认工作区布局(清掉用户/旧版布局记忆) */
   onResetLayout: () => void;
 }
+
+/** 顶层目录用途预设可选项(列表顺序即优先级;none = 无预设) */
+const PRESET_TYPE_OPTIONS: { value: string; label: string }[] = [
+  { value: 'none', label: '无预设(新建时选模板)' },
+  { value: 'diary', label: '日记(日期命名)' },
+  { value: 'manual', label: '手册(结构标题)' },
+  { value: 'knowledge', label: '知识库(双链/结构)' },
+  { value: 'project', label: '项目(状态模板)' },
+  { value: 'custom', label: '自定义' },
+];
 
 /** 快捷键条目:key = ShortcutSettings 字段名,label = 中文名 */
 const SHORTCUT_FIELDS: { key: keyof AppSettings['shortcuts']; label: string }[] = [
@@ -31,7 +56,7 @@ const SHORTCUT_FIELDS: { key: keyof AppSettings['shortcuts']; label: string }[] 
   { key: 'toggle_editor_mode', label: '编辑器模式' },
 ];
 
-export function SettingsModal({ settings, plugins, onClose, onSave, onTogglePlugin, onResetLayout }: SettingsModalProps) {
+export function SettingsModal({ settings, folders, folderPresets, onFolderPresetsChange, plugins, onClose, onSave, onTogglePlugin, onResetLayout }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState('appearance');
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
 
@@ -81,6 +106,34 @@ export function SettingsModal({ settings, plugins, onClose, onSave, onTogglePlug
     setLocalSettings(prev => ({ ...prev, shortcuts: { ...prev.shortcuts, [key]: value } }));
   };
 
+  /** [顶层目录预设] 顶层目录(parent_id 为 null)列表 */
+  const topFolders = folders.filter(f => f.parent_id == null);
+
+  /** [顶层目录预设] 切换某顶层目录的预设类型(套用该类型默认模板/命名;none 清除绑定) */
+  const handlePresetTypeChange = (folderId: string, type: string) => {
+    if (type === 'none') { onFolderPresetsChange(removePreset(folderPresets, folderId)); return; }
+    onFolderPresetsChange(upsertPreset(folderPresets, {
+      folderId,
+      type: type as FolderPresetConfig['type'],
+      templateId: PRESET_DEFAULT_TEMPLATE_ID[type as FolderPresetConfig['type']] || '',
+      namingPattern: PRESET_DEFAULT_NAMING[type as FolderPresetConfig['type']] || '{{title}}',
+    }));
+  };
+
+  /** [顶层目录预设] 绑定模板(id 变更;自定义或覆盖类型默认) */
+  const handlePresetTemplateChange = (folderId: string, templateId: string) => {
+    const cfg = getPresetForFolder(folderPresets, folderId);
+    if (!cfg) return;
+    onFolderPresetsChange(upsertPreset(folderPresets, { ...cfg, templateId }));
+  };
+
+  /** [顶层目录预设] 命名规则({{date}} / {{title}} 变量) */
+  const handlePresetNamingChange = (folderId: string, namingPattern: string) => {
+    const cfg = getPresetForFolder(folderPresets, folderId);
+    if (!cfg) return;
+    onFolderPresetsChange(upsertPreset(folderPresets, { ...cfg, namingPattern }));
+  };
+
   const tabs = [
     { id: 'appearance', label: '外观' },
     { id: 'editor', label: '编辑器' },
@@ -88,6 +141,7 @@ export function SettingsModal({ settings, plugins, onClose, onSave, onTogglePlug
     { id: 'workspace', label: '工作区' },
     { id: 'shortcuts', label: '快捷键' },
     { id: 'templates', label: '模板' },
+    { id: 'presets', label: '目录预设' },
     { id: 'sync', label: '同步' },
     { id: 'plugins', label: '插件' },
     { id: 'about', label: '关于' },
@@ -229,6 +283,52 @@ export function SettingsModal({ settings, plugins, onClose, onSave, onTogglePlug
                     value={newTemplateContent} onChange={e => setNewTemplateContent(e.target.value)} />
                   <button className="btn btn-secondary" onClick={handleAddTemplate}>新增自定义模板</button>
                 </div>
+              </div>
+            )}
+
+            {activeTab === 'presets' && (
+              <div className="settings-section">
+                <h3>顶层目录用途预设</h3>
+                <p className="settings-hint">单笔记库内靠顶层文件夹分类用途。为某个顶层目录绑定预设后,在其下新建笔记会自动套用对应模板与命名规则(知识仍互通,不做多 vault)。仅顶层目录(不带父级)可配置;子文件夹自动继承所属顶层目录的预设。更改即时生效(存于本地)。</p>
+                {topFolders.length === 0 && (
+                  <p className="settings-hint">暂无顶层目录,请先在左侧创建文件夹。</p>
+                )}
+                {topFolders.map(folder => {
+                  const cfg = getPresetForFolder(folderPresets, folder.id);
+                  const type = cfg?.type ?? 'none';
+                  return (
+                    <div key={folder.id} className="preset-row">
+                      <div className="preset-folder">
+                        <span className={`preset-folder-dot${folder.color ? '' : ''}`} style={folder.color ? { background: folder.color } : undefined} />
+                        <span className="preset-folder-name">{folder.name || '未命名文件夹'}</span>
+                        {cfg && cfg.type !== 'none' && (
+                          <span className={`preset-badge badge-${cfg.type}`}>{PRESET_LABELS[cfg.type]}</span>
+                        )}
+                      </div>
+                      <label className="preset-field">
+                        <span>预设</span>
+                        <select value={type} onChange={e => handlePresetTypeChange(folder.id, e.target.value)}>
+                          {PRESET_TYPE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                        </select>
+                      </label>
+                      {cfg && cfg.type !== 'none' && (
+                        <>
+                          <label className="preset-field">
+                            <span>模板</span>
+                            <select value={cfg.templateId} onChange={e => handlePresetTemplateChange(folder.id, e.target.value)}>
+                              {templates.map(t => <option key={t.id} value={t.id}>{t.name}{t.is_builtin ? '(内置)' : '(自定义)'}</option>)}
+                            </select>
+                          </label>
+                          <label className="preset-field">
+                            <span>命名</span>
+                            <input type="text" value={cfg.namingPattern} placeholder="{{date}} 或 {{title}}"
+                              onChange={e => handlePresetNamingChange(folder.id, e.target.value)} />
+                          </label>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
 

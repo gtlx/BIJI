@@ -401,10 +401,14 @@ export const DEFAULT_SHORTCUTS: ShortcutSettings = {
   toggle_editor_mode: 'Ctrl+E',
 };
 
-// 默认模板(前端兜底,真实后端以 getTemplates 为准)
+// 默认模板(前端兜底,真实后端以 getTemplates 为准)。含顶层目录预设的四个内置模板:
+// 日记 / 手册 / 知识库 / 项目(供「顶层目录预设」绑定,也作为普通模板可选)。
 export const DEFAULT_TEMPLATES = [
   { id: 'blank', name: '空白笔记', content: '', category: 'blank' },
   { id: 'diary', name: '日记', content: '# {{date}}\n\n## 天气\n\n## 今日要点\n\n## 明日计划\n', category: 'diary' },
+  { id: 'manual', name: '手册', content: '# {{title}}\n\n## 概述\n\n## 使用\n\n## 配置\n\n## 常见问题\n', category: 'manual' },
+  { id: 'knowledge', name: '知识库', content: '# {{title}}\n\n## 摘要\n\n## 正文\n\n## 相关笔记\n\n[[相关笔记]]\n', category: 'knowledge' },
+  { id: 'project', name: '项目', content: '# {{title}}\n\n## 目标\n\n## 当前状态:进行中\n\n## 任务\n- [ ] \n\n## 备注\n', category: 'project' },
   { id: 'meeting', name: '会议', content: '# {{date}} 会议纪要\n\n## 会议主题\n\n## 议程\n- \n- \n- \n\n## 讨论要点\n\n## 待办事项\n- [ ] \n', category: 'meeting' },
   { id: 'reading', name: '读书', content: '# 《书名》读书笔记\n\n## 内容概要\n\n## 我的笔记\n\n## 精彩摘录\n> \n', category: 'reading' },
 ];

@@ -12,11 +12,25 @@ interface NewNoteModalProps {
   onClose: () => void;
 }
 
-/** 预览内容(替换 {{date}} 并折叠) */
+/** 预览内容(替换 {{date}}/{{title}} 并折叠) */
 function previewText(t: NoteTemplate): string {
   const today = new Date().toLocaleDateString('zh-CN');
-  const c = (t.content || '').replace(/\{\{date\}\}/g, today);
+  const c = (t.content || '').replace(/\{\{date\}\}/g, today).replace(/\{\{title\}\}/g, t.name);
   return c.trim() || '(空模板)';
+}
+
+/** 模板类别 → 一句话简介(新建弹窗卡片描述) */
+function categoryDesc(t: NoteTemplate): string {
+  switch (t.category) {
+    case 'blank': return '空白文档';
+    case 'diary': return '日期 / 天气 / 今日要点';
+    case 'manual': return '概述 / 使用 / 配置';
+    case 'knowledge': return '摘要 / 正文 / 双链';
+    case 'project': return '目标 / 状态 / 任务';
+    case 'meeting': return '议程 / 讨论 / 待办';
+    case 'reading': return '书名 / 笔记 / 摘录';
+    default: return '自定义模板';
+  }
 }
 
 /** [M3.5b 笔记模板] 新建笔记时选模板(空白/日记/会议/读书/自定义 + 内容预览 + 自定义 CRUD) */
@@ -57,7 +71,7 @@ export function NewNoteModal({ templates, onSelect, onTemplatesChange, onClose }
                   </span>
                   <span className="new-note-card-name">{t.name}</span>
                   <span className="new-note-card-desc">
-                    {t.category === 'blank' ? '空白文档' : t.category === 'diary' ? '日期 / 天气 / 今日要点' : t.category === 'meeting' ? '议程 / 讨论 / 待办' : t.category === 'reading' ? '书名 / 笔记 / 摘录' : '自定义模板'}
+                    {categoryDesc(t)}
                   </span>
                 </button>
                 <button
