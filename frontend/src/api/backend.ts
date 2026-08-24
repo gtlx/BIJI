@@ -24,6 +24,8 @@ export interface NoteFrontmatter {
   created?: string;
   updated?: string;
   completed?: boolean;
+  /** [M11 看板] 看板状态:待办 / 进行中 / 已完成(承载于 content 的 YAML frontmatter,不进块) */
+  status?: string;
 }
 
 export interface Folder {

@@ -24,7 +24,7 @@
  */
 
 /** 可用面板模块 id */
-export type PaneId = 'editor' | 'files' | 'outline' | 'backlinks' | 'graph' | 'calendar' | 'tags' | 'pomodoro';
+export type PaneId = 'editor' | 'files' | 'outline' | 'backlinks' | 'graph' | 'calendar' | 'tags' | 'pomodoro' | 'kanban';
 
 /** 右 dock 的一块:一组 tab(同块内面板可切换) */
 export interface PaneRow {
@@ -66,6 +66,7 @@ export const PANE_REGISTRY: PaneMeta[] = [
   { id: 'calendar', label: '日历', icon: 'calendar', zone: 'right' },
   { id: 'tags', label: '标签', icon: 'tag', zone: 'right' },
   { id: 'pomodoro', label: '番茄钟', icon: 'timer', zone: 'right' },
+  { id: 'kanban', label: '看板', icon: 'kanban', zone: 'right' },
 ];
 
 export const PANE_META: Record<PaneId, PaneMeta> = Object.fromEntries(
@@ -80,12 +81,13 @@ const nid = () => `row-${Date.now().toString(36)}-${seq++}`;
 
 /** 默认布局:左文件 | 主编辑器 | 右 dock(每个右 dock 模块各自独立成一块,不堆 tab 组) */
 export function defaultLayout(): PaneLayout {
+  // 看板不默认打开(避免右 dock 一开始就塞满),靠导航/Pane「添加面板」打开;其余右 dock 模块默认各一块
+  const openRight = RIGHT_PANES.filter(id => id !== 'kanban');
   return {
     main: 'editor',
     left: ['files'],
-    // 每个右 dock 模块默认独立一个 group(块),可自由上下分块/移动/合并
-    right: RIGHT_PANES.map(id => ({ id: nid(), panes: [id], active: 0 })),
-    hidden: [],
+    right: openRight.map(id => ({ id: nid(), panes: [id], active: 0 })),
+    hidden: RIGHT_PANES.filter(id => id === 'kanban'),
   };
 }
 

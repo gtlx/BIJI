@@ -8,5 +8,6 @@
     "cli": "cargo run -p biji-cli --",
     "frontend:dev": "cd frontend && npm run dev",
     "frontend:build": "cd frontend && npm run build"
-  }
+  },
+  "license": "AGPL-3.0"
 }

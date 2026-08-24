@@ -297,6 +297,15 @@ const S_DOWNLOAD = (
   </>
 );
 
+/** [M11 看板] 看板:三列卡片 */
+const S_KANBAN = (
+  <>
+    <path d="M6 5v14" />
+    <path d="M12 5v6" />
+    <path d="M18 5v11" />
+  </>
+);
+
 /** Stroke 图标注册表:name → 子元素(与 ICON_PATHS 互补,供导航/工具按钮使用) */
 export const STROKE_ICONS: Record<string, React.ReactNode> = {
   notes: S_NOTES,
@@ -322,6 +331,8 @@ export const STROKE_ICONS: Record<string, React.ReactNode> = {
   restore: S_RESTORE,
   template: S_TEMPLATE,
   download: S_DOWNLOAD,
+  /** [M11 看板] 看板:三列卡片 */
+  kanban: S_KANBAN,
 };
 
 /** Stroke 图标组件 — 按名称取素材,渲染为统一 stroke 风格 */

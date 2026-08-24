@@ -11,7 +11,6 @@ import { SettingsModal } from './components/SettingsModal';
 import { GraphView } from './components/GraphView';
 import { CalendarView } from './components/CalendarView';
 import { GitPanel } from './components/GitPanel';
-import { PublishPanel } from './components/PublishPanel';
 import { SearchModal } from './components/SearchModal';
 import { PluginManagerModal } from './components/PluginManagerModal';
 import { RightPanel } from './components/RightPanel';
@@ -27,6 +26,9 @@ import { loadLayout, saveLayout } from './components/pane/layoutStore';
 import type { PaneId, PaneLayout } from './components/pane/types';
 import { PANE_META } from './components/pane/types';
 import { StrokeIcon } from './icons';
+import { KanbanPane } from './components/KanbanPane';
+import { getFrontendPlugin, getViewPlugin, getNavPlugins } from './plugins/registry';
+import { withKanbanStatus } from './utils/frontmatter';
 import './App.css';
 
 interface ToastItem {
@@ -53,14 +55,22 @@ function sanitizeName(name: string): string {
   return (name || '未命名').replace(/[\\/:*?"<>|]/g, '_');
 }
 
-/** 应用导航(桌面左侧栏 = 移动端底部 Tab 栏的并集,商枢注册表思路) */
-const NAV_ITEMS: SidebarNavItem[] = [
+/** 核心导航项(硬编码,不插件化):笔记/日历/搜索/图谱/Git */
+const CORE_NAV_ITEMS: SidebarNavItem[] = [
   { id: 'notes', icon: 'notes', label: '笔记' },
   { id: 'calendar', icon: 'calendar', label: '日历' },
   { id: 'search', icon: 'search', label: '搜索' },
   { id: 'graph', icon: 'graph', label: '图谱' },
   { id: 'git', icon: 'git', label: 'Git' },
-  { id: 'publish', icon: 'publish', label: '发布' },
+];
+
+/** [M8] 前端插件生成的导航项(注册表驱动;发布=view,看板=pane) */
+const PLUGIN_NAV_ITEMS: SidebarNavItem[] = getNavPlugins().map(p => ({ id: p.id, icon: p.icon, label: p.label }));
+
+/** 应用导航(桌面左侧栏 = 移动端底部 Tab 栏的并集,商枢注册表思路)——核心 + 插件 + 工具项 */
+const NAV_ITEMS: SidebarNavItem[] = [
+  ...CORE_NAV_ITEMS,
+  ...PLUGIN_NAV_ITEMS,
   { id: 'plugins', icon: 'plugin', label: '插件' },
   { id: 'trash', icon: 'trash', label: '回收站' },
 ];
@@ -316,11 +326,25 @@ export default function App() {
       setWorkspaceView(true);
       setMobileView('editor');
       if (!isMobile) togglePane('graph');
-    } else if (id === 'git' || id === 'publish' || id === 'trash') {
+    } else if (id === 'git' || id === 'trash') {
+      // git/trash 仍为核心硬编码全屏视图
       setActiveNav(id);
       setWorkspaceView(false);
       setMobileView('editor');
       if (id === 'trash') loadTrash();
+    } else if (getFrontendPlugin(id)) {
+      // [M8] 前端插件导航:view 型 → 全屏主区;pane 型 → 打开/切换分栏面板
+      const plugin = getFrontendPlugin(id)!;
+      if (plugin.kind === 'view') {
+        setActiveNav(id);
+        setWorkspaceView(false);
+        setMobileView('editor');
+      } else if (plugin.kind === 'pane' && plugin.paneId) {
+        setActiveNav(id);
+        setWorkspaceView(true);
+        setMobileView('editor');
+        if (!isMobile) togglePane(plugin.paneId);
+      }
     } else if (id === 'plugins') {
       setShowPluginManager(true);
     } else if (id === 'settings') {
@@ -432,6 +456,22 @@ export default function App() {
     if (selectedNote?.id === id) setSelectedNote(null);
     showToast('笔记已删除(可到回收站恢复)');
   };
+
+  /** [M11 看板] 把笔记流转到看板某列:状态写入 content 的 frontmatter 并持久化(不进块,不破坏块级存储) */
+  const handleSetKanbanStatus = useCallback(async (note: Note, status: string) => {
+    const content = withKanbanStatus(note.content, status);
+    const updated: Note = {
+      ...note,
+      content,
+      frontmatter: { ...(note.frontmatter || {}), status: status || '待办' },
+      updated_at: Date.now(),
+      sync_status: 'pending',
+    };
+    await backend.saveNote(updated);
+    setNotes(prev => prev.map(n => n.id === note.id ? updated : n));
+    if (selectedNote?.id === note.id) setSelectedNote(updated);
+    showToast(`看板:已移至「${status}」`);
+  }, [selectedNote?.id, showToast]);
 
   // ==================== [M3.5b 回收站] ====================
 
@@ -699,12 +739,20 @@ export default function App() {
         );
       case 'pomodoro':
         return pomodoroEnabled ? <PomodoroTimer /> : <div className="pomodoro-disabled">番茄钟插件未启用,请到设置开启</div>;
+      case 'kanban':
+        return (
+          <KanbanPane
+            notes={notes}
+            onSetStatus={handleSetKanbanStatus}
+            onOpenNote={(noteId) => jumpToNote({ id: noteId, title: '' })}
+          />
+        );
       default:
         return null;
     }
   }, [selectedNote, folders, handleSaveNote, handleDeleteNote, settings, pomodoroEnabled,
       handleLinkClick, handleTitleChange, noteBlocks, notes, selectedFolderId, selectedTag,
-      tags, handleNewNote, closePane, togglePane, jumpToNote, graphKey, showToast]);
+      tags, handleNewNote, closePane, togglePane, jumpToNote, graphKey, showToast, handleSetKanbanStatus]);
 
   if (isLoading) return <div className="loading">加载中...</div>;
 
@@ -785,7 +833,13 @@ export default function App() {
             ) : activeNav === 'git' ? (
               <GitPanel onClose={() => handleNavClick('notes')} onOpenPublish={() => handleNavClick('publish')} />
             ) : (
-              <PublishPanel onClose={() => handleNavClick('notes')} />
+              (() => {
+                // [M8] view 型前端插件:按 activeNav 查注册表渲染全屏视图(目前=发布)
+                const vp = getViewPlugin(activeNav);
+                return vp?.renderView
+                  ? vp.renderView({ onClose: () => handleNavClick('notes'), showToast })
+                  : null;
+              })()
             )
           ) : isMobile && activeNav === 'graph' ? (
             <GraphView
@@ -799,6 +853,13 @@ export default function App() {
             />
           ) : isMobile && activeNav === 'calendar' ? (
             <CalendarView onSelectNote={jumpToNote} />
+          ) : isMobile && activeNav === 'kanban' ? (
+            // 手机端单栏:看板整页展示(工作区 Pane 在手机隐藏,底栏切换)
+            <KanbanPane
+              notes={notes}
+              onSetStatus={handleSetKanbanStatus}
+              onOpenNote={(noteId) => jumpToNote({ id: noteId, title: '' })}
+            />
           ) : (
             /* 手机端单栏:直接渲染编辑器(工作区 Pane 在手机隐藏,底栏切换) */
             <Editor

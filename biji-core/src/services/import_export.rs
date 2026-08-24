@@ -337,6 +337,12 @@ pub fn export_notes_obsidian_folder(
                 .join(", ");
             md.push_str(&format!("tags: [{}]\n", tags));
         }
+        // [M11 看板] 若笔记 frontmatter 承载了看板状态,导出时一并写入
+        if let Some(status) = note.frontmatter.as_ref().and_then(|fm| fm.status.as_deref()) {
+            if !status.is_empty() {
+                md.push_str(&format!("status: \"{}\"\n", status));
+            }
+        }
         md.push_str("---\n\n");
 
         // 块正文 + 每块时间戳 HTML 注释

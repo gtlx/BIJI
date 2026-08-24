@@ -100,6 +100,8 @@ pub fn parse_frontmatter(content: &str) -> Option<(NoteFrontmatter, &str)> {
                     "created" => frontmatter.created = Some(val),
                     "updated" => frontmatter.updated = Some(val),
                     "completed" => frontmatter.completed = Some(val == "true" || val == "yes"),
+                    // [M11 看板] 看板状态(待办/进行中/已完成);字符串透传
+                    "status" => frontmatter.status = Some(val),
                     _ => {}
                 }
             }
@@ -133,6 +135,17 @@ mod tests {
         let content = "---\ntags: [rust, note, app]\n---\n\nBody";
         let (fm, _) = parse_frontmatter(content).unwrap();
         assert_eq!(fm.tags, Some(vec!["rust".into(), "note".into(), "app".into()]));
+    }
+
+    #[test]
+    fn test_kanban_status() {
+        // [M11 看板] status 字段应能被解析出来(看板状态承载于 frontmatter)
+        let content = "---\ntitle: 任务\nstatus: 进行中\n---\n\nBody";
+        let (fm, _) = parse_frontmatter(content).unwrap();
+        assert_eq!(fm.status.as_deref(), Some("进行中"));
+        // 无 status 时默认 None
+        let plain = parse_frontmatter("---\ntitle: x\n---\n\nB").unwrap().0;
+        assert_eq!(plain.status, None);
     }
 
     #[test]

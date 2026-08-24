@@ -41,6 +41,8 @@ pub struct NoteFrontmatter {
     pub created: Option<String>,
     pub updated: Option<String>,
     pub completed: Option<bool>,
+    /// [M11 看板] 看板状态(待办/进行中/已完成);从 content 的 frontmatter 派生,不进块
+    pub status: Option<String>,
 }
 
 /// 笔记链接（[[链接]] 解析结果）
