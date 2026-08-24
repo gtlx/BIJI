@@ -98,6 +98,40 @@
 .calendar-cell:hover { transform: translateY(-2px); }
 .calendar-daynum { font-size: 13px; font-weight: 600; }
 
+/* [参考 RILI] 相邻月格子:灰显,点击跳转该月 */
+.calendar-cell.other-month {
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-tertiary);
+  opacity: 0.55;
+}
+.calendar-cell.other-month .calendar-daynum { color: var(--text-tertiary); }
+[data-theme='dark'] .calendar-cell.other-month { opacity: 0.5; }
+
+/* [参考 RILI] 今天高亮:清晰圆环 + 触点标记,一眼定位当日 */
+.calendar-cell.today {
+  outline: 2px solid var(--teal-600);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--accent-bg);
+}
+.calendar-today-dot {
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--teal-600);
+  box-shadow: 0 0 0 1px var(--glass-strong);
+}
+
+/* [参考 RILI] 周末着色:周六日区分(日期号暖色 + 空日微暖底),热力底色仍表示写作量 */
+.calendar-cell.weekend .calendar-daynum { color: var(--warning-color, #d97706); }
+.calendar-cell.weekend.heat-0 { background: rgba(217, 119, 6, 0.08); }
+[data-theme='dark'] .calendar-cell.weekend .calendar-daynum { color: #fbbf24; }
+[data-theme='dark'] .calendar-cell.weekend.heat-0 { background: rgba(251, 191, 36, 0.08); }
+
 /* 热力图色阶:薄荷绿 → teal(无写入最浅,写得多越深) */
 .calendar-cell.heat-0 { background: var(--bg-tertiary); color: var(--text-muted); }
 .calendar-cell.heat-1 { background: #ccfbf1; color: #115e59; }
@@ -105,7 +139,6 @@
 .calendar-cell.heat-3 { background: #2dd4bf; color: #042f2e; }
 .calendar-cell.heat-4 { background: #0d9488; color: #ffffff; }
 
-.calendar-cell.today { outline: 2px solid var(--teal-600); outline-offset: 1px; }
 .calendar-cell.selected { box-shadow: 0 0 0 3px var(--teal-500), var(--shadow-md); }
 
 .calendar-count {

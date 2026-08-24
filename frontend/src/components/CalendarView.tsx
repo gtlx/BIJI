@@ -89,14 +89,18 @@ export function CalendarView({ onSelectNote }: CalendarViewProps) {
     return max;
   }, [activity]);
 
-  // 生成月历格子:首位星期偏移 + 当月天数
-  const cells = useMemo(() => {
-    const firstWeekday = new Date(year, month, 1).getDay(); // 0=周日
+  // 生成月历格子(参考 RILI):铺满整周 —— 首日所在周的周日到末周周六,含相邻月开头/结尾显示为灰显。
+  // 相比原来只渲染当月日(前面补空),这样每行对齐、相邻月日可点跳转,日期显示更规整顺眼。
+  const gridCells = useMemo(() => {
+    const first = new Date(year, month, 1);
+    const startOfWeek = new Date(year, month, 1 - first.getDay()); // 首日所在周的周日
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const out: (number | null)[] = [];
-    for (let i = 0; i < firstWeekday; i++) out.push(null);
-    for (let d = 1; d <= daysInMonth; d++) out.push(d);
-    return out;
+    const total = Math.ceil((first.getDay() + daysInMonth) / 7) * 7;
+    const arr: Date[] = [];
+    for (let i = 0; i < total; i++) {
+      arr.push(new Date(startOfWeek.getFullYear(), startOfWeek.getMonth(), startOfWeek.getDate() + i));
+    }
+    return arr;
   }, [year, month]);
 
   /** 色阶:0 无写入;1..4 越写越深(薄荷绿→teal) */
@@ -105,8 +109,9 @@ export function CalendarView({ onSelectNote }: CalendarViewProps) {
     return Math.max(1, Math.min(4, Math.ceil((count / maxCount) * 4)));
   };
 
-  const dateStr = (d: number) =>
-    `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  /** 由 Date 生成 \"YYYY-MM-DD\"(供相邻月格子用) */
+  const dateStrFromDate = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const todayStr = toDay(Date.now());
 
   const prevMonth = () => setCursor(new Date(year, month - 1, 1));
@@ -139,25 +144,44 @@ export function CalendarView({ onSelectNote }: CalendarViewProps) {
         ))}
       </div>
 
-      {/* 月历网格(热力图着色) */}
+      {/* 月历网格(热力图着色;参考 RILI 铺满整周,今天/周末/相邻月灰显规范化) */}
       <div className="calendar-grid">
-        {cells.map((d, i) => {
-          if (d === null) return <div key={`blank-${i}`} className="calendar-cell blank" />;
-          const ds = dateStr(d);
+        {gridCells.map((d, i) => {
+          const isCurrent = d.getFullYear() === year && d.getMonth() === month;
+          const ds = dateStrFromDate(d);
+          const dow = d.getDay(); // 0=周日,6=周六
+          const isWeekend = dow === 0 || dow === 6;
+          const isToday = ds === todayStr;
+          const isSelected = ds === selectedDay;
+
+          // 相邻月格子:灰显,点击跳转该月(RILI 习惯)
+          if (!isCurrent) {
+            return (
+              <button
+                key={ds}
+                className={`calendar-cell other-month ${isToday ? 'today' : ''} ${isWeekend ? 'weekend' : ''}`}
+                onClick={() => setCursor(d)}
+                title={ds}
+              >
+                <span className="calendar-daynum">{d.getDate()}</span>
+                {isToday && <span className="calendar-today-dot" />}
+              </button>
+            );
+          }
+
           const act = activityMap.get(ds);
           const count = act ? act.created + act.updated : 0;
           const level = heatLevel(count);
-          const isToday = ds === todayStr;
-          const isSelected = ds === selectedDay;
           return (
             <button
               key={ds}
-              className={`calendar-cell heat-${level} ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}`}
+              className={`calendar-cell heat-${level} ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''} ${isWeekend ? 'weekend' : ''}`}
               onClick={() => setSelectedDay(isSelected ? null : ds)}
               title={count > 0 ? `${ds} · 写了 ${count} 块` : ds}
             >
-              <span className="calendar-daynum">{d}</span>
+              <span className="calendar-daynum">{d.getDate()}</span>
               {count > 0 && <span className="calendar-count">{count}</span>}
+              {isToday && <span className="calendar-today-dot" />}
             </button>
           );
         })}

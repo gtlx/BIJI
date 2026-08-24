@@ -1,0 +1,154 @@
+/* ============================================================
+   [渐进多标签] 打开历史笔记标签条
+   顶部横排(默认) / 左侧竖排(可切换)。薄荷绿/teal 毛玻璃,商枢风。
+   仅在桌面工作区(Editor pane)渲染:移动端不渲染,不挤占单栏。
+   ============================================================ */
+
+/* ---- 包裹 Editor 的外壳(标签条 + 编辑器) ---- */
+.note-tabs-shell {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+.note-tabs-shell.note-tabs-top {
+  flex-direction: column;
+}
+.note-tabs-shell.note-tabs-left {
+  flex-direction: row;
+}
+/* 标签条占固定位,编辑器填满剩余 */
+.note-tabs-shell .editor-container {
+  flex: 1;
+  min-width: 0;
+  height: auto;
+}
+
+/* ---- 标签条容器 ---- */
+.note-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  background: linear-gradient(180deg, var(--bg-tertiary), transparent);
+  border-bottom: 1px solid var(--border-color);
+  padding: 5px 8px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+/* 左侧竖排:纵向列,容器贴左缘,标签竖排 */
+.note-tabs.note-tabs-left {
+  flex-direction: column;
+  align-items: stretch;
+  width: 172px;
+  max-width: 200px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border-bottom: none;
+  border-right: 1px solid var(--border-color);
+  padding: 6px;
+}
+
+/* ---- 单个标签 ---- */
+.note-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.15s;
+  max-width: 180px;
+}
+.note-tab svg { color: var(--accent-color); flex-shrink: 0; }
+.note-tab-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.note-tab:hover {
+  background: var(--accent-bg);
+  border-color: var(--accent-color);
+  color: var(--text-primary);
+}
+.note-tab.active {
+  background: var(--accent-bg);
+  border-color: var(--accent-color);
+  color: var(--text-primary);
+  font-weight: 600;
+  box-shadow: 0 0 0 1px var(--accent-color);
+}
+/* 左侧竖排:标签撑满列宽,不必换行截断 */
+.note-tabs.note-tabs-left .note-tab {
+  width: 100%;
+  max-width: none;
+}
+/* 关闭按钮 */
+.note-tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s;
+  padding: 0;
+}
+.note-tab-close:hover {
+  background: var(--danger-bg);
+  color: var(--danger-color);
+}
+
+/* ---- 空态 ---- */
+.note-tabs-empty {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  flex: 1;
+  white-space: nowrap;
+}
+.note-tabs.note-tabs-left .note-tabs-empty {
+  writing-mode: vertical-rl;
+  margin: 0 auto;
+}
+
+/* ---- 位置切换按钮 ---- */
+.note-tabs-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-left: auto;
+  flex-shrink: 0;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: var(--glass-strong);
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.note-tabs-toggle:hover {
+  background: var(--accent-bg);
+  color: var(--teal-700);
+  border-color: var(--accent-color);
+}
+.note-tabs.note-tabs-left .note-tabs-toggle {
+  margin-left: 0;
+  margin-top: auto;
+  align-self: center;
+}

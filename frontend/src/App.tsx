@@ -22,6 +22,7 @@ import { MobileTabbar, type TabItem } from './components/MobileTabbar';
 import { CommandPalette, type CommandAction } from './components/CommandPalette';
 import { TemplateInsertModal } from './components/TemplateInsertModal';
 import { PaneWorkspace } from './components/pane/PaneWorkspace';
+import { NoteTabs, type NoteTabPosition } from './components/NoteTabs';
 import { TagsPane } from './components/TagsPane';
 import { PomodoroTimer } from './components/PomodoroTimer';
 import { loadLayout, saveLayout } from './components/pane/layoutStore';
@@ -89,6 +90,27 @@ function readStoredInt(key: string, def: number, min: number, max: number): numb
     const v = Number(raw);
     return Number.isFinite(v) ? Math.min(max, Math.max(min, Math.round(v))) : def;
   } catch { return def; }
+}
+
+/** [渐进多标签] 打开历史标签的本地存储键 */
+const OPEN_TABS_KEY = 'biji.openNoteTabs';
+const NOTE_TAB_POS_KEY = 'biji.noteTabPosition';
+
+/** 读打开笔记历史(localStorage;结构 = 笔记 id 数组 + 活动 id,便于将来升级真多标签) */
+function readOpenTabs(): { ids: string[]; activeId: string | null } {
+  try {
+    const raw = localStorage.getItem(OPEN_TABS_KEY);
+    if (!raw) return { ids: [], activeId: null };
+    const p = JSON.parse(raw);
+    const ids = Array.isArray(p?.ids) ? p.ids.filter((x: unknown) => typeof x === 'string') : [];
+    const activeId = typeof p?.activeId === 'string' && ids.includes(p.activeId) ? p.activeId : null;
+    return { ids, activeId };
+  } catch { return { ids: [], activeId: null }; }
+}
+
+/** 读标签排列偏好(默认顶部横排) */
+function readTabPosition(): NoteTabPosition {
+  try { return localStorage.getItem(NOTE_TAB_POS_KEY) === 'left' ? 'left' : 'top'; } catch { return 'top'; }
 }
 
 export default function App() {
@@ -180,6 +202,11 @@ export default function App() {
   /** [Pane] 模板插入弹窗开关 */
   const [showTemplateInsert, setShowTemplateInsert] = useState(false);
 
+  /** [渐进多标签] 本会话打开过的笔记历史(视图层记录,不参与数据模型;结构 = ids[] + activeId) */
+  const [openTabs, setOpenTabs] = useState<{ ids: string[]; activeId: string | null }>(() => readOpenTabs());
+  /** [渐进多标签] 标签排列偏好:顶部横排(默认) / 左侧竖排 */
+  const [tabPosition, setTabPosition] = useState<NoteTabPosition>(() => readTabPosition());
+
   // [M8 补] 前端插件 enable 状态:订阅注册表变化,驱动导航重算
   const [fpRev, setFpRev] = useState(0);
   useEffect(() => {
@@ -268,6 +295,80 @@ export default function App() {
   const removeToast = useCallback((id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
+
+  // ==================== [渐进多标签] 打开历史 ====================
+  // 依赖 selectedNote 驱动核心:只要换到一篇新笔记(文件树/搜索/双链/日历/图谱等任意入口),
+  // 都经全局 effect 记录到历史标签(去重,已在则移到末尾=激活)。不做任何数据模型改动。
+  useEffect(() => {
+    const id = selectedNote?.id;
+    if (!id) return;
+    setOpenTabs(prev => {
+      const ids = prev.ids.filter(x => x !== id);
+      return { ids: [...ids, id], activeId: id };
+    });
+  }, [selectedNote?.id]);
+
+  // 笔记被删除/不存在时,清理对应历史标签(避免残留失效标签)
+  useEffect(() => {
+    setOpenTabs(prev => {
+      const valid = prev.ids.filter(id => notes.some(n => n.id === id));
+      if (valid.length === prev.ids.length) return prev;
+      const activeId = prev.activeId !== null && valid.includes(prev.activeId)
+        ? prev.activeId
+        : (valid[valid.length - 1] ?? null);
+      return { ids: valid, activeId };
+    });
+  }, [notes]);
+
+  // 历史标签落 localStorage(重启保留;视图层记录,不接数据模型)
+  useEffect(() => {
+    try { localStorage.setItem(OPEN_TABS_KEY, JSON.stringify(openTabs)); } catch { /* 忽略 */ }
+  }, [openTabs]);
+  // 排列偏好落 localStorage
+  useEffect(() => {
+    try { localStorage.setItem(NOTE_TAB_POS_KEY, tabPosition); } catch { /* 忽略 */ }
+  }, [tabPosition]);
+
+  // 标签标题:从 notes 解析(未知名回退「未命名」)
+  const tabTitles = useMemo(() => {
+    const m: Record<string, string> = {};
+    openTabs.ids.forEach(id => {
+      const n = notes.find(x => x.id === id);
+      if (n) m[id] = n.title || '未命名';
+    });
+    return m;
+  }, [openTabs, notes]);
+
+  /** [渐进多标签] 点某标签 → 跳到该篇笔记(设 selectedNote + 打开;已在则激活) */
+  const handleSelectTab = useCallback((id: string) => {
+    const note = notes.find(n => n.id === id);
+    if (!note) return;
+    setOpenTabs(prev => ({ ids: [...prev.ids.filter(x => x !== id), id], activeId: id }));
+    setSelectedNote(note);
+    setActiveNav('notes');
+    setWorkspaceView(true);
+    setMobileView('editor');
+  }, [notes]);
+
+  /** [渐进多标签] 关闭某标签:移除历史;若关的是活动标签 → 跳到相邻标签(优先右侧,否则左侧),无则空态 */
+  const handleCloseTab = useCallback((id: string) => {
+    const idx = openTabs.ids.indexOf(id);
+    if (idx === -1) return;
+    const ids = openTabs.ids.filter(x => x !== id);
+    let activeId = openTabs.activeId;
+    if (openTabs.activeId === id) {
+      const neighbor = ids[Math.min(idx, ids.length - 1)] ?? ids[Math.max(idx - 1, 0)] ?? null;
+      activeId = neighbor;
+      if (neighbor) {
+        const n = notes.find(x => x.id === neighbor);
+        if (n) { setSelectedNote(n); setActiveNav('notes'); setWorkspaceView(true); setMobileView('editor'); }
+      } else {
+        setSelectedNote(null);
+        setMobileView('list');
+      }
+    }
+    setOpenTabs({ ids, activeId });
+  }, [openTabs, notes]);
 
   const loadData = useCallback(async () => {
     try {
@@ -759,23 +860,35 @@ export default function App() {
     switch (id) {
       case 'editor':
         return (
-          <Editor
-            note={selectedNote}
-            folders={folders}
-            onSelectFolder={setSelectedFolderId}
-            onSave={handleSaveNote}
-            onDelete={handleDeleteNote}
-            settings={settings}
-            syncEnabled={pomodoroEnabled}
-            onLinkClick={handleLinkClick}
-            onTitleChange={handleTitleChange}
-            noteBlocks={noteBlocks}
-            onRegisterApi={(api) => { editorApiRef.current = api; }}
-            onToggleOutline={() => { setWorkspaceView(true); togglePane('outline'); }}
-            onOpenBacklinks={() => { setWorkspaceView(true); togglePane('backlinks'); }}
-            onExportMarkdown={handleExportMarkdown}
-            onExportHtml={handleExportHtml}
-          />
+          <div className={`note-tabs-shell note-tabs-${tabPosition}`}>
+            {/* [渐进多标签] 顶部/左侧打开笔记历史标签条(仅桌面工作区渲染,移动端单栏不受影响) */}
+            <NoteTabs
+              ids={openTabs.ids}
+              activeId={openTabs.activeId}
+              getTitle={id => tabTitles[id] || '未命名'}
+              position={tabPosition}
+              onSelect={handleSelectTab}
+              onClose={handleCloseTab}
+              onTogglePosition={() => setTabPosition(p => p === 'top' ? 'left' : 'top')}
+            />
+            <Editor
+              note={selectedNote}
+              folders={folders}
+              onSelectFolder={setSelectedFolderId}
+              onSave={handleSaveNote}
+              onDelete={handleDeleteNote}
+              settings={settings}
+              syncEnabled={pomodoroEnabled}
+              onLinkClick={handleLinkClick}
+              onTitleChange={handleTitleChange}
+              noteBlocks={noteBlocks}
+              onRegisterApi={(api) => { editorApiRef.current = api; }}
+              onToggleOutline={() => { setWorkspaceView(true); togglePane('outline'); }}
+              onOpenBacklinks={() => { setWorkspaceView(true); togglePane('backlinks'); }}
+              onExportMarkdown={handleExportMarkdown}
+              onExportHtml={handleExportHtml}
+            />
+          </div>
         );
       case 'files':
         return (
@@ -844,7 +957,8 @@ export default function App() {
   }, [selectedNote, folders, handleSaveNote, handleDeleteNote, settings, pomodoroEnabled,
       handleLinkClick, handleTitleChange, noteBlocks, notes, selectedFolderId, selectedTag,
       tags, handleNewNote, closePane, togglePane, jumpToNote, graphKey, showToast, handleSetKanbanStatus,
-      handleCreateKanbanCard, handleRenameKanbanCard]);
+      handleCreateKanbanCard, handleRenameKanbanCard, openTabs, tabPosition, tabTitles,
+      handleSelectTab, handleCloseTab]);
 
   if (isLoading) return <div className="loading">加载中...</div>;
 
