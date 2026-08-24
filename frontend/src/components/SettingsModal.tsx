@@ -127,6 +127,14 @@ export function SettingsModal({ settings, folders, folderPresets, onFolderPreset
   const [debugMsg, setDebugMsg] = useState('');
   const [exportPath, setExportPath] = useState('');
   const [importPath, setImportPath] = useState('');
+  // [演变排序] 与编辑器共用的演变排序开关(读 localStorage 同键;默认关 = 仅常显时间戳)
+  const [evolutionSort, setEvolutionSort] = useState<boolean>(() => {
+    try {
+      const v = localStorage.getItem('biji.evolution_sort');
+      if (v !== null) return v === '1';
+      return localStorage.getItem('biji.timeline_mode') === '1'; // 旧键迁移兜底
+    } catch { return false; }
+  });
   // [需求①] 软件数据导入:隐藏 file 输入,供「导入软件数据」按钮触发
   const softwareFileInputRef = useRef<HTMLInputElement>(null);
   // [zip] 整库 zip 导入:隐藏 file 输入,供「从 zip 导入」按钮触发
@@ -228,6 +236,17 @@ export function SettingsModal({ settings, folders, folderPresets, onFolderPreset
         setFpRev(r => r + 1);
       }
     }
+  };
+
+  /** [演变排序] 设置里的演变排序开关:写 localStorage 并广播事件,让 Editor 实时重排(底层逻辑不动)。
+      与工具栏按钮共用同一开关、同一存储键。 */
+  const handleEvolutionSortChange = (checked: boolean) => {
+    setEvolutionSort(checked);
+    try {
+      localStorage.setItem('biji.evolution_sort', checked ? '1' : '0');
+      localStorage.removeItem('biji.timeline_mode'); // 清理旧键
+    } catch { /* ignore */ }
+    try { window.dispatchEvent(new CustomEvent('biji:evolution-sort-changed', { detail: checked })); } catch { /* ignore */ }
   };
 
   /** 展开/收起某插件行的详情(仅番茄钟行有详情设置) */
@@ -490,6 +509,12 @@ export function SettingsModal({ settings, folders, folderPresets, onFolderPreset
                   <span>自动保存</span>
                   <input type="checkbox" checked={localSettings.auto_save} onChange={e => setLocalSettings({ ...localSettings, auto_save: e.target.checked })} />
                 </label>
+                {/* [演变排序] 唯一的演变回归入口:开 = 时间戳基础上按创建时间重排并显示序号;关(默认)=仅常显时间戳 */}
+                <label className="settings-field">
+                  <span>演变排序</span>
+                  <input type="checkbox" checked={evolutionSort} onChange={e => handleEvolutionSortChange(e.target.checked)} />
+                </label>
+                <p className="settings-hint">开:块按创建时间重排并显示序号(展示「先写哪段后写哪段」);关(默认):仅显示每段更新时间。时间戳始终显示。</p>
                 <label className="settings-field">
                   <span>默认模板</span>
                   <select value={localSettings.template} onChange={e => setLocalSettings({ ...localSettings, template: e.target.value })}>

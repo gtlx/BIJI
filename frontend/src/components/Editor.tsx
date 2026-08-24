@@ -58,14 +58,17 @@ export function Editor({
   const [editorMode, setEditorMode] = useState<string>('markdown');
   const [previewMode, setPreviewMode] = useState<string>('live');
   const [frontmatter, setFrontmatter] = useState<NoteFrontmatter>({});
-  /** M2 可选开关:每段旁小字块时间戳(localStorage 记忆) */
-  const [showBlockTimestamps, setShowBlockTimestamps] = useState<boolean>(() => {
-    try { return localStorage.getItem('biji.show_block_timestamps') === '1'; } catch { return false; }
-  });
-  /** M3 演变模式:开启后块按创建时间重排(展示「先写哪段后写哪段」),退出恢复 sort_order */
+  /** [时间戳常显] 每段始终显示更新时间(合并后不再单独开关,默认常开;底层逻辑保留不动) */
+  const [showBlockTimestamps] = useState<boolean>(true);
+  /** M3 演变排序(原「演变模式/时间线重排」):开启后块按创建时间重排并显示序号,退出恢复 sort_order。
+      存储键改为 biji.evolution_sort(兼容旧键 biji.timeline_mode 作迁移兜底)。 */
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [timelineMode, setTimelineMode] = useState<boolean>(() => {
-    try { return localStorage.getItem('biji.timeline_mode') === '1'; } catch { return false; }
+    try {
+      const v = localStorage.getItem('biji.evolution_sort');
+      if (v !== null) return v === '1';
+      return localStorage.getItem('biji.timeline_mode') === '1'; // 旧键迁移兜底
+    } catch { return false; }
   });
   /** M3 块历史弹层:当前查看历史的块 + 其历史列表 */
   const [historyBlock, setHistoryBlock] = useState<NoteBlock | null>(null);
@@ -117,6 +120,21 @@ export function Editor({
   useEffect(() => {
     if (externalPreviewMode && externalPreviewMode !== previewMode) setPreviewMode(externalPreviewMode);
   }, [externalPreviewMode]);
+
+  /** [演变排序] 监听「设置」里演变排序开关的变更(localStorage 同键),实时同步本组件状态。
+      设置弹窗与工具栏共用同一开关,底层 timelineMode/排序逻辑不动。 */
+  useEffect(() => {
+    const syncEvolutionSort = () => {
+      try { setTimelineMode(localStorage.getItem('biji.evolution_sort') === '1'); } catch { /* ignore */ }
+    };
+    syncEvolutionSort(); // 与设置里已改过的值对齐
+    window.addEventListener('biji:evolution-sort-changed', syncEvolutionSort);
+    window.addEventListener('storage', syncEvolutionSort); // 多标签页同步
+    return () => {
+      window.removeEventListener('biji:evolution-sort-changed', syncEvolutionSort);
+      window.removeEventListener('storage', syncEvolutionSort);
+    };
+  }, []);
 
   const handleSave = useCallback(() => {
     if (!note) return;
@@ -281,20 +299,15 @@ export function Editor({
     }
   };
 
-  /** M2:块时间戳可选开关(记忆到 localStorage) */
-  const toggleBlockTimestamps = () => {
-    setShowBlockTimestamps(v => {
-      const next = !v;
-      try { localStorage.setItem('biji.show_block_timestamps', next ? '1' : '0'); } catch { /* ignore */ }
-      return next;
-    });
-  };
-
-  /** M3:演变模式开关(时间线重排,记忆到 localStorage) */
+  /** [演变排序开关] 唯一演变入口:开 = 时间戳基础上 + 按创建时间重排 + 序号;关(默认) = 仅常显时间戳。
+      存储到 localStorage 并清理旧键;时间戳不再单独关,无需块时间戳切换函数。 */
   const toggleTimelineMode = () => {
     setTimelineMode(v => {
       const next = !v;
-      try { localStorage.setItem('biji.timeline_mode', next ? '1' : '0'); } catch { /* ignore */ }
+      try {
+        localStorage.setItem('biji.evolution_sort', next ? '1' : '0');
+        localStorage.removeItem('biji.timeline_mode'); // 清理旧键,统一用新键
+      } catch { /* ignore */ }
       return next;
     });
   };
@@ -452,22 +465,14 @@ export function Editor({
             >
               <StrokeIcon name="trash" size={18} />
             </button>
+            {/* [演变排序] 唯一演变入口:关(默认)=仅常显时间戳;开=时间戳+按创建时间重排+序号 */}
             <button
               className={`outline-toggle-btn ${timelineMode ? 'active' : ''}`}
               onClick={toggleTimelineMode}
-              title={timelineMode ? '退出演变模式' : '演变模式:按块时间线重排(先写哪段后写哪段)'}
+              title={timelineMode ? '退出演变排序' : '演变排序:按块创建时间重排并显示序号(时间戳始终显示)'}
             >
               <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
                 <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm-1-13h2v6l4.28 2.54-1 1.72L11 13.6V7z"/>
-              </svg>
-            </button>
-            <button
-              className={`outline-toggle-btn block-time-toggle ${showBlockTimestamps ? 'active' : ''}`}
-              onClick={toggleBlockTimestamps}
-              title={showBlockTimestamps ? '隐藏块时间戳' : '显示块时间戳(每段更新时间)'}
-            >
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm1-13h-2v6l5.25 3.15 1-1.65-4.25-2.5V7z"/>
               </svg>
             </button>
             {editorMode === 'markdown' && (
