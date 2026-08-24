@@ -1009,6 +1009,7 @@ export default function App() {
             notes={notes}
             selectedTag={selectedTag}
             onSelectTag={setSelectedTag}
+            onOpenNote={(id, title) => jumpToNote({ id, title })}
           />
         );
       case 'pomodoro':
@@ -1042,10 +1043,6 @@ export default function App() {
           onNavClick={handleNavClick}
           collapsed={leftSidebarCollapsed}
           onToggleCollapse={() => setLeftSidebarCollapsed(prev => !prev)}
-          tags={tags}
-          notes={notes}
-          selectedTag={selectedTag}
-          onSelectTag={setSelectedTag}
         />
       </div>
 

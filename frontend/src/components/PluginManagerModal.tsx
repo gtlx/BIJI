@@ -15,26 +15,56 @@ interface PluginManagerModalProps {
 /**
  * 统一展示结构:后端插件(Promise 异步)与前端插件(同步数组)合并显示。
  * 二者来源/持久化方式不同,故显示层统一转成同构结构,开关动作各自分派。
+ *
+ * 同能力合并:同一能力分「后端能力插件」+「前端入口插件」两层(如发布:
+ * 后端 publish-plugin 提供 publish 能力 + 前端 publish 注册为入口),
+ * 插件管理里合并成一行「能力+入口」,避免出现两个「发布」。看板/日历等
+ * 纯前端插件无同名后端插件,各自单独一行。
  */
 interface UnifiedPlugin {
+  /** 展示用稳定键(合并行 = 'backend:xxx/frontend:yyy') */
   id: string;
   name: string;
   version: string;
   description: string;
   enabled: boolean;
-  /** backend = 由后端 biji-core 管理;publish 前端入口 + kanban 看板 = frontend */
-  source: 'backend' | 'frontend';
+  /** backend = 仅后端能力插件;frontend = 仅前端入口插件;both = 同能力前后端合并 */
+  source: 'backend' | 'frontend' | 'both';
+  /** 对应的后端插件 id(backend/both 时存在) */
+  backendId?: string;
+  /** 对应的前端插件 id(frontend/both 时存在) */
+  frontendId?: string;
 }
 
 /** 后端插件 → 统一展示结构 */
 function toUnified(p: Plugin): UnifiedPlugin {
   return {
-    id: p.id,
+    id: `backend:${p.id}`,
     name: p.name,
     version: p.version,
     description: p.description,
     enabled: p.enabled,
     source: 'backend',
+    backendId: p.id,
+  };
+}
+
+/** 前端插件 → 统一展示结构 */
+function frontToUnified(p: {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  enabled: boolean;
+}): UnifiedPlugin {
+  return {
+    id: `frontend:${p.id}`,
+    name: p.name,
+    version: p.version,
+    description: p.description,
+    enabled: p.enabled,
+    source: 'frontend',
+    frontendId: p.id,
   };
 }
 
@@ -47,31 +77,55 @@ export function PluginManagerModal({ onClose, onPluginChange }: PluginManagerMod
     backend.getPlugins().then(setBackendPlugins);
   }, []);
 
-  /** 合并列表:后端插件在前,前端插件在后,一眼可见「发布」「看板」 */
+  /** 合并列表:同能力的后端+前端合并成一行「both」,否则各自单独一行 */
   const merged = useMemo<UnifiedPlugin[]>(() => {
-    const frontendItems = getFrontendPluginsForManager().map(
-      (p): UnifiedPlugin => ({
-        id: p.id,
-        name: p.name,
-        version: p.version,
-        description: p.description,
-        enabled: p.enabled,
-        source: 'frontend',
-      }),
-    );
-    return [...backendPlugins.map(toUnified), ...frontendItems];
+    const backends = backendPlugins.map(toUnified);
+    const frontends = getFrontendPluginsForManager().map(frontToUnified);
+
+    const rows: UnifiedPlugin[] = [];
+    const takenFrontend = new Set<string>();
+    // 后端在前:发现同名前端入口 → 合并为「能力+入口」一行
+    for (const b of backends) {
+      const fr = frontends.find(f => f.name === b.name && !takenFrontend.has(f.id));
+      if (fr) {
+        takenFrontend.add(fr.id);
+        rows.push({
+          ...b,
+          id: `${b.id}/${fr.id}`,
+          source: 'both',
+          frontendId: fr.frontendId,
+          // 同能力开关合一:两端都开着才显示启用
+          enabled: b.enabled && fr.enabled,
+        });
+      } else {
+        rows.push(b);
+      }
+    }
+    // 剩余前端插件(看板/日历等纯前端)单独一行
+    for (const f of frontends) {
+      if (!takenFrontend.has(f.id)) rows.push(f);
+    }
+    return rows;
   }, [backendPlugins, fpRev]);
 
-  /** 开关动作:后端走 API + App 状态;前端走 localStorage 订阅,互不打架 */
+  /**
+   * 开关动作:后端走 API + App 状态;前端走 localStorage 订阅、互不打架。
+   * 合并行(source=both)同一能力两端一起切:关 = 能力停 + 入口停,开 = 两端都恢复。
+   */
   const handleToggle = async (item: UnifiedPlugin, enabled: boolean) => {
-    if (item.source === 'backend') {
-      await backend.togglePlugin(item.id, enabled);
-      const updated = backendPlugins.map(p => p.id === item.id ? { ...p, enabled } : p);
-      setBackendPlugins(updated);
-      onPluginChange(updated);
-    } else {
-      setFrontendPluginEnabled(item.id, enabled);
-      setFpRev(r => r + 1);
+    if (item.source === 'both' || item.source === 'backend') {
+      if (item.backendId) {
+        await backend.togglePlugin(item.backendId, enabled);
+        const updated = backendPlugins.map(p => p.id === item.backendId ? { ...p, enabled } : p);
+        setBackendPlugins(updated);
+        onPluginChange(updated);
+      }
+    }
+    if (item.source === 'both' || item.source === 'frontend') {
+      if (item.frontendId) {
+        setFrontendPluginEnabled(item.frontendId, enabled);
+        setFpRev(r => r + 1);
+      }
     }
   };
 
@@ -87,12 +141,12 @@ export function PluginManagerModal({ onClose, onPluginChange }: PluginManagerMod
             <p className="plugin-empty">正在加载插件列表…</p>
           ) : (
             merged.map(item => (
-              <div key={`${item.source}:${item.id}`} className="plugin-item">
+              <div key={item.id} className="plugin-item">
                 <div className="plugin-info">
                   <div className="plugin-name-row">
                     <span className="plugin-name">{item.name}</span>
                     <span className="plugin-source">
-                      {item.source === 'backend' ? '后端' : '前端'}
+                      {item.source === 'both' ? '能力+入口' : item.source === 'backend' ? '后端' : '前端'}
                     </span>
                   </div>
                   <span className="plugin-version">v{item.version}</span>

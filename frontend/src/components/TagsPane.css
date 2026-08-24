@@ -109,3 +109,50 @@
   flex-shrink: 0;
 }
 .tags-pane-item.active .tags-pane-count { background: var(--accent-bg); color: var(--teal-700); }
+
+/* [M3.5a→TagsPane] 展开标签 → 该标签下笔记列表(点击进笔记;替代已移除的侧栏标签树) */
+.tags-pane-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+.tags-pane-group {
+  display: flex;
+  flex-direction: column;
+}
+.tags-pane-notes {
+  display: flex;
+  flex-direction: column;
+  margin-left: 18px;
+  padding-left: 8px;
+  border-left: 1px solid var(--glass-border);
+}
+.tags-pane-note {
+  display: flex;
+  align-items: center;
+  padding: 5px 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+  text-align: left;
+}
+.tags-pane-note:hover { background: var(--accent-bg); color: var(--teal-700); }
+.tags-pane-note-title {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tags-pane-notes-empty {
+  color: var(--text-tertiary);
+  font-size: 12px;
+  padding: 4px 8px;
+}
