@@ -93,6 +93,8 @@ export function SettingsModal({ settings, folders, folderPresets, onFolderPreset
   const [importPath, setImportPath] = useState('');
   // [需求①] 软件数据导入:隐藏 file 输入,供「导入软件数据」按钮触发
   const softwareFileInputRef = useRef<HTMLInputElement>(null);
+  // [zip] 整库 zip 导入:隐藏 file 输入,供「从 zip 导入」按钮触发
+  const zipFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setLocalSettings(settings);
@@ -257,6 +259,52 @@ export function SettingsModal({ settings, folders, folderPresets, onFolderPreset
     } catch (err) {
       setDataMsg('导入失败: ' + (err instanceof Error ? err.message : String(err)));
     }
+  };
+
+  /**
+   * [zip 导出] 整库打包为 .zip 单文件并触发浏览器下载。
+   * web Mock 下用纯前端 STORE 方式**真实生成** .zip(可被任何 zip 工具打开);
+   * 真实写盘走 Tauri 壳(M6)的后端 export_notes_zip。zip 内容含每篇笔记的 .md 与清单。
+   */
+  const handleExportZip = async () => {
+    try {
+      const r = await backend.exportNotesZip();
+      if (r.success && r.blob) {
+        const url = URL.createObjectURL(r.blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `biji-notes-${new Date().toISOString().slice(0, 10)}.zip`;
+        a.click();
+        URL.revokeObjectURL(url);
+        setDataMsg(`已导出为 zip 并开始下载(web Mock 真实生成 .zip):${r.count} 条笔记。真实写盘在 Tauri 壳。`);
+      } else if (r.success && r.path) {
+        setDataMsg(`已导出为 zip 到「${r.path}」:${r.count} 条。`);
+      } else {
+        setDataMsg(`导出失败:${r.error || '未知错误'}`);
+      }
+    } catch (e) { setDataMsg('导出失败: ' + (e instanceof Error ? e.message : String(e))); }
+  };
+
+  /** [zip 导入] 触发隐藏文件选择,读取要导入的 .zip */
+  const handleChooseZipImport = () => {
+    zipFileInputRef.current?.click();
+  };
+
+  /**
+   * [zip 导入] 读取所选 .zip 并导入整库。
+   * web Mock 用纯前端 STORE 解析(优先清单保真还原,否则平铺 notes/*.md),
+   * 读入内存库会话内生效;真实 zip 解析走 Tauri 壳(M6)。
+   */
+  const handleImportZipFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // 允许重复选择同一文件
+    if (!file) { setDataMsg('导入失败:未选择 zip 文件'); return; }
+    try {
+      const r = await backend.importNotesZip(file);
+      setDataMsg(r.success
+        ? `从 zip 导入完成:${r.count} 条(web Mock 已读入内存库,会话内可见;刷新即重置。真实解析在 Tauri 壳)。`
+        : `导入失败:${r.error || '未知错误'}`);
+    } catch (err) { setDataMsg('导入失败: ' + (err instanceof Error ? err.message : String(err))); }
   };
 
   const tabs = [
@@ -493,6 +541,17 @@ export function SettingsModal({ settings, folders, folderPresets, onFolderPreset
                   <input type="text" className="data-path-input" placeholder="导入路径 (md 文件或文件夹)"
                     value={importPath} onChange={e => setImportPath(e.target.value)} />
                   <button className="btn btn-secondary" onClick={handleImportMarkdown}>导入 Markdown</button>
+                </div>
+
+                {/* [zip] 整库 zip 压缩包迁移备份:导出/导入 .zip 单文件(与上面 Markdown 文件夹方式并存) */}
+                <h4 className="data-block-title">整库 zip 压缩包(迁移备份)</h4>
+                <p className="settings-hint">把全部笔记打包为单个 <strong>.zip</strong> 文件,便于整库迁移/备份;导入时选一个 .zip 即可恢复。<strong>Web 预览(Mock)</strong>下导出会真实生成一个 .zip(纯前端打包,任何 zip 工具可打开);导入会读入内存库会话内生效——真实 zip 写盘/压缩解析在 Tauri 壳(M6)。与上方 Markdown 文件夹导出/导入两种方式并存。</p>
+                <div className="data-row">
+                  <button className="btn btn-secondary" onClick={handleExportZip}>导出为 zip(.zip)</button>
+                  <button className="btn btn-secondary" onClick={handleChooseZipImport}>从 zip 导入(.zip)</button>
+                  {/* 隐藏 file 输入:由「从 zip 导入」按钮触发 */}
+                  <input ref={zipFileInputRef} type="file" accept=".zip,application/zip"
+                    style={{ display: 'none' }} onChange={handleImportZipFile} />
                 </div>
 
                 {dataMsg && <p className={`data-msg ${dataMsg.includes('失败') ? 'error' : ''}`}>{dataMsg}</p>}

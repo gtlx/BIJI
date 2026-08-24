@@ -2,8 +2,10 @@ import {
   BackendAdapter, Note, Folder, AppSettings, SearchQuery, GraphData, SyncResult, SyncStatus,
   GitStatus, GitLogEntry, PublishConfig, PublishResult, PublishPreviewResult, Plugin, ImportResult,
   NoteBlock, BlockHistoryEntry, BlockSearchResult, BlockType, BlockActivity, BlockBacklink, TagCount,
-  NoteTemplate, TrashBlock, DEFAULT_TEMPLATES,
+  NoteTemplate, TrashBlock, DEFAULT_TEMPLATES, ZipExportResult,
 } from './backend';
+// [zip] web Mock 的整库 zip 导入导出:纯前端 STORE 方式真实打包/解析(无压缩库,零依赖)
+import { createStoreZip, readStoreZip, decodeText, type ZipEntry } from '../utils/zip';
 
 // ============================================================
 // M2 拆块规则(与 biji-core utils/blocks.rs 保持一致)
@@ -417,6 +419,114 @@ export class MockBackend implements BackendAdapter {
   }
   async importMarkdown(path: string): Promise<ImportResult> { return { success: true, count: 0 }; }
   async exportMarkdown(path: string): Promise<ImportResult> { return { success: true, count: 0 }; }
+
+  /**
+   * [zip 导出] Mock:整库打包为**真实的 .zip**(STORE 零压缩,任何 zip 工具可打开)。
+   * 内容 = 每篇笔记一个 .md 文件 + biji-export.json 清单(完整元数据,供回导保真)。
+   * 返回 blob 供前端直接下载;真实写盘走 Tauri 壳(M6)后端 zip crate。
+   */
+  async exportNotesZip(): Promise<ZipExportResult> {
+    const alive = this.notes.filter(n => !n.deleted_at);
+    // 每篇笔记作为一个 .md 文件(人眼可读,便于手工查看/取用)
+    const entries: ZipEntry[] = alive.map(n => ({
+      name: `notes/${this.safeFileName(n.title)}.md`,
+      data: new TextEncoder().encode(n.content.endsWith('\n') ? n.content : n.content + '\n'),
+    }));
+    // 完整元数据清单:含 id/时间戳/标签/文件夹,回导可保真还原
+    entries.push({
+      name: 'biji-export.json',
+      data: new TextEncoder().encode(JSON.stringify({
+        app: 'biji',
+        kind: 'notes-zip-export',
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        notes: alive.map(n => ({
+          id: n.id, title: n.title, content: n.content,
+          created_at: n.created_at, updated_at: n.updated_at,
+          tags: n.tags, folder_id: n.folder_id,
+        })),
+        folders: this.folders.filter(f => !f.deleted_at).map(f => ({
+          id: f.id, name: f.name, parent_id: f.parent_id, created_at: f.created_at,
+        })),
+      })),
+    });
+    const zipBytes = createStoreZip(entries);
+    return { success: true, count: alive.length, blob: new Blob([zipBytes], { type: 'application/zip' }) };
+  }
+
+  /** 过滤文件名里的非法字符(/ \ : * ? " < > | 与控制符),保证 .md 条目名合法 */
+  private safeFileName(name: string): string {
+    const cleaned = name.replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').trim();
+    return cleaned || '未命名';
+  }
+
+  /**
+   * [zip 导入] Mock:读取 .zip 并导入笔记。
+   * 优先用包内 biji-export.json 清单保真还原;否则回退到 notes/*.md 平铺导入。
+   * 仅支持本 Mock 产出的 STORE 方式 zip;DEFLATE 压缩 zip 交 Tauri 壳(M6)。
+   * 导入结果写入内存库(会话内生效;web Mock 刷新即重置)。
+   */
+  async importNotesZip(zip: Blob | File): Promise<ImportResult> {
+    try {
+      const bytes = new Uint8Array(await zip.arrayBuffer());
+      const entries = readStoreZip(bytes);
+      if (entries.length === 0) return { success: false, count: 0, error: 'zip 中没有可导入的条目' };
+
+      let imported = 0;
+      // 1) 若有清单,按清单保真还原(优先)
+      const manifestEntry = entries.find(e => e.name === 'biji-export.json');
+      if (manifestEntry) {
+        try {
+          const m = JSON.parse(decodeText(manifestEntry.data));
+          if (m && m.notes && Array.isArray(m.notes)) {
+            for (const rn of m.notes as Array<Partial<Note> & { id: string; title: string; content: string }>) {
+              const note: Note = {
+                id: rn.id || this.nextId('imp'),
+                title: rn.title || '未命名',
+                content: rn.content || '',
+                created_at: rn.created_at || Date.now(),
+                updated_at: rn.updated_at || Date.now(),
+                tags: rn.tags || [],
+                folder_id: rn.folder_id ?? null,
+                is_encrypted: false,
+                sync_status: 'synced',
+              };
+              if (!this.notes.some(n => n.id === note.id)) this.notes.push(note);
+              imported++;
+            }
+            // 恢复文件夹(仅在 zip 提供时)
+            if (m.folders && Array.isArray(m.folders)) {
+              for (const rfolder of m.folders as Array<Partial<Folder> & { id: string; name: string }>) {
+                const folder: Folder = {
+                  id: rfolder.id, name: rfolder.name || '文件夹',
+                  parent_id: rfolder.parent_id ?? null, created_at: rfolder.created_at || Date.now(),
+                };
+                if (!this.folders.some(f => f.id === folder.id)) this.folders.push(folder);
+              }
+            }
+            return { success: true, count: imported };
+          }
+        } catch { /* 清单损坏则回退到逐个 .md 导入 */ }
+      }
+      // 2) 回退:把 notes/*.md 逐个当作笔记导入
+      const prefix = 'notes/';
+      for (const e of entries) {
+        if (!e.name.startsWith(prefix) || !e.name.endsWith('.md')) continue;
+        const title = e.name.slice(prefix.length, -'.md'.length) || '未命名';
+        const note: Note = {
+          id: this.nextId('imp'),
+          title, content: decodeText(e.data),
+          created_at: Date.now(), updated_at: Date.now(),
+          tags: [], folder_id: null, is_encrypted: false, sync_status: 'synced',
+        };
+        if (!this.notes.some(n => n.title === note.title && n.content === note.content)) this.notes.push(note);
+        imported++;
+      }
+      return { success: imported > 0, count: imported, error: imported > 0 ? undefined : 'zip 中没有可导入的 Markdown 笔记' };
+    } catch (e) {
+      return { success: false, count: 0, error: e instanceof Error ? e.message : String(e) };
+    }
+  }
   async getPlugins(): Promise<Plugin[]> {
     // [M11 收尾] web Mock 与真后端 built_in_plugins 保持一致(番茄钟 + 云同步 + 发布),
     // 让浏览器预览的插件管理能看到/开关这 3 个,行为与 Tauri 真后端一致。

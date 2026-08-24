@@ -270,6 +270,18 @@ export interface ImportResult {
   error?: string;
 }
 
+/** [zip 导出] 整库导出为 .zip 单文件(便于整库迁移备份)的结果 */
+export interface ZipExportResult {
+  success: boolean;
+  /** 导出笔记条数 */
+  count: number;
+  /** web Mock:可直接下载的 zip Blob;Tauri 壳写盘成功时为 undefined */
+  blob?: Blob;
+  /** Tauri 壳:写出文件路径(写盘时提供) */
+  path?: string;
+  error?: string;
+}
+
 // ============================================================
 // 后端适配器接口 — 所有后端实现必须实现此接口
 // ============================================================
@@ -345,6 +357,10 @@ export interface BackendAdapter {
   // === 导入导出 ===
   importMarkdown(path: string): Promise<ImportResult>;
   exportMarkdown(path: string): Promise<ImportResult>;
+  /** [zip] 整库导出为 .zip 单文件(整库迁移备份);web Mock 返回可直接下载的 Blob,真实写盘在 Tauri 壳 */
+  exportNotesZip(): Promise<ZipExportResult>;
+  /** [zip] 从 .zip 单文件导入整库(读取 zip 并导入笔记);真实解析在 Tauri 壳 */
+  importNotesZip(zip: Blob | File): Promise<ImportResult>;
 
   // === [M3.5b 回收站] ===
   /** 回收站中的笔记(软删未彻底删) */

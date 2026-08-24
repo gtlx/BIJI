@@ -14,6 +14,7 @@ import {
   PublishPreviewResult,
   Plugin,
   ImportResult,
+  ZipExportResult,
   BlockActivity,
   BlockSearchResult,
   BlockBacklink,
@@ -157,6 +158,18 @@ export class TauriBackend implements BackendAdapter {
   }
   async exportMarkdown(path: string): Promise<ImportResult> {
     return invoke('export_markdown', { path });
+  }
+
+  // ===== [zip] 整库 zip 导入导出(真实写盘/解析在 Tauri 壳 M6) =====
+  /** [zip] 整库导出为 .zip:走后端 export_notes_zip(把库打包写出);Tauri 壳 M6 接入后生效 */
+  async exportNotesZip(): Promise<ZipExportResult> {
+    return invoke('export_notes_zip');
+  }
+  /** [zip] 从 .zip 导入整库:把所选文件字节传给后端 import_notes_zip 解析入库;Tauri 壳 M6 接入后生效 */
+  async importNotesZip(zip: Blob | File): Promise<ImportResult> {
+    // 当前壳尚未接入大文件字节传输;此处先把文件读成字节数组,便于 M6 命令对接
+    const bytes = Array.from(new Uint8Array(await zip.arrayBuffer()));
+    return invoke('import_notes_zip', { data: bytes });
   }
 
   // ===== [M3.5b] 回收站 / 模板 / 导出(Tauri 命令待 M6 接入,先走 invoke 命名) =====
