@@ -63,6 +63,10 @@ export interface AppSettings {
   ui_custom_css: UICustomCSS;
   zoom: number;
   shortcuts: ShortcutSettings;
+  /** [M11 收尾] 番茄钟设置(可选,缺省用组件默认 25/5 分钟,不强制后端适配器实现) */
+  pomodoro_focus_minutes?: number;
+  pomodoro_break_minutes?: number;
+  pomodoro_reminder?: boolean;
 }
 
 export interface UICustomCSS {

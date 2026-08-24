@@ -219,6 +219,12 @@ export class MockBackend implements BackendAdapter {
   private mockGitLog: GitLogEntry[] = [];
   /** [M4] 内存 git 假哈希自增 */
   private mockGitSeq = 0;
+  /** [M11 收尾] 内存插件清单(对齐真后端 built_in_plugins:番茄钟/云同步/发布;开关仅内存生效) */
+  private mockPlugins: Plugin[] = [
+    { id: 'pomodoro-plugin', name: '番茄钟', version: '1.0.0', description: '专注计时器,帮助您保持专注和高效', author: 'Biji Note', enabled: true, built_in: true },
+    { id: 'sync-plugin', name: '云同步', version: '1.0.0', description: '将笔记同步到云端或本地文件夹', author: 'Biji Note', enabled: false, built_in: true },
+    { id: 'publish-plugin', name: '发布', version: '1.0.0', description: '把笔记导出/发布到静态博客(多框架适配器:Astro 等)', author: 'Biji Note', enabled: true, built_in: true },
+  ];
   private settings: AppSettings = {
     theme: 'light',
     font_size: 14,
@@ -412,12 +418,14 @@ export class MockBackend implements BackendAdapter {
   async importMarkdown(path: string): Promise<ImportResult> { return { success: true, count: 0 }; }
   async exportMarkdown(path: string): Promise<ImportResult> { return { success: true, count: 0 }; }
   async getPlugins(): Promise<Plugin[]> {
-    // [web Mock 默认] 内置一个已启用的番茄钟插件,便于在「添加面板」里体验番茄钟分栏面板
-    return [
-      { id: 'pomodoro-plugin', name: '番茄钟', version: '0.1.0', description: '专注计时(可作分栏面板)', author: '内置', enabled: true, built_in: true },
-    ];
+    // [M11 收尾] web Mock 与真后端 built_in_plugins 保持一致(番茄钟 + 云同步 + 发布),
+    // 让浏览器预览的插件管理能看到/开关这 3 个,行为与 Tauri 真后端一致。
+    return this.mockPlugins.map(p => ({ ...p }));
   }
-  async togglePlugin(id: string, enabled: boolean): Promise<void> {}
+  async togglePlugin(id: string, enabled: boolean): Promise<void> {
+    // 内存状态切换(web Mock;真后端持久化到 plugin_state 表)
+    this.mockPlugins = this.mockPlugins.map(p => p.id === id ? { ...p, enabled } : p);
+  }
   onMenuEvent(event: string, callback: () => void): () => void { return () => {}; }
 
   // ==================== M2 块级存储(内存实现) ====================

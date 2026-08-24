@@ -70,6 +70,15 @@ export const FRONTEND_PLUGINS: FrontendPlugin[] = [
     description: '三列看板面板(纯前端插件,基于笔记 frontmatter 状态)',
     paneId: 'kanban',
   },
+  {
+    id: 'calendar',
+    label: '日历',
+    icon: 'calendar',
+    kind: 'pane',
+    version: '0.1.0',
+    description: '日历热力图面板(内置 pane 型前端插件,可随 enable 开关)',
+    paneId: 'calendar',
+  },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -187,8 +196,8 @@ export function getFrontendPluginByPane(paneId: PaneId): FrontendPlugin | undefi
 
 /**
  * 判断某分栏面板当前是否应出现在「添加面板」菜单里:
- * - 核心内置面板(无对应前端插件,如 outline/calendar 等)→ 恒可添加;
- * - 由前端插件提供(如 kanban)→ 仅当该插件已启用才可添加(关闭插件后标题不再入菜单)。
+ * - 核心内置面板(无对应前端插件,如 outline/tags/properties 等)→ 恒可添加;
+ * - 由前端插件提供(如 kanban/calendar)→ 仅当该插件已启用才可添加(关闭插件后标题不再入菜单)。
  * 「添加面板」候选列表由 PANE_META 驱动(非插件注册表),这里补上 enable 关注,与导航/渲染一致。
  */
 export function isPaneAddable(paneId: PaneId): boolean {

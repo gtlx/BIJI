@@ -1,15 +1,37 @@
 import { useState, useEffect } from 'react';
 import { StrokeIcon } from '../icons';
+import type { AppSettings } from '../api/backend';
 import './PomodoroTimer.css';
 
-const WORK_SEC = 25 * 60;
-const BREAK_SEC = 5 * 60;
+/** 默认专注/休息时长(分钟);可由设置覆盖 */
+const DEFAULT_WORK_MIN = 25;
+const DEFAULT_BREAK_MIN = 5;
+
+interface PomodoroTimerProps {
+  /** [M11 收尾] 设置中的番茄钟时长/提醒;缺省用默认 25/5 分钟 */
+  settings?: AppSettings | null;
+}
 
 /** [Pane 番茄钟面板] 独立的番茄钟面板组件(可作分栏面板,也可作右栏 tab) */
-export function PomodoroTimer() {
-  const [timeLeft, setTimeLeft] = useState(WORK_SEC);
+export function PomodoroTimer({ settings }: PomodoroTimerProps) {
+  // 专注/休息时长(分钟 → 秒),跟随设置变化
+  const workSec = (settings?.pomodoro_focus_minutes ?? DEFAULT_WORK_MIN) * 60;
+  const breakSec = (settings?.pomodoro_break_minutes ?? DEFAULT_BREAK_MIN) * 60;
+  const remind = settings?.pomodoro_reminder !== false; // 缺省提醒
+  const [timeLeft, setTimeLeft] = useState(workSec);
   const [isRunning, setIsRunning] = useState(false);
   const [mode, setMode] = useState<'work' | 'break'>('work');
+
+  // 完成一个番茄后可选提醒:系统通知 + 控制台提示(浏览器环境做 feature 检测)
+  const notify = (msg: string) => {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      try { new Notification('番茄钟', { body: msg }); } catch { /* 忽略 */ }
+    }
+    // 改变 document.title 闪烁,提醒回到窗口(简单版)
+    const prev = document.title;
+    document.title = msg;
+    setTimeout(() => { document.title = prev; }, 3000);
+  };
 
   useEffect(() => {
     if (!isRunning) return;
@@ -19,10 +41,12 @@ export function PomodoroTimer() {
           setIsRunning(false);
           if (mode === 'work') {
             setMode('break');
-            setTimeLeft(BREAK_SEC);
+            setTimeLeft(breakSec);
+            if (remind) notify('休息一下!专注时段结束');
           } else {
             setMode('work');
-            setTimeLeft(WORK_SEC);
+            setTimeLeft(workSec);
+            if (remind) notify('休息结束,开始下一个专注时段');
           }
           return 0;
         }
@@ -30,19 +54,19 @@ export function PomodoroTimer() {
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [isRunning, mode]);
+  }, [isRunning, mode, workSec, breakSec, remind]);
 
   const formatTime = (s: number) =>
     `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
 
   const toggle = () => {
-    if (timeLeft === 0) { setTimeLeft(WORK_SEC); setMode('work'); }
+    if (timeLeft === 0) { setTimeLeft(workSec); setMode('work'); }
     setIsRunning(!isRunning);
   };
 
   const reset = () => {
     setIsRunning(false);
-    setTimeLeft(mode === 'work' ? WORK_SEC : BREAK_SEC);
+    setTimeLeft(mode === 'work' ? workSec : breakSec);
   };
 
   const modeLabel = mode === 'work' ? '专注' : '休息';

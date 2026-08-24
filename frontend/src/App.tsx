@@ -26,7 +26,7 @@ import { TagsPane } from './components/TagsPane';
 import { PomodoroTimer } from './components/PomodoroTimer';
 import { loadLayout, saveLayout } from './components/pane/layoutStore';
 import type { PaneId, PaneLayout } from './components/pane/types';
-import { PANE_META } from './components/pane/types';
+import { PANE_META, defaultLayout } from './components/pane/types';
 import { StrokeIcon } from './icons';
 import { KanbanPane } from './components/KanbanPane';
 import { getFrontendPlugin, getViewPlugin, getNavPlugins, subscribeFrontendPlugins, isPaneAddable } from './plugins/registry';
@@ -134,9 +134,14 @@ export default function App() {
     return subscribeFrontendPlugins(() => setFpRev(r => r + 1));
   }, []);
 
-  /** [M8] 前端插件生成的导航项(随 enable 状态实时增减;发布=view,看板=pane) */
+  /** [M8] 前端插件生成的导航项(随 enable 状态实时增减;发布=view,看板=calendar 等=pane)。
+   *  de-dupe:剔除与核心导航重复的 id(如 calendar 既是核心导航又是内置 pane 插件),
+   *  避免右侧栏出现两个「日历」。 */
+  const coreNavIds = new Set<string>(CORE_NAV_ITEMS.map(i => i.id));
   const pluginNavItems = useMemo<SidebarNavItem[]>(
-    () => getNavPlugins().map(p => ({ id: p.id, icon: p.icon, label: p.label })),
+    () => getNavPlugins()
+      .filter(p => !coreNavIds.has(p.id))
+      .map(p => ({ id: p.id, icon: p.icon, label: p.label })),
     [fpRev],
   );
 
@@ -587,6 +592,12 @@ export default function App() {
     setPlugins(prev => prev.map(p => p.id === id ? { ...p, enabled } : p));
   };
 
+  /** [M11 收尾] 恢复默认工作区布局(清掉用户/旧版布局记忆 → 默认右 dock 分块) */
+  const handleResetLayout = () => {
+    setPaneLayout(defaultLayout());
+    showToast('已恢复默认布局');
+  };
+
   const handleLinkClick = (noteTitle: string) => {
     const linked = notes.find(n => n.title === noteTitle);
     if (linked) {
@@ -773,7 +784,7 @@ export default function App() {
           />
         );
       case 'pomodoro':
-        return pomodoroEnabled ? <PomodoroTimer /> : <div className="pomodoro-disabled">番茄钟插件未启用,请到设置开启</div>;
+        return pomodoroEnabled ? <PomodoroTimer settings={settings} /> : <div className="pomodoro-disabled">番茄钟插件未启用,请到设置开启</div>;
       case 'kanban':
         return (
           <KanbanPane
@@ -943,6 +954,7 @@ export default function App() {
           onClose={() => setShowSettings(false)}
           onSave={handleSettingsChange}
           onTogglePlugin={handleTogglePlugin}
+          onResetLayout={handleResetLayout}
         />
       )}
 

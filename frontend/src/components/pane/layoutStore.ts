@@ -6,11 +6,33 @@
  * - 迁移:兼容旧 columns 结构(v1)与新 main/left/right 结构(v2)
  */
 import type { PaneId, PaneLayout } from './types';
-import { PANE_REGISTRY, defaultLayout } from './types';
+import { PANE_REGISTRY, RIGHT_PANES, collectRightPanes, defaultLayout } from './types';
 
 const STORAGE_KEY = 'biji.paneLayout.v2';
 
 const VALID_IDS = new Set<string>(PANE_REGISTRY.map(m => m.id));
+
+/**
+ * [M11 收尾·严谨迁移] 布局收尾:保证「每个合法右 dock 面板都有归宿」。
+ *
+ * 背景:M10③ 把右 dock 从「多面板共用一个 tab 组」拆成「每个面板独立成一块」,
+ * 但老 localStorage('biji.paneLayout.v2') 存的是拆分前的旧布局(例如某 row 是
+ * panes:['outline','backlinks','properties','pomodoro'])。旧布局可能只覆盖了一部分
+ * 面板(如没把番茄钟放进任何 row 也没进 hidden),清洗后这些面板会被静默丢弃,
+ * 表现为用户桌面端右 dock 找不到番茄钟。
+ *
+ * 修法:清洗(migrateV1/sanitizeV2)完成后统一走一遍 —— 收集全部右 dock 面板 id,
+ * 「已显示」的保持原样;「未显示但合法」的面板一律补进 hidden(可经「添加面板」恢复),
+ * 而不是丢进虚空。这样无论旧布局长什么样,番茄钟/日历等右 dock 面板永不丢失。
+ */
+function finalizeLayout(layout: PaneLayout): PaneLayout {
+  const displayed = new Set<PaneId>([layout.main, ...layout.left, ...collectRightPanes(layout)]);
+  const hidden = [...layout.hidden];
+  RIGHT_PANES.forEach(id => {
+    if (!displayed.has(id) && !hidden.includes(id)) hidden.push(id);
+  });
+  return { ...layout, hidden };
+}
 
 /** 判定新结构布局是否可用(返回清洗后的布局) */
 function sanitizeV2(raw: any): PaneLayout | null {
@@ -43,10 +65,10 @@ function sanitizeV2(raw: any): PaneLayout | null {
     // 无右 dock 时给默认(大纲+反向链接)
     right.push({ id: 'row-fallback', panes: ['outline', 'backlinks'], active: 0 });
   }
-  // hidden:不在已显示集合里的合法面板
+  // hidden:不在已显示集合里的合法面板(再经 finalize 补全所有未归位右 dock 面板)
   const hidden = (Array.isArray(raw.hidden) ? raw.hidden : [])
     .filter((p: unknown): p is PaneId => VALID_IDS.has(p as string) && !seen.has(p as string));
-  return { main, left, right, hidden };
+  return finalizeLayout({ main, left, right, hidden });
 }
 
 /** 旧 v1 结构(columns) → 新结构迁移 */
@@ -76,7 +98,7 @@ function migrateV1(raw: any): PaneLayout | null {
   }
   const hidden = (Array.isArray(raw.hidden) ? raw.hidden : [])
     .filter((p: unknown): p is PaneId => VALID_IDS.has(p as string) && !seen.has(p as string));
-  return { main, left: left.length ? left : ['files'], right: right.filter(r => r.panes.length > 0), hidden };
+  return finalizeLayout({ main, left: left.length ? left : ['files'], right: right.filter(r => r.panes.length > 0), hidden });
 }
 
 /** 读布局(不存在/损坏 → 默认布局) */
