@@ -7,6 +7,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.0"
+# 版本号:0.5.0 = 当前功能大丰富(模板/目录预设/插件化/番茄钟等);外壳(M6 Tauri 壳)完成后到 0.6
+version = "0.5.0"
 edition = "2021"
 license = "AGPL-3.0"

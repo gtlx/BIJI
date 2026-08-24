@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { backend } from '../api';
 import type { Note, AppSettings, Plugin, NoteTemplate, Folder } from '../api/backend';
 import { DEFAULT_TEMPLATES } from '../api/backend';
@@ -11,6 +11,9 @@ import {
   removePreset,
   getPresetForFolder,
 } from '../utils/folderPresets';
+import { setFrontendPluginEnabled } from '../plugins/registry';
+import type { UnifiedPlugin } from '../utils/unifiedPlugins';
+import { buildUnifiedPluginList } from '../utils/unifiedPlugins';
 import './SettingsModal.css';
 
 interface SettingsModalProps {
@@ -56,6 +59,14 @@ const SHORTCUT_FIELDS: { key: keyof AppSettings['shortcuts']; label: string }[] 
   { key: 'toggle_editor_mode', label: '编辑器模式' },
 ];
 
+/** 番茄钟后端插件 id(用于在插件管理里识别出番茄钟行,展示其详细设置) */
+const POMODORO_PLUGIN_ID = 'pomodoro-plugin';
+
+/** 判断某统一插件行是否为「番茄钟」(后端 id 命中或名称含「番茄钟」) */
+function isPomodoroItem(item: UnifiedPlugin): boolean {
+  return item.backendId === POMODORO_PLUGIN_ID || item.name.includes('番茄钟');
+}
+
 export function SettingsModal({ settings, folders, folderPresets, onFolderPresetsChange, plugins, onClose, onSave, onTogglePlugin, onResetLayout }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState('appearance');
   const [localSettings, setLocalSettings] = useState<AppSettings>(settings);
@@ -65,15 +76,33 @@ export function SettingsModal({ settings, folders, folderPresets, onFolderPreset
   const [newTemplateName, setNewTemplateName] = useState('');
   const [newTemplateContent, setNewTemplateContent] = useState('');
 
+  // [设置优化] 插件管理:后端插件本地副本 + 前端 enable 版本号 + 展开的插件详情行 id
+  const [localPlugins, setLocalPlugins] = useState<Plugin[]>(plugins);
+  const [fpRev, setFpRev] = useState(0);
+  const [expandedPluginId, setExpandedPluginId] = useState<string>('');
+  // [需求⑦] 数据管理:导出/导入结果提示 + 路径输入
+  const [dataMsg, setDataMsg] = useState('');
+  const [exportPath, setExportPath] = useState('');
+  const [importPath, setImportPath] = useState('');
+
   useEffect(() => {
     setLocalSettings(settings);
   }, [settings]);
+
+  useEffect(() => {
+    setLocalPlugins(plugins);
+  }, [plugins]);
 
   useEffect(() => {
     backend.getTemplates()
       .then(t => { if (t && t.length) setTemplates(t); })
       .catch(() => setTemplates(DEFAULT_TEMPLATES as NoteTemplate[]));
   }, []);
+
+  /** [设置优化] 合并全部插件行(后端能力 + 前端入口,同能力合并「both」);fpRev 保证前端开关即时重读 */
+  const mergedPlugins = useMemo<UnifiedPlugin[]>(() => {
+    return buildUnifiedPluginList(localPlugins);
+  }, [localPlugins, fpRev]);
 
   /** 保存后关闭;localSettings 含 shortcuts/番茄钟等新字段,整体落库 */
   const handleSave = async () => {
@@ -134,15 +163,67 @@ export function SettingsModal({ settings, folders, folderPresets, onFolderPreset
     onFolderPresetsChange(upsertPreset(folderPresets, { ...cfg, namingPattern }));
   };
 
+  /**
+   * [设置优化] 插件开关(设置内统一列表):
+   * 后端走 onTogglePlugin(API + App 状态);前端走 localStorage 订阅、互不打架。
+   * 合并行(source=both)同一能力两端一起切:关 = 能力停 + 入口停,开 = 两端都恢复。
+   */
+  const handleToggleInSettings = async (item: UnifiedPlugin, enabled: boolean) => {
+    if (item.source === 'both' || item.source === 'backend') {
+      if (item.backendId) {
+        await onTogglePlugin(item.backendId, enabled);
+        setLocalPlugins(prev => prev.map(p => p.id === item.backendId ? { ...p, enabled } : p));
+      }
+    }
+    if (item.source === 'both' || item.source === 'frontend') {
+      if (item.frontendId) {
+        setFrontendPluginEnabled(item.frontendId, enabled);
+        setFpRev(r => r + 1);
+      }
+    }
+  };
+
+  /** 展开/收起某插件行的详情(仅番茄钟行有详情设置) */
+  const toggleExpandPlugin = (item: UnifiedPlugin) => {
+    setExpandedPluginId(prev => (prev === item.id ? '' : item.id));
+  };
+
+  /** [需求⑦] 导出为 Markdown 文件夹(含 git 提交;真实写盘在 Tauri 壳,web Mock 走模拟) */
+  const handleExportFolder = async () => {
+    try {
+      const hash = await backend.gitExportAndCommit(`导出 Obsidian 文件夹 ${new Date().toISOString()}`);
+      setDataMsg(hash ? `已导出为 Markdown 文件夹并提交,commit: ${hash}` : '导出完成(无 git 提交记录)');
+    } catch (e) { setDataMsg('导出失败: ' + (e instanceof Error ? e.message : String(e))); }
+  };
+
+  /** [需求⑦] 导出到指定路径(全库 md) */
+  const handleExportPath = async () => {
+    const path = exportPath.trim();
+    if (!path) { setDataMsg('请先填写导出路径'); return; }
+    try {
+      const r = await backend.exportMarkdown(path);
+      setDataMsg(r.success ? `导出到「${path}」完成:${r.count} 条` : `导出失败:${r.error}`);
+    } catch (e) { setDataMsg('导出失败: ' + (e instanceof Error ? e.message : String(e))); }
+  };
+
+  /** [需求⑦] 从 Markdown 导入 */
+  const handleImportMarkdown = async () => {
+    const path = importPath.trim();
+    if (!path) { setDataMsg('请先填写导入路径'); return; }
+    try {
+      const r = await backend.importMarkdown(path);
+      setDataMsg(r.success ? `从「${path}」导入完成:${r.count} 条` : `导入失败:${r.error}`);
+    } catch (e) { setDataMsg('导入失败: ' + (e instanceof Error ? e.message : String(e))); }
+  };
+
   const tabs = [
     { id: 'appearance', label: '外观' },
     { id: 'editor', label: '编辑器' },
-    { id: 'pomodoro', label: '番茄钟' },
     { id: 'workspace', label: '工作区' },
     { id: 'shortcuts', label: '快捷键' },
     { id: 'templates', label: '模板' },
-    { id: 'presets', label: '目录预设' },
     { id: 'sync', label: '同步' },
+    { id: 'data', label: '数据' },
     { id: 'plugins', label: '插件' },
     { id: 'about', label: '关于' },
   ];
@@ -213,29 +294,6 @@ export function SettingsModal({ settings, folders, folderPresets, onFolderPreset
               </div>
             )}
 
-            {activeTab === 'pomodoro' && (
-              <div className="settings-section">
-                <h3>番茄钟</h3>
-                <label className="settings-field">
-                  <span>专注时长(分钟)</span>
-                  <input type="number" min={1} max={90}
-                    value={localSettings.pomodoro_focus_minutes ?? 25}
-                    onChange={e => setLocalSettings({ ...localSettings, pomodoro_focus_minutes: parseInt(e.target.value) || 25 })} />
-                </label>
-                <label className="settings-field">
-                  <span>休息时长(分钟)</span>
-                  <input type="number" min={1} max={30}
-                    value={localSettings.pomodoro_break_minutes ?? 5}
-                    onChange={e => setLocalSettings({ ...localSettings, pomodoro_break_minutes: parseInt(e.target.value) || 5 })} />
-                </label>
-                <label className="settings-field">
-                  <span>时段结束提醒</span>
-                  <input type="checkbox" checked={localSettings.pomodoro_reminder !== false}
-                    onChange={e => setLocalSettings({ ...localSettings, pomodoro_reminder: e.target.checked })} />
-                </label>
-              </div>
-            )}
-
             {activeTab === 'workspace' && (
               <div className="settings-section">
                 <h3>默认工作区 / 布局</h3>
@@ -260,6 +318,7 @@ export function SettingsModal({ settings, folders, folderPresets, onFolderPreset
 
             {activeTab === 'templates' && (
               <div className="settings-section">
+                {/* [需求②] 模板 tab = 模板管理 + 按顶层目录绑定模板/命名规则(原独立 presets tab 并入) */}
                 <h3>模板管理</h3>
                 <p className="settings-hint">内置模板不可删除;自定义模板可增/删,新建笔记时可选择。</p>
                 {templates.map(t => (
@@ -283,12 +342,9 @@ export function SettingsModal({ settings, folders, folderPresets, onFolderPreset
                     value={newTemplateContent} onChange={e => setNewTemplateContent(e.target.value)} />
                   <button className="btn btn-secondary" onClick={handleAddTemplate}>新增自定义模板</button>
                 </div>
-              </div>
-            )}
 
-            {activeTab === 'presets' && (
-              <div className="settings-section">
-                <h3>顶层目录用途预设</h3>
+                {/* [需求②] 目录预设并入:按顶层目录绑定模板/命名规则(复用 folderPresets.ts,UI 从独立 tab 归入模板) */}
+                <h3 className="preset-heading">按顶层目录绑定模板 / 命名规则</h3>
                 <p className="settings-hint">单笔记库内靠顶层文件夹分类用途。为某个顶层目录绑定预设后,在其下新建笔记会自动套用对应模板与命名规则(知识仍互通,不做多 vault)。仅顶层目录(不带父级)可配置;子文件夹自动继承所属顶层目录的预设。更改即时生效(存于本地)。</p>
                 {topFolders.length === 0 && (
                   <p className="settings-hint">暂无顶层目录,请先在左侧创建文件夹。</p>
@@ -354,28 +410,113 @@ export function SettingsModal({ settings, folders, folderPresets, onFolderPreset
               </div>
             )}
 
+            {activeTab === 'data' && (
+              <div className="settings-section">
+                {/* [需求⑦] 数据管理:把既有导出/导入能力接进设置,做成可见可点的入口 */}
+                <h3>数据管理</h3>
+                <p className="settings-hint">导出/导入为 Markdown(全库或单篇)。Web 预览(Mock)下这些入口为模拟,真实写盘在 Tauri 壳中生效。单篇导出(.md / 可打印 HTML)仍可从命令面板或编辑器菜单触发。</p>
+
+                <div className="data-location">
+                  <span className="data-label">数据位置</span>
+                  <span className="data-value">{localSettings.storage_path
+                    ? localSettings.storage_path
+                    : '浏览器 Mock(无磁盘库);Tauri 壳下此处显示 biji.db 所在路径'}</span>
+                </div>
+
+                <h4 className="data-block-title">导出</h4>
+                <div className="data-row">
+                  <button className="btn btn-secondary" onClick={handleExportFolder}>导出为 Markdown 文件夹(含 git 提交)</button>
+                </div>
+                <div className="data-row">
+                  <input type="text" className="data-path-input" placeholder="导出路径 (如 ~/biji-export)"
+                    value={exportPath} onChange={e => setExportPath(e.target.value)} />
+                  <button className="btn btn-secondary" onClick={handleExportPath}>导出到该路径</button>
+                </div>
+
+                <h4 className="data-block-title">导入</h4>
+                <div className="data-row">
+                  <input type="text" className="data-path-input" placeholder="导入路径 (md 文件或文件夹)"
+                    value={importPath} onChange={e => setImportPath(e.target.value)} />
+                  <button className="btn btn-secondary" onClick={handleImportMarkdown}>导入 Markdown</button>
+                </div>
+
+                {dataMsg && <p className={`data-msg ${dataMsg.includes('失败') ? 'error' : ''}`}>{dataMsg}</p>}
+              </div>
+            )}
+
             {activeTab === 'plugins' && (
               <div className="settings-section">
+                {/* [需求①] 插件管理在设置里要「显示完全」:合并后端/前端插件,每项含名称/来源徽标/开关;番茄钟行可展开详细设置 */}
                 <h3>插件管理</h3>
-                {plugins.map(plugin => (
-                  <div key={plugin.id} className="plugin-item">
-                    <div className="plugin-info">
-                      <span className="plugin-name">{plugin.name}</span>
-                      <span className="plugin-desc">{plugin.description}</span>
-                    </div>
-                    <label className="switch">
-                      <input type="checkbox" checked={plugin.enabled} onChange={e => onTogglePlugin(plugin.id, e.target.checked)} />
-                      <span className="slider" />
-                    </label>
+                <p className="settings-hint">开关即插即用;后端能力与前端入口按能力合并成一行。点「番茄钟」可展开其详细设置(专注/休息时长与结束提醒)。保存后生效。</p>
+                {mergedPlugins.length === 0 ? (
+                  <p className="empty-text">正在加载插件列表…</p>
+                ) : (
+                  <div className="settings-plugin-list">
+                    {mergedPlugins.map(item => {
+                      const isPomodoro = isPomodoroItem(item);
+                      const expanded = expandedPluginId === item.id;
+                      return (
+                        <div key={item.id} className={`settings-plugin-item ${isPomodoro ? 'is-pomodoro' : ''}`}>
+                          <div className="settings-plugin-main" onClick={() => isPomodoro && toggleExpandPlugin(item)} title={isPomodoro ? '点击展开/收起番茄钟详细设置' : undefined}>
+                            <div className="plugin-info">
+                              <div className="plugin-name-row">
+                                <span className="plugin-name">{item.name}</span>
+                                <span className={`plugin-source src-${item.source}`}>
+                                  {item.source === 'both' ? '能力+入口' : item.source === 'backend' ? '后端' : '前端'}
+                                </span>
+                              </div>
+                              <span className="plugin-version">v{item.version}</span>
+                              <p className="plugin-desc">{item.description}</p>
+                            </div>
+                            <div className="settings-plugin-actions">
+                              {isPomodoro && (
+                                <span className="plugin-detail-btn" onClick={e => { e.stopPropagation(); toggleExpandPlugin(item); }}>
+                                  {expanded ? '收起' : '设置'}
+                                </span>
+                              )}
+                              <label className="switch">
+                                <input type="checkbox" checked={item.enabled} onChange={e => handleToggleInSettings(item, e.target.checked)} />
+                                <span className="slider" />
+                              </label>
+                            </div>
+                          </div>
+                          {/* [需求④] 番茄钟插件详情设置:入口从设置 tab 移到插件管理内(仍写 settings 的 pomodoro_* 字段) */}
+                          {isPomodoro && expanded && (
+                            <div className="plugin-detail">
+                              <div className="plugin-detail-title">番茄钟设置</div>
+                              <label className="settings-field">
+                                <span>专注时长(分钟)</span>
+                                <input type="number" min={1} max={90}
+                                  value={localSettings.pomodoro_focus_minutes ?? 25}
+                                  onChange={e => setLocalSettings({ ...localSettings, pomodoro_focus_minutes: parseInt(e.target.value) || 25 })} />
+                              </label>
+                              <label className="settings-field">
+                                <span>休息时长(分钟)</span>
+                                <input type="number" min={1} max={30}
+                                  value={localSettings.pomodoro_break_minutes ?? 5}
+                                  onChange={e => setLocalSettings({ ...localSettings, pomodoro_break_minutes: parseInt(e.target.value) || 5 })} />
+                              </label>
+                              <label className="settings-field">
+                                <span>时段结束提醒</span>
+                                <input type="checkbox" checked={localSettings.pomodoro_reminder !== false}
+                                  onChange={e => setLocalSettings({ ...localSettings, pomodoro_reminder: e.target.checked })} />
+                              </label>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                ))}
+                )}
               </div>
             )}
 
             {activeTab === 'about' && (
               <div className="settings-section">
+                {/* [需求③] 版本号:0.5.0 = 当前功能大丰富;外壳(M6 Tauri 壳)完成后到 0.6 */}
                 <h3>关于 Biji Note</h3>
-                <p>版本: 0.1.0</p>
+                <p>版本: 0.5.0</p>
                 <p>跨平台笔记编辑器</p>
                 <p>Rust + Tauri + React</p>
               </div>

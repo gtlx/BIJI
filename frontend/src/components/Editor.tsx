@@ -27,8 +27,8 @@ interface EditorProps {
   onEditorModeChange?: (mode: string) => void;
   onPreviewModeChange?: (mode: string) => void;
   noteBlocks?: NoteBlock[];
-  /** [Pane] 向父级注册命令 API(保存 / 光标处插入),供全局快捷键与模板插入调用 */
-  onRegisterApi?: (api: { save: () => void; insertAtCursor: (text: string) => void }) => void;
+  /** [Pane] 向父级注册命令 API(保存 / 光标处插入 / 聚焦正文),供全局快捷键与模板插入调用 */
+  onRegisterApi?: (api: { save: () => void; insertAtCursor: (text: string) => void; focusContent: () => void }) => void;
 }
 
 interface NoteFrontmatter {
@@ -174,11 +174,28 @@ export function Editor({
     scheduleAutoSave();
   }, [note, content, textareaRef, previewMode, scheduleAutoSave]);
 
-  // 向父级注册命令 API(供全局 Ctrl+S 保存、模板插入等调用)
+  /**
+   * [需求⑥] 聚焦/定位到笔记正文:编辑态聚焦 textarea 并滚到可视区中央,
+   * 预览态滚动预览容器进入视野。供看板等入口「点开 → 直接看到正文内容」。
+   */
+  const focusContent = useCallback(() => {
+    const ta = textareaRef.current;
+    if (ta) {
+      ta.focus();
+      try { ta.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch { ta.scrollIntoView(); }
+      return;
+    }
+    // 纯预览态:滚动预览区进入视野
+    const previews = document.querySelectorAll<HTMLElement>('.markdown-preview');
+    const last = previews[previews.length - 1];
+    if (last) { try { last.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch { last.scrollIntoView(); } }
+  }, [textareaRef]);
+
+  // 向父级注册命令 API(供全局 Ctrl+S 保存、模板插入、聚焦正文等调用)
   useEffect(() => {
     if (!onRegisterApi) return;
-    onRegisterApi({ save: handleSave, insertAtCursor });
-  }, [onRegisterApi, handleSave, insertAtCursor]);
+    onRegisterApi({ save: handleSave, insertAtCursor, focusContent });
+  }, [onRegisterApi, handleSave, insertAtCursor, focusContent]);
 
   useEffect(() => () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); }, []);
 

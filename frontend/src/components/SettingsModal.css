@@ -1,5 +1,9 @@
-.settings-modal {
-  width: 500px;
+/* [设置优化] 设置框加宽到 720px(原 500px)。用 .modal.settings-modal 提升优先级,
+   覆盖全局 .modal 的 max-width:600px 上限,插件管理才有足够展示空间 */
+.modal.settings-modal {
+  width: 720px;
+  max-width: 92vw;
+  max-height: 86vh;
 }
 
 .settings-modal-wide {
@@ -70,7 +74,8 @@
 .settings-tabs {
   display: flex;
   flex-direction: column;
-  width: 140px;
+  /* [设置优化] 左侧 tab 栏加宽到 172px(原 140px),10 个 tab 合并为 8 个后布局更规整 */
+  width: 172px;
   border-right: 1px solid var(--border-color);
   padding: 12px 0;
   flex-shrink: 0;
@@ -339,4 +344,199 @@
 .preset-field input[type="text"]:focus {
   border-color: var(--accent-color);
   outline: none;
+}
+
+/* ================= [设置优化] 目录预设并入模板 tab 的分区标题 ================= */
+.preset-heading {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-color);
+}
+
+/* ================= [设置优化] 插件管理(设置内)完全展示 ================= */
+/* 列表滚动容器:给足高度与滚动,插件再多也不会把设置框撑爆/截断 */
+.settings-plugin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 52vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.settings-plugin-item {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  background: var(--glass-strong);
+  padding: 12px 14px;
+  transition: border-color 0.15s;
+}
+.settings-plugin-item:hover {
+  border-color: color-mix(in srgb, var(--accent-color) 50%, transparent);
+}
+
+/* 主行:信息区(flex:1) + 操作区(设置按钮 + 开关)横排 */
+.settings-plugin-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.settings-plugin-item .plugin-info {
+  flex: 1;
+  min-width: 0;
+}
+.settings-plugin-item .plugin-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.settings-plugin-item .plugin-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-top: 4px;
+  word-break: break-word;
+}
+.settings-plugin-item .plugin-version {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+/* 来源徽标:与插件管理弹窗一致的配色(后端 teal / 前端中性) */
+.plugin-source {
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 7px;
+  border-radius: 10px;
+  color: var(--accent-color);
+  background-color: color-mix(in srgb, var(--accent-color) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-color) 40%, transparent);
+  white-space: nowrap;
+}
+
+.settings-plugin-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+/* 「设置」按钮(番茄钟行);点信息区或此按钮均可展开详情 */
+.plugin-detail-btn {
+  font-size: 12px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--accent-color);
+  background: none;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.plugin-detail-btn:hover {
+  border-color: var(--accent-color);
+  background: var(--accent-bg);
+}
+
+/* 番茄钟详情设置块:从设置独立 tab 移入插件管理后展示在这里 */
+.plugin-detail {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border-color);
+}
+.plugin-detail-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+/* 空态 */
+.settings-plugin-list + .empty-text {
+  color: var(--text-tertiary);
+  text-align: center;
+  padding: 20px 0;
+}
+
+/* ================= [需求⑦] 数据管理 tab ================= */
+.data-location {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  font-size: 13px;
+}
+.data-label {
+  min-width: 72px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+.data-value {
+  color: var(--text-primary);
+  word-break: break-all;
+}
+.data-block-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 14px 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-color);
+}
+.data-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.data-path-input {
+  flex: 1;
+  padding: 7px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 13px;
+  box-sizing: border-box;
+}
+.data-path-input:focus {
+  border-color: var(--accent-color);
+  outline: none;
+}
+.data-msg {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--accent-color);
+}
+.data-msg.error {
+  color: #cc4b4b;
+}
+
+/* ================= [需求⑤] 设置界面响应式三档(桌面 / 平板 / 手机) ================= */
+/* 平板 768-1024px:设置框贴近视口宽度、内边距收紧,仍为左右布局 */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .modal.settings-modal { width: min(720px, 94vw); }
+  .settings-tabs { width: 156px; }
+  .settings-panel { padding: 16px; }
+  .settings-plugin-list { max-height: 46vh; }
+}
+/* 手机 <768px:全局已把 modal 强制为满宽底部 Sheet;这里把 tab 改成顶部横排滚动,
+   使 8 个 tab 在窄屏不溢出、可横向滑动,面板整宽显示 */
+@media (max-width: 767px) {
+  .settings-content { flex-direction: column; }
+  .settings-tabs {
+    flex-direction: row;
+    width: 100%;
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border-color);
+    padding: 8px;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .settings-tab { margin: 0; white-space: nowrap; }
+  .settings-panel { padding: 14px; }
+  .settings-field { flex-wrap: wrap; }
+  .settings-plugin-list { max-height: 40vh; }
 }

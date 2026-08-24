@@ -222,7 +222,7 @@ export default function App() {
   /** [Pane] 是否正在渲染画布式工作区(notes/calendar/graph)→ true;git/publish/trash 全屏视图 → false */
   const [workspaceView, setWorkspaceView] = useState(true);
   /** [Pane] 编辑器命令 API(save / insertAtCursor),由 Editor 通过 onRegisterApi 注册 */
-  const editorApiRef = useRef<{ save: () => void; insertAtCursor: (text: string) => void } | null>(null);
+  const editorApiRef = useRef<{ save: () => void; insertAtCursor: (text: string) => void; focusContent: () => void } | null>(null);
   /** [Pane] 命令面板开关 */
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   /** [Pane] 模板插入弹窗开关 */
@@ -575,6 +575,9 @@ export default function App() {
       setSelectedNote(target);
       setActiveNav('notes');
       setMobileView('editor');
+      // [需求⑥] 打开笔记后聚焦/定位到正文内容(编辑态聚焦 textarea、预览态滚到预览区),
+      // 避免点开只在列表「选中」而看不到正文。next tick 等编辑器随新笔记重渲染后再执行。
+      requestAnimationFrame(() => { editorApiRef.current?.focusContent?.(); });
     } else {
       showToast(`未找到笔记: ${title}`, 'info');
     }
