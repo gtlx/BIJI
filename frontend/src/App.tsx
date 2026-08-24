@@ -568,16 +568,32 @@ export default function App() {
   }, [selectedNote, showToast]);
 
 
-  /** [M3.5a] 日历/反向链接的跳转入口:打开目标笔记 */
+  /** [M3.5a] 日历/反向链接/看板卡片的跳转入口:打开目标笔记并聚焦正文 */
   const jumpToNote = ({ id, title }: { id: string; title: string }) => {
     const target = notes.find(n => n.id === id);
     if (target) {
       setSelectedNote(target);
       setActiveNav('notes');
       setMobileView('editor');
-      // [需求⑥] 打开笔记后聚焦/定位到正文内容(编辑态聚焦 textarea、预览态滚到预览区),
-      // 避免点开只在列表「选中」而看不到正文。next tick 等编辑器随新笔记重渲染后再执行。
-      requestAnimationFrame(() => { editorApiRef.current?.focusContent?.(); });
+      // [需求③] 确保工作区渲染编辑器(看板/发布等全屏 view 切回时 workspaceView 仍为 false,
+      // 若不切回则 Editor 不会挂载、editorApiRef 为空,正文无法聚焦)。
+      setWorkspaceView(true);
+      ensurePane('editor');
+
+      // [需求⑥+③] 打开笔记后聚焦/定位到正文内容(编辑态聚焦 textarea、预览态滚到预览区)。
+      // 看板全屏切回时 Editor 可能尚未注册 editorApiRef,单次 rAF 取到的是 null → 改「重试至就绪」:
+      // 给渲染挂载留帧,帧内再延后重试,直到 editorApiRef.current.focusContent 存在才调用,
+      // 保证点看板卡片能直接聚焦正文。日历/反向链接等入口已就绪,首次重试即命中,行为不变。
+      const tryFocusEditor = (attempt: number) => {
+        const fc = editorApiRef.current?.focusContent;
+        if (fc && typeof fc === 'function') {
+          fc();
+          return;
+        }
+        if (attempt >= 8) return; // 上限,避免无限轮询(此时编辑器大概率仍未挂载,放弃聚焦)
+        requestAnimationFrame(() => setTimeout(() => tryFocusEditor(attempt + 1), 40));
+      };
+      tryFocusEditor(0);
     } else {
       showToast(`未找到笔记: ${title}`, 'info');
     }

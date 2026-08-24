@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { backend } from '../api';
 import type { Note, AppSettings, Plugin, NoteTemplate, Folder } from '../api/backend';
 import { DEFAULT_TEMPLATES } from '../api/backend';
@@ -14,6 +14,13 @@ import {
 import { setFrontendPluginEnabled } from '../plugins/registry';
 import type { UnifiedPlugin } from '../utils/unifiedPlugins';
 import { buildUnifiedPluginList } from '../utils/unifiedPlugins';
+// [需求①] 软件数据导入导出(完整迁移备份):非笔记配置的 JSON 备份/恢复
+import {
+  buildSoftwareBackup,
+  downloadJsonFile,
+  parseSoftwareBackup,
+  writeBackupLocalKeys,
+} from '../utils/softwareBackup';
 import './SettingsModal.css';
 
 interface SettingsModalProps {
@@ -84,6 +91,8 @@ export function SettingsModal({ settings, folders, folderPresets, onFolderPreset
   const [dataMsg, setDataMsg] = useState('');
   const [exportPath, setExportPath] = useState('');
   const [importPath, setImportPath] = useState('');
+  // [需求①] 软件数据导入:隐藏 file 输入,供「导入软件数据」按钮触发
+  const softwareFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setLocalSettings(settings);
@@ -216,6 +225,40 @@ export function SettingsModal({ settings, folders, folderPresets, onFolderPreset
     } catch (e) { setDataMsg('导入失败: ' + (e instanceof Error ? e.message : String(e))); }
   };
 
+  /** [需求①] 导出软件数据:收集设置 + 全部配置 localStorage 键 → JSON 下载(不含笔记正文) */
+  const handleExportSoftware = () => {
+    downloadJsonFile(`biji-software-config-${new Date().toISOString().slice(0, 10)}.json`, buildSoftwareBackup(localSettings));
+    setDataMsg('软件数据已导出(设置/快捷键/插件开关/顶层目录预设/布局/标签偏好等,不含笔记正文)。');
+  };
+
+  /** [需求①] 触发隐藏文件选择,读取软件数据备份 JSON */
+  const handleChooseSoftwareImport = () => {
+    softwareFileInputRef.current?.click();
+  };
+
+  /** [需求①] 读取所选备份文件并应用:设置落库 + 写回 localStorage → 刷新让布局/目录预设等完全生效 */
+  const handleImportSoftwareFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // 允许重复选择同一文件
+    if (!file) { setDataMsg('导入失败:未选择文件'); return; }
+    try {
+      const text = await file.text();
+      const backup = parseSoftwareBackup(text);
+      if (!backup) { setDataMsg('导入失败:不是有效的软件数据备份文件。'); return; }
+      // 1) 设置/快捷键/番茄钟等通过 onSave 落库并即时生效(web Mock 为内存库,真实壳为后端)
+      if (backup.settings) {
+        await onSave(backup.settings);
+        setLocalSettings(backup.settings); // 同步弹窗内编辑态
+      }
+      // 2) 其余纯 localStorage 配置逐键写回(布局/目录预设/标签偏好等)
+      const n = writeBackupLocalKeys(backup.localStorage);
+      setDataMsg(`软件数据导入成功:设置已恢复,已写回 ${n} 项本地配置。正在刷新以让布局/目录预设等完全生效…`);
+      setTimeout(() => window.location.reload(), 900);
+    } catch (err) {
+      setDataMsg('导入失败: ' + (err instanceof Error ? err.message : String(err)));
+    }
+  };
+
   const tabs = [
     { id: 'appearance', label: '外观' },
     { id: 'editor', label: '编辑器' },
@@ -291,59 +334,9 @@ export function SettingsModal({ settings, folders, folderPresets, onFolderPreset
                     {DEFAULT_TEMPLATES.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
                 </label>
-              </div>
-            )}
 
-            {activeTab === 'workspace' && (
-              <div className="settings-section">
-                <h3>默认工作区 / 布局</h3>
-                <p className="settings-hint">恢复默认布局:清掉本地记忆的右 dock 布局,回到「左文件 | 主编辑器 | 右 dock 独立分块」。番茄钟等被隐藏的面板可由「添加面板」重新打开。</p>
-                <button className="btn btn-secondary" onClick={onResetLayout}>恢复默认布局</button>
-              </div>
-            )}
-
-            {activeTab === 'shortcuts' && (
-              <div className="settings-section">
-                <h3>快捷键</h3>
-                <p className="settings-hint">在这里自定义命令面板快捷键(如 Ctrl/Cmd+K 搜索、Ctrl/Cmd+P 命令面板)。填写组合键文本,保存后生效。</p>
-                {SHORTCUT_FIELDS.map(({ key, label }) => (
-                  <label key={key} className="settings-field">
-                    <span>{label}</span>
-                    <input type="text" value={localSettings.shortcuts[key]}
-                      onChange={e => updateShortcut(key, e.target.value)} />
-                  </label>
-                ))}
-              </div>
-            )}
-
-            {activeTab === 'templates' && (
-              <div className="settings-section">
-                {/* [需求②] 模板 tab = 模板管理 + 按顶层目录绑定模板/命名规则(原独立 presets tab 并入) */}
-                <h3>模板管理</h3>
-                <p className="settings-hint">内置模板不可删除;自定义模板可增/删,新建笔记时可选择。</p>
-                {templates.map(t => (
-                  <div key={t.id} className="template-row">
-                    <div className="template-info">
-                      <span className="template-name">{t.name}</span>
-                      <span className={`template-badge ${t.is_builtin ? 'builtin' : 'custom'}`}>
-                        {t.is_builtin ? '内置' : '自定义'}
-                      </span>
-                    </div>
-                    {!t.is_builtin && (
-                      <button className="template-del" title="删除该模板"
-                        onClick={() => handleDeleteTemplate(t.id)}>删除</button>
-                    )}
-                  </div>
-                ))}
-                <div className="template-add">
-                  <input type="text" placeholder="模板名称"
-                    value={newTemplateName} onChange={e => setNewTemplateName(e.target.value)} />
-                  <textarea placeholder="模板内容 {{date}} 会被替换为当天日期"
-                    value={newTemplateContent} onChange={e => setNewTemplateContent(e.target.value)} />
-                  <button className="btn btn-secondary" onClick={handleAddTemplate}>新增自定义模板</button>
-                </div>
-
-                {/* [需求②] 目录预设并入:按顶层目录绑定模板/命名规则(复用 folderPresets.ts,UI 从独立 tab 归入模板) */}
+                {/* [需求②] 按顶层目录绑定模板/命名规则:与全局默认模板同属「新建笔记用什么模板」,
+                    故将其分区从「模板」tab 并入「编辑器」tab(功能逻辑仍复用 folderPresets.ts)。 */}
                 <h3 className="preset-heading">按顶层目录绑定模板 / 命名规则</h3>
                 <p className="settings-hint">单笔记库内靠顶层文件夹分类用途。为某个顶层目录绑定预设后,在其下新建笔记会自动套用对应模板与命名规则(知识仍互通,不做多 vault)。仅顶层目录(不带父级)可配置;子文件夹自动继承所属顶层目录的预设。更改即时生效(存于本地)。</p>
                 {topFolders.length === 0 && (
@@ -388,6 +381,57 @@ export function SettingsModal({ settings, folders, folderPresets, onFolderPreset
               </div>
             )}
 
+            {activeTab === 'workspace' && (
+              <div className="settings-section">
+                <h3>默认工作区 / 布局</h3>
+                <p className="settings-hint">恢复默认布局:清掉本地记忆的右 dock 布局,回到「左文件 | 主编辑器 | 右 dock 独立分块」。番茄钟等被隐藏的面板可由「添加面板」重新打开。</p>
+                <button className="btn btn-secondary" onClick={onResetLayout}>恢复默认布局</button>
+              </div>
+            )}
+
+            {activeTab === 'shortcuts' && (
+              <div className="settings-section">
+                <h3>快捷键</h3>
+                <p className="settings-hint">在这里自定义命令面板快捷键(如 Ctrl/Cmd+K 搜索、Ctrl/Cmd+P 命令面板)。填写组合键文本,保存后生效。</p>
+                {SHORTCUT_FIELDS.map(({ key, label }) => (
+                  <label key={key} className="settings-field">
+                    <span>{label}</span>
+                    <input type="text" value={localSettings.shortcuts[key]}
+                      onChange={e => updateShortcut(key, e.target.value)} />
+                  </label>
+                ))}
+              </div>
+            )}
+
+            {activeTab === 'templates' && (
+              <div className="settings-section">
+                {/* [需求②] 模板 tab = 纯模板管理(内置 + 自定义增删);目录预设分区已并入「编辑器」tab */}
+                <h3>模板管理</h3>
+                <p className="settings-hint">内置模板不可删除;自定义模板可增/删,新建笔记时可选择。新建笔记「用什么模板」的目录级绑定请看「编辑器」tab 的「按顶层目录绑定模板 / 命名规则」。</p>
+                {templates.map(t => (
+                  <div key={t.id} className="template-row">
+                    <div className="template-info">
+                      <span className="template-name">{t.name}</span>
+                      <span className={`template-badge ${t.is_builtin ? 'builtin' : 'custom'}`}>
+                        {t.is_builtin ? '内置' : '自定义'}
+                      </span>
+                    </div>
+                    {!t.is_builtin && (
+                      <button className="template-del" title="删除该模板"
+                        onClick={() => handleDeleteTemplate(t.id)}>删除</button>
+                    )}
+                  </div>
+                ))}
+                <div className="template-add">
+                  <input type="text" placeholder="模板名称"
+                    value={newTemplateName} onChange={e => setNewTemplateName(e.target.value)} />
+                  <textarea placeholder="模板内容 {{date}} 会被替换为当天日期"
+                    value={newTemplateContent} onChange={e => setNewTemplateContent(e.target.value)} />
+                  <button className="btn btn-secondary" onClick={handleAddTemplate}>新增自定义模板</button>
+                </div>
+              </div>
+            )}
+
             {activeTab === 'sync' && (
               <div className="settings-section">
                 <h3>云同步</h3>
@@ -421,6 +465,17 @@ export function SettingsModal({ settings, folders, folderPresets, onFolderPreset
                   <span className="data-value">{localSettings.storage_path
                     ? localSettings.storage_path
                     : '浏览器 Mock(无磁盘库);Tauri 壳下此处显示 biji.db 所在路径'}</span>
+                </div>
+
+                {/* [需求①] 软件数据导入导出:非笔记配置的完整备份/恢复(跨机迁移) */}
+                <h4 className="data-block-title">软件数据(配置备份)</h4>
+                <p className="settings-hint">备份/还原「软件配置」:设置(主题/字号/快捷键/番茄钟时长等)、前端插件开关、顶层目录预设、面板布局、侧栏宽度、标签条偏好等本地配置。导入后自动刷新以完整生效。<strong>不含笔记正文</strong>——笔记请用下方的 Markdown 导出/导入。</p>
+                <div className="data-row">
+                  <button className="btn btn-secondary" onClick={handleExportSoftware}>导出软件数据(JSON)</button>
+                  <button className="btn btn-secondary" onClick={handleChooseSoftwareImport}>导入软件数据(JSON)</button>
+                  {/* 隐藏 file 输入:由「导入软件数据」按钮触发 */}
+                  <input ref={softwareFileInputRef} type="file" accept="application/json,.json"
+                    style={{ display: 'none' }} onChange={handleImportSoftwareFile} />
                 </div>
 
                 <h4 className="data-block-title">导出</h4>
