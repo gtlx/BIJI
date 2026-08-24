@@ -80,3 +80,65 @@ export function withKanbanStatus(content: string, status: string): string {
 
   return next.join('\n') + bodyOpen + body;
 }
+
+/**
+ * [M10③ 属性面板] 把多个 frontmatter 字段写入 content 顶部 YAML 块(通用序列化)。
+ *
+ * 语义与 withKanbanStatus 一致但更通用:
+ *  - 已存在的键 → 就地更新值(保持原行序);
+ *  - 新键 → 在 `---` 结束前追加;
+ *  - 值为 undefined / 空串 / 空数组 → 移除该键;
+ *  - 无 frontmatter → 在正文前新建一个 YAML 块;全部被移除且原本无块 → 返回原内容。
+ * 数组序列化为内联 `[a, "b"]` 形式(与 parseFrontmatter 的解析互为逆运算)。
+ */
+export function writeFrontmatter(
+  content: string,
+  patch: Record<string, string | string[] | boolean | undefined>,
+): string {
+  // 序列化单个字段值;空值返回 null(表示移除)
+  const ser = (key: string, v: unknown): string | null => {
+    if (v === undefined || v === null || v === '') return null;
+    if (Array.isArray(v)) {
+      if (v.length === 0) return null;
+      const items = v.map(i => `"${String(i).replace(/"/g, '\\"')}"`).join(', ');
+      return `${key}: [${items}]`;
+    }
+    if (typeof v === 'boolean') return `${key}: ${v}`;
+    return `${key}: ${String(v)}`;
+  };
+
+  const fmMatch = content.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+  const fmLines = fmMatch ? fmMatch[1].split('\n') : [];
+  const body = fmMatch ? fmMatch[2] : content;
+
+  // 已在更新范围内的键(用于去重 / 判断是「更新」还是「新增」)
+  const keyRe = /^([A-Za-z0-9_-]+)\s*:/;
+  const out: string[] = [];
+  const seen = new Set<string>();
+
+  for (const line of fmLines) {
+    const m = line.match(keyRe);
+    // 非「键:值」行(注释等)直接保留
+    if (!m) { out.push(line); continue; }
+    const key = m[1];
+    // 本次不更新的键原样保留
+    if (!(key in patch)) { out.push(line); continue; }
+    seen.add(key);
+    const val = ser(key, patch[key]);
+    if (val !== null) out.push(val);
+  }
+  // 新增键(原本不存在)追加到块尾
+  for (const [k, v] of Object.entries(patch)) {
+    if (seen.has(k)) continue;
+    const val = ser(k, v);
+    if (val !== null) out.push(val);
+  }
+
+  // 原本无 frontmatter 且没有需要写入的字段 → 不改动
+  if (!fmMatch && out.length === 0) return content;
+
+  const head = ['---', ...out, '---'].join('\n');
+  // 规范输出:frontmatter 块后空一行再接正文
+  const sep = body === '' ? '' : '\n\n';
+  return head + sep + body;
+}

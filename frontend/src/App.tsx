@@ -13,7 +13,9 @@ import { CalendarView } from './components/CalendarView';
 import { GitPanel } from './components/GitPanel';
 import { SearchModal } from './components/SearchModal';
 import { PluginManagerModal } from './components/PluginManagerModal';
-import { RightPanel } from './components/RightPanel';
+import { OutlinePane } from './components/OutlinePane';
+import { BacklinksPane } from './components/BacklinksPane';
+import { PropertiesPane } from './components/PropertiesPane';
 import { TrashView } from './components/TrashView';
 import { NewNoteModal } from './components/NewNoteModal';
 import { MobileTabbar, type TabItem } from './components/MobileTabbar';
@@ -728,30 +730,23 @@ export default function App() {
         );
       case 'outline':
         return (
-          <RightPanel
-            key="outline"
+          <OutlinePane
             content={selectedNote?.content || ''}
-            defaultTab="outline"
-            pomodoroEnabled={pomodoroEnabled}
-            noteId={selectedNote?.id || null}
-            onSelectNote={(n) => { const t = notes.find(x => x.id === n.id); if (t) setSelectedNote(t); }}
             onHeadingClick={() => {}}
-            onToggle={() => closePane('outline')}
-            onPropertiesClick={() => showToast('属性面板', 'info')}
           />
         );
       case 'backlinks':
         return (
-          <RightPanel
-            key="backlinks"
-            content={selectedNote?.content || ''}
-            defaultTab="backlinks"
-            pomodoroEnabled={pomodoroEnabled}
+          <BacklinksPane
             noteId={selectedNote?.id || null}
             onSelectNote={jumpToNote}
-            onHeadingClick={() => {}}
-            onToggle={() => closePane('backlinks')}
-            onPropertiesClick={() => showToast('属性面板', 'info')}
+          />
+        );
+      case 'properties':
+        return (
+          <PropertiesPane
+            note={selectedNote}
+            onSave={handleSaveNote}
           />
         );
       case 'graph':

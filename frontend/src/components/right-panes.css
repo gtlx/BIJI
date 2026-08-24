@@ -1,0 +1,179 @@
+/* ============================================================
+   [M10③ 右 dock 模块独立] 右 dock 各独立面板共享样式
+   大纲 / 反向链接 / 属性 —— 每个面板只渲染本模块内容,无多 tab。
+   PaneWorkspace 已提供 pane-header(标题 + 关闭),故这里只负责内容样式。
+   ============================================================ */
+
+/* ---------- 大纲 ---------- */
+.outline {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.outline-empty {
+  padding: 16px;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+
+.outline-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 7px 10px;
+  margin-bottom: 1px;
+  text-align: left;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: inherit;
+  font-size: 13px;
+}
+.outline-item svg {
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+}
+.outline-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.outline-item:hover {
+  background: var(--accent-bg);
+  color: var(--teal-700);
+}
+
+.outline-level-1 { font-weight: 600; }
+.outline-level-3 { font-size: 13px; }
+.outline-level-4 { font-size: 12px; color: var(--text-tertiary); }
+.outline-level-5 { font-size: 11px; color: var(--text-tertiary); }
+.outline-level-6 { font-size: 11px; color: var(--text-tertiary); }
+
+/* ---------- 反向链接(块级) ---------- */
+.backlinks-panel { padding: 2px; }
+
+.backlinks-empty {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  text-align: center;
+  padding: 18px 8px;
+}
+
+.backlinks-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+}
+
+.backlinks-item {
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  padding: 8px 10px;
+}
+
+.backlinks-source {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--accent-color);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  padding: 0;
+}
+.backlinks-source:hover { text-decoration: underline; }
+
+.backlinks-time {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.backlinks-snippet {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  margin: 5px 0 0;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ---------- 属性(frontmatter 编辑) ---------- */
+.properties-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 4px 2px;
+}
+
+.prop-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.prop-label {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  letter-spacing: 0.5px;
+}
+
+.prop-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 13px;
+  transition: border-color 0.15s ease;
+}
+.prop-input:focus {
+  outline: none;
+  border-color: var(--teal-500);
+}
+
+.prop-select {
+  cursor: pointer;
+}
+
+.prop-save {
+  margin-top: 2px;
+  padding: 8px 0;
+  border: none;
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, var(--teal-500), var(--teal-600));
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(20, 184, 166, 0.30);
+  transition: filter 0.15s ease;
+}
+.prop-save:hover:not(:disabled) { filter: brightness(1.06); }
+.prop-save:disabled { opacity: 0.6; cursor: default; }

@@ -24,7 +24,7 @@
  */
 
 /** 可用面板模块 id */
-export type PaneId = 'editor' | 'files' | 'outline' | 'backlinks' | 'graph' | 'calendar' | 'tags' | 'pomodoro' | 'kanban';
+export type PaneId = 'editor' | 'files' | 'outline' | 'backlinks' | 'properties' | 'graph' | 'calendar' | 'tags' | 'pomodoro' | 'kanban';
 
 /** 右 dock 的一块:一组 tab(同块内面板可切换) */
 export interface PaneRow {
@@ -62,6 +62,7 @@ export const PANE_REGISTRY: PaneMeta[] = [
   { id: 'files', label: '文件', icon: 'folder', zone: 'left' },
   { id: 'outline', label: '大纲', icon: 'outline', zone: 'right' },
   { id: 'backlinks', label: '反向链接', icon: 'backlink', zone: 'right' },
+  { id: 'properties', label: '属性', icon: 'edit', zone: 'right' },
   { id: 'graph', label: '图谱', icon: 'graph', zone: 'right' },
   { id: 'calendar', label: '日历', icon: 'calendar', zone: 'right' },
   { id: 'tags', label: '标签', icon: 'tag', zone: 'right' },
@@ -81,13 +82,13 @@ const nid = () => `row-${Date.now().toString(36)}-${seq++}`;
 
 /** 默认布局:左文件 | 主编辑器 | 右 dock(每个右 dock 模块各自独立成一块,不堆 tab 组) */
 export function defaultLayout(): PaneLayout {
-  // 看板不默认打开(避免右 dock 一开始就塞满),靠导航/Pane「添加面板」打开;其余右 dock 模块默认各一块
-  const openRight = RIGHT_PANES.filter(id => id !== 'kanban');
+  // 看板/属性不默认打开(避免右 dock 一开始就塞满),靠导航/Pane「添加面板」打开;其余右 dock 模块默认各一块
+  const openRight = RIGHT_PANES.filter(id => id !== 'kanban' && id !== 'properties');
   return {
     main: 'editor',
     left: ['files'],
     right: openRight.map(id => ({ id: nid(), panes: [id], active: 0 })),
-    hidden: RIGHT_PANES.filter(id => id === 'kanban'),
+    hidden: RIGHT_PANES.filter(id => id === 'kanban' || id === 'properties'),
   };
 }
 
