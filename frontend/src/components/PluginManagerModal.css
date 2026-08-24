@@ -34,6 +34,39 @@
   margin-bottom: 4px;
 }
 
+/* 名称与来源徽标同行排列 */
+.plugin-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 来源徽标:后端(teal) / 前端(中性) */
+.plugin-source {
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 10px;
+  color: var(--accent-color);
+  background-color: color-mix(in srgb, var(--accent-color) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-color) 40%, transparent);
+}
+
+.plugin-version {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-bottom: 4px;
+}
+
+/* 空态提示 */
+.plugin-empty {
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-align: center;
+  padding: 20px 0;
+}
+
 .plugin-description {
   font-size: 13px;
   color: var(--text-secondary);

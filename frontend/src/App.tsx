@@ -27,7 +27,7 @@ import type { PaneId, PaneLayout } from './components/pane/types';
 import { PANE_META } from './components/pane/types';
 import { StrokeIcon } from './icons';
 import { KanbanPane } from './components/KanbanPane';
-import { getFrontendPlugin, getViewPlugin, getNavPlugins } from './plugins/registry';
+import { getFrontendPlugin, getViewPlugin, getNavPlugins, subscribeFrontendPlugins } from './plugins/registry';
 import { withKanbanStatus } from './utils/frontmatter';
 import './App.css';
 
@@ -62,17 +62,6 @@ const CORE_NAV_ITEMS: SidebarNavItem[] = [
   { id: 'search', icon: 'search', label: '搜索' },
   { id: 'graph', icon: 'graph', label: '图谱' },
   { id: 'git', icon: 'git', label: 'Git' },
-];
-
-/** [M8] 前端插件生成的导航项(注册表驱动;发布=view,看板=pane) */
-const PLUGIN_NAV_ITEMS: SidebarNavItem[] = getNavPlugins().map(p => ({ id: p.id, icon: p.icon, label: p.label }));
-
-/** 应用导航(桌面左侧栏 = 移动端底部 Tab 栏的并集,商枢注册表思路)——核心 + 插件 + 工具项 */
-const NAV_ITEMS: SidebarNavItem[] = [
-  ...CORE_NAV_ITEMS,
-  ...PLUGIN_NAV_ITEMS,
-  { id: 'plugins', icon: 'plugin', label: '插件' },
-  { id: 'trash', icon: 'trash', label: '回收站' },
 ];
 
 /** 移动端底部 Tab(手机 <768px;搜索/设置为模态入口) */
@@ -136,6 +125,29 @@ export default function App() {
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   /** [Pane] 模板插入弹窗开关 */
   const [showTemplateInsert, setShowTemplateInsert] = useState(false);
+
+  // [M8 补] 前端插件 enable 状态:订阅注册表变化,驱动导航重算
+  const [fpRev, setFpRev] = useState(0);
+  useEffect(() => {
+    return subscribeFrontendPlugins(() => setFpRev(r => r + 1));
+  }, []);
+
+  /** [M8] 前端插件生成的导航项(随 enable 状态实时增减;发布=view,看板=pane) */
+  const pluginNavItems = useMemo<SidebarNavItem[]>(
+    () => getNavPlugins().map(p => ({ id: p.id, icon: p.icon, label: p.label })),
+    [fpRev],
+  );
+
+  /** 应用导航(桌面左侧栏 = 移动端底部 Tab 栏的并集,商枢注册表思路)——核心 + 插件 + 工具项 */
+  const navItems = useMemo<SidebarNavItem[]>(
+    () => [
+      ...CORE_NAV_ITEMS,
+      ...pluginNavItems,
+      { id: 'plugins', icon: 'plugin', label: '插件' },
+      { id: 'trash', icon: 'trash', label: '回收站' },
+    ],
+    [pluginNavItems],
+  );
 
   // [Pane] 布局变化即落 localStorage(重启还原)
   useEffect(() => { saveLayout(paneLayout); }, [paneLayout]);
@@ -769,7 +781,7 @@ export default function App() {
           onOpenSettings={() => setShowSettings(true)}
           onNewNote={handleNewNote}
           onNewFolder={handleNewFolder}
-          navItems={NAV_ITEMS}
+          navItems={navItems}
           activeNav={activeNav}
           onNavClick={handleNavClick}
           collapsed={leftSidebarCollapsed}
