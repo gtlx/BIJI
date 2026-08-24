@@ -258,6 +258,11 @@ export class MockBackend implements BackendAdapter {
       toggle_left_sidebar: 'Ctrl+[', toggle_right_sidebar: 'Ctrl+]', toggle_graph: 'Ctrl+G',
       toggle_outline: 'Ctrl+O', toggle_preview_mode: 'Ctrl+P', toggle_editor_mode: 'Ctrl+E',
     },
+    // [通知] 默认:自动消失 4 秒、右下角出现
+    toast_duration_seconds: 4,
+    toast_position: 'right-bottom',
+    // [关于调试] 默认日志级别:信息
+    log_level: 'info',
   };
 
   async getNotes(includeDeleted = false): Promise<Note[]> {

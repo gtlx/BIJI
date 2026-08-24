@@ -192,6 +192,17 @@
   margin: 0 0 12px;
 }
 
+/* [关于调试] 调试小节的操作区:按钮与提示并排 */
+.settings-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+.settings-actions .settings-hint {
+  margin: 0;
+}
+
 /* 工作区:恢复默认布局按钮 */
 .settings-section .btn-secondary {
   margin-top: 4px;

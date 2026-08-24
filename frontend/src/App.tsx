@@ -6,7 +6,7 @@ import { Sidebar, type SidebarNavItem } from './components/Sidebar';
 import { NoteList } from './components/NoteList';
 import { Editor } from './components/Editor';
 import { StatusBar } from './components/StatusBar';
-import { ToastContainer } from './components/Toast';
+import { ToastContainer, type ToastPosition } from './components/Toast';
 import { SettingsModal } from './components/SettingsModal';
 import { GraphView } from './components/GraphView';
 import { CalendarView } from './components/CalendarView';
@@ -45,7 +45,14 @@ interface ToastItem {
   id: string;
   message: string;
   type?: 'success' | 'error' | 'info';
+  /** [通知] 自动消失时长(毫秒);null/0 = 常驻,点击关闭。 */
+  durationMs?: number | null;
 }
+
+/** [通知] Toast 默认自动消失时长(秒):4 秒;0=常驻。可在设置覆盖。 */
+const DEFAULT_TOAST_DURATION_SECONDS = 4;
+/** [通知] Toast 默认出现位置:右下(与旧行为一致)。 */
+const DEFAULT_TOAST_POSITION: ToastPosition = 'right-bottom';
 
 /** [M3.5b 导出] 触发浏览器下载一个文本文件 */
 function downloadFile(content: string, filename: string, mime: string): void {
@@ -313,10 +320,18 @@ export default function App() {
     if (has) closePane(id); else ensurePane(id);
   }, [paneLayout, closePane, ensurePane]);
 
-  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success', durationMs?: number | null) => {
     const id = crypto.randomUUID();
-    setToasts(prev => [...prev, { id, message, type }]);
-  }, []);
+    // [通知] 未显式传时长时按设置读取默认;0/未设 = 常驻(需点击才关)
+    let effective: number | null = null;
+    if (typeof durationMs === 'number') {
+      effective = durationMs > 0 ? durationMs : null;
+    } else {
+      const secs = settings?.toast_duration_seconds ?? DEFAULT_TOAST_DURATION_SECONDS;
+      effective = secs > 0 ? secs * 1000 : null;
+    }
+    setToasts(prev => [...prev, { id, message, type, durationMs: effective }]);
+  }, [settings]);
 
   const removeToast = useCallback((id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id));
@@ -1200,7 +1215,7 @@ export default function App() {
         onTabClick={handleNavClick}
       />
 
-      <ToastContainer toasts={toasts} onRemove={removeToast} />
+      <ToastContainer toasts={toasts} onRemove={removeToast} position={settings?.toast_position ?? DEFAULT_TOAST_POSITION} />
 
       {showSettings && settings && (
         <SettingsModal

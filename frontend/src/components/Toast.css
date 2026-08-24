@@ -8,6 +8,12 @@
   gap: 8px;
 }
 
+/* [通知] 出现位置可切换:基础保持右下(旧行为);以下按类名覆盖定位。 */
+.toast-pos-right-bottom { bottom: 60px; right: 20px; }
+.toast-pos-right-top    { top: 20px;    right: 20px; }
+.toast-pos-left-bottom  { bottom: 60px; left: 20px;  }
+.toast-pos-left-top     { top: 20px;    left: 20px;  }
+
 .toast {
   display: flex;
   align-items: center;

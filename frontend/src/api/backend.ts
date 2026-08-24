@@ -67,6 +67,15 @@ export interface AppSettings {
   pomodoro_focus_minutes?: number;
   pomodoro_break_minutes?: number;
   pomodoro_reminder?: boolean;
+  /**
+   * [通知] Toast 自动消失时长(秒)。0 / undefined = 常驻,需点击才关闭。
+   * 可选字段:未设置时用前端默认 4 秒。
+   */
+  toast_duration_seconds?: number;
+  /** [通知] Toast 出现位置:右下/右上/左下/左上(类名控制);缺省右下。 */
+  toast_position?: 'right-bottom' | 'right-top' | 'left-bottom' | 'left-top';
+  /** [关于调试] 日志级别偏好(现有日志系统接入前的偏好缓存,为日后接入预留)。 */
+  log_level?: 'error' | 'warn' | 'info' | 'debug';
 }
 
 export interface UICustomCSS {

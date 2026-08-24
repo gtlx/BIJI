@@ -66,6 +66,40 @@ const SHORTCUT_FIELDS: { key: keyof AppSettings['shortcuts']; label: string }[] 
   { key: 'toggle_editor_mode', label: '编辑器模式' },
 ];
 
+// ==================== [通知 / 关于调试] 常量 ====================
+/** [通知] 自动消失时长选项(select 值=秒,0=常驻点击关闭),亦用于诊断信息文案。 */
+const TOAST_DURATION_OPTIONS: { value: number; label: string }[] = [
+  { value: 0, label: '常驻(需点击关闭)' },
+  { value: 2, label: '2 秒' },
+  { value: 4, label: '4 秒' },
+  { value: 6, label: '6 秒' },
+  { value: 10, label: '10 秒' },
+];
+/** [通知] 默认自动消失时长(秒);与 App.tsx 的 DEFAULT_TOAST_DURATION_SECONDS 保持一致。 */
+const DEFAULT_TOAST_DURATION = 4;
+/** [通知] 出现位置:值=ToastPosition 类名后缀,label=中文。 */
+const TOAST_POSITION_OPTIONS: { value: string; label: string }[] = [
+  { value: 'right-bottom', label: '右下' },
+  { value: 'right-top', label: '右上' },
+  { value: 'left-bottom', label: '左下' },
+  { value: 'left-top', label: '左上' },
+];
+/** [通知] 默认出现位置:右下(与旧行为一致)。 */
+const DEFAULT_TOAST_POSITION = 'right-bottom';
+/** [关于调试] 日志级别选项(现有日志系统接入前的偏好,预留给日后日志输出)。 */
+const LOG_LEVEL_OPTIONS: { value: string; label: string }[] = [
+  { value: 'error', label: '错误' },
+  { value: 'warn', label: '警告' },
+  { value: 'info', label: '信息' },
+  { value: 'debug', label: '调试' },
+];
+/** [关于调试] 默认日志级别:信息。 */
+const DEFAULT_LOG_LEVEL = 'info';
+/** 选项 → 中文文案映射,用于「复制诊断信息」排版。 */
+const TOAST_DURATION_LABELS = Object.fromEntries(TOAST_DURATION_OPTIONS.map(o => [o.value, o.label]));
+const TOAST_POSITION_LABELS = Object.fromEntries(TOAST_POSITION_OPTIONS.map(o => [o.value, o.label]));
+const LOG_LEVEL_LABELS = Object.fromEntries(LOG_LEVEL_OPTIONS.map(o => [o.value, o.label]));
+
 /** 番茄钟后端插件 id(用于在插件管理里识别出番茄钟行,展示其详细设置) */
 const POMODORO_PLUGIN_ID = 'pomodoro-plugin';
 
@@ -89,6 +123,8 @@ export function SettingsModal({ settings, folders, folderPresets, onFolderPreset
   const [expandedPluginId, setExpandedPluginId] = useState<string>('');
   // [需求⑦] 数据管理:导出/导入结果提示 + 路径输入
   const [dataMsg, setDataMsg] = useState('');
+  // [关于调试] 调试小节提示信息(复制成功 / 失败原因)
+  const [debugMsg, setDebugMsg] = useState('');
   const [exportPath, setExportPath] = useState('');
   const [importPath, setImportPath] = useState('');
   // [需求①] 软件数据导入:隐藏 file 输入,供「导入软件数据」按钮触发
@@ -307,6 +343,65 @@ export function SettingsModal({ settings, folders, folderPresets, onFolderPreset
     } catch (err) { setDataMsg('导入失败: ' + (err instanceof Error ? err.message : String(err))); }
   };
 
+  /**
+   * [关于调试] 复制诊断信息到剪贴板(版本 / 设置关键项 / localStorage 配置键),便于排查分享。
+   * 优先用 navigator.clipboard;旧浏览器 / 非安全上下文降级为临时 textarea + execCommand。
+   */
+  const handleCopyDiagnostics = async () => {
+    const lines: string[] = [];
+    lines.push('=== Biji Note 诊断信息 ===');
+    lines.push('版本: 0.5.0');
+    lines.push(`生成时间: ${new Date().toLocaleString()}`);
+    lines.push('');
+    lines.push('--- 设置关键项 ---');
+    const secs = localSettings.toast_duration_seconds ?? DEFAULT_TOAST_DURATION;
+    const kv: Array<[string, string]> = [
+      ['主题', localSettings.theme],
+      ['字体大小', `${localSettings.font_size}px`],
+      ['编辑器模式', localSettings.editor_mode === 'rich' ? '富文本' : 'Markdown'],
+      ['自动保存', localSettings.auto_save ? '开' : '关'],
+      ['同步', localSettings.sync_enabled ? '开' : '关'],
+      ['工具栏位置', localSettings.toolbar_position],
+      ['通知自动消失', TOAST_DURATION_LABELS[secs] ?? `${secs} 秒`],
+      ['通知位置', TOAST_POSITION_LABELS[localSettings.toast_position ?? DEFAULT_TOAST_POSITION] ?? localSettings.toast_position],
+      ['日志级别', LOG_LEVEL_LABELS[localSettings.log_level ?? DEFAULT_LOG_LEVEL] ?? localSettings.log_level],
+    ];
+    for (const [k, v] of kv) lines.push(`  ${k}: ${v}`);
+    lines.push('');
+    lines.push('--- localStorage 配置键 ---');
+    try {
+      const keys: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k) keys.push(k);
+      }
+      keys.sort();
+      if (keys.length === 0) lines.push('  (空)');
+      for (const k of keys) lines.push(`  ${k}`);
+    } catch {
+      lines.push('  (无法读取 localStorage)');
+    }
+    const text = lines.join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      setDebugMsg('已复制诊断信息到剪贴板');
+    } catch {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        setDebugMsg('已复制诊断信息到剪贴板');
+      } catch {
+        setDebugMsg('复制失败,请手动复制');
+      }
+    }
+  };
+
   const tabs = [
     { id: 'appearance', label: '外观' },
     { id: 'editor', label: '编辑器' },
@@ -364,6 +459,25 @@ export function SettingsModal({ settings, folders, folderPresets, onFolderPreset
                   <select value={localSettings.toolbar_position} onChange={e => setLocalSettings({ ...localSettings, toolbar_position: e.target.value as any })}>
                     <option value="left">左侧</option>
                     <option value="right">右侧</option>
+                  </select>
+                </label>
+              </div>
+            )}
+
+            {/* [需求①] 通知设置:Toast 自动消失时长 + 出现位置(存 settings,App/Toast 读配置) */}
+            {activeTab === 'appearance' && (
+              <div className="settings-section">
+                <h3>通知</h3>
+                <label className="settings-field">
+                  <span>自动消失时长</span>
+                  <select value={localSettings.toast_duration_seconds ?? DEFAULT_TOAST_DURATION} onChange={e => setLocalSettings({ ...localSettings, toast_duration_seconds: parseInt(e.target.value, 10) || 0 })}>
+                    {TOAST_DURATION_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </label>
+                <label className="settings-field">
+                  <span>出现位置</span>
+                  <select value={localSettings.toast_position ?? DEFAULT_TOAST_POSITION} onChange={e => setLocalSettings({ ...localSettings, toast_position: e.target.value as any })}>
+                    {TOAST_POSITION_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </label>
               </div>
@@ -633,6 +747,23 @@ export function SettingsModal({ settings, folders, folderPresets, onFolderPreset
                 <p>版本: 0.5.0</p>
                 <p>跨平台笔记编辑器</p>
                 <p>Rust + Tauri + React</p>
+              </div>
+            )}
+
+            {/* [需求②] 调试:不新增 tab,收敛在「关于」里。日志级别偏好 + 复制诊断信息。 */}
+            {activeTab === 'about' && (
+              <div className="settings-section">
+                <h3>调试</h3>
+                <label className="settings-field">
+                  <span>日志级别</span>
+                  <select value={localSettings.log_level ?? DEFAULT_LOG_LEVEL} onChange={e => setLocalSettings({ ...localSettings, log_level: e.target.value as any })}>
+                    {LOG_LEVEL_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </label>
+                <div className="settings-actions">
+                  <button className="btn btn-secondary" onClick={handleCopyDiagnostics}>复制诊断信息</button>
+                  {debugMsg && <span className="settings-hint">{debugMsg}</span>}
+                </div>
               </div>
             )}
           </div>
