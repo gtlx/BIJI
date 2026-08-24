@@ -57,10 +57,10 @@ function sanitizeName(name: string): string {
   return (name || '未命名').replace(/[\\/:*?"<>|]/g, '_');
 }
 
-/** 核心导航项(硬编码,不插件化):笔记/日历/搜索/图谱/Git */
+/** 核心导航项(硬编码,不插件化):笔记/搜索/图谱/Git。
+ *  (日历已从核心导航移除 → 纯右 dock 面板,靠「添加面板」/命令面板打开,见 registry。番茄钟同理。) */
 const CORE_NAV_ITEMS: SidebarNavItem[] = [
   { id: 'notes', icon: 'notes', label: '笔记' },
-  { id: 'calendar', icon: 'calendar', label: '日历' },
   { id: 'search', icon: 'search', label: '搜索' },
   { id: 'graph', icon: 'graph', label: '图谱' },
   { id: 'git', icon: 'git', label: 'Git' },
@@ -134,9 +134,8 @@ export default function App() {
     return subscribeFrontendPlugins(() => setFpRev(r => r + 1));
   }, []);
 
-  /** [M8] 前端插件生成的导航项(随 enable 状态实时增减;发布=view,看板=calendar 等=pane)。
-   *  de-dupe:剔除与核心导航重复的 id(如 calendar 既是核心导航又是内置 pane 插件),
-   *  避免右侧栏出现两个「日历」。 */
+  /** [M8] 前端插件生成的导航项(随 enable 状态实时增减;发布/看板=view 全屏,日历=pane 不进导航)。
+   *  de-dupe:剔除与核心导航重复的 id,避免右侧栏出现重复项。 */
   const coreNavIds = new Set<string>(CORE_NAV_ITEMS.map(i => i.id));
   const pluginNavItems = useMemo<SidebarNavItem[]>(
     () => getNavPlugins()
@@ -785,16 +784,6 @@ export default function App() {
         );
       case 'pomodoro':
         return pomodoroEnabled ? <PomodoroTimer settings={settings} /> : <div className="pomodoro-disabled">番茄钟插件未启用,请到设置开启</div>;
-      case 'kanban':
-        return (
-          <KanbanPane
-            notes={notes}
-            onSetStatus={handleSetKanbanStatus}
-            onOpenNote={(noteId) => jumpToNote({ id: noteId, title: '' })}
-            onNewCard={handleCreateKanbanCard}
-            onRename={handleRenameKanbanCard}
-          />
-        );
       default:
         return null;
     }
@@ -884,10 +873,21 @@ export default function App() {
               <GitPanel onClose={() => handleNavClick('notes')} onOpenPublish={() => handleNavClick('publish')} />
             ) : (
               (() => {
-                // [M8] view 型前端插件:按 activeNav 查注册表渲染全屏视图(目前=发布)
+                // [M8] view 型前端插件:按 activeNav 查注册表渲染全屏视图(发布 / 看板)
                 const vp = getViewPlugin(activeNav);
                 return vp?.renderView
-                  ? vp.renderView({ onClose: () => handleNavClick('notes'), showToast })
+                  ? vp.renderView({
+                      onClose: () => handleNavClick('notes'),
+                      showToast,
+                      // [kanban=view] 看板全屏视图所需的数据与操作(注册表 renderView 从 ctx 取;看板数据/回调都在 App)
+                      kanban: {
+                        notes,
+                        onSetStatus: handleSetKanbanStatus,
+                        onOpenNote: (noteId) => jumpToNote({ id: noteId, title: '' }),
+                        onNewCard: handleCreateKanbanCard,
+                        onRename: handleRenameKanbanCard,
+                      },
+                    })
                   : null;
               })()
             )

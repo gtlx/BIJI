@@ -121,8 +121,8 @@ interface FrontendPlugin {
 > 1. **文件必须 `.tsx` 后缀**(含 JSX);`registry.ts` 写 `renderView` JSX 会报 TS1005。
 > 2. 对照 `PaneId` 联合类型(`frontend/src/components/pane/types.ts`):若新增分栏面板插件,
 >    需同步把面板 id 加进 `PaneId` / `PANE_REGISTRY`。
-> 3. **导航去重**:核心导航(`CORE_NAV_ITEMS`)已含的面板(如 calendar)再注册为插件时,
->    App 侧已按核心 nav id 过滤插件导航项,避免出现重复。
+> 3. **导航去重**:核心导航(`CORE_NAV_ITEMS`)与插件导航在 App 侧按 id 去重(避免重复)。
+>    但纯右 dock 面板(日历/番茄钟)不再进核心导航 —— 由 `nav:false` + Pane 注册表承接,靠「添加面板」打开。
 
 ### enable 状态机制
 
@@ -135,6 +135,34 @@ interface FrontendPlugin {
 - 面板联动: `getFrontendPluginByPane(paneId)` + `isPaneAddable(paneId)`,决定某分栏面板
   是否进「添加面板」菜单(核心面板恒可加;插件面板仅当其插件启用)。
 - 查询入口统一**过滤未启用插件**:关闭 → 导航/渲染/添加面板里即时消失。
+
+### 各内置插件当前 `kind` 与位置(2026-08)
+
+<!-- 保持与 registry.tsx 的 FRONTEND_PLUGINS + Pane 注册表同步;改插件形态时先更新这里。 -->
+
+| 插件 id | 类型 kind | 渲染位置 | 说明 |
+| --- | --- | --- | --- |
+| `publish` | `view` | 全屏主区视图 | 左侧栏进入,端到端样板(后端 provides + 前端注册表) |
+| `kanban` | `view` | **全屏主区视图** | **由 pane 改为 view**:左侧栏点开 → 全屏主区,复用 `KanbanPane` 外包 `KanbanView` 全屏容器;已从右 dock 移除(不再是 pane 面板,`PaneId` 里也不再有 `kanban`) |
+| `calendar` | `pane` | 纯右 dock 分栏面板 | 默认已打开;**不进左侧栏**(`nav:false`),靠「添加面板」/命令面板打开 |
+| 番茄钟 `pomodoro` | (核心 pane) | 纯右 dock 分栏面板 | 不在前端 `FRONTEND_PLUGINS` 里(是 Pane 注册表的核心面板),同样不进左侧栏,靠「添加面板」打开 |
+
+`FrontendPlugin.nav` 语义(缺省 `true`):
+- `view` 型默认进左侧栏:点开 → `handleNavClick` 走 view 分支 → 全屏主区;
+- `pane` 型想进左侧栏才需要 `nav:true`;纯右 dock 面板设 `nav:false`。
+`getNavPlugins()` 现按 `p.nav !== false` 过滤(旧逻辑看 `p.kind === 'view' || p.paneId`,已改)。
+
+### 进左侧栏导航 vs 只进右 dock 的规则
+
+| 形态 | 进左侧栏? | 打开方式 | 代表 |
+| --- | --- | --- | --- |
+| view 型插件 | ✅ 默认进 | 左侧栏点开 → 全屏主区(`handleNavClick` view 分支) | publish、kanban |
+| pane 型插件 + `nav:false` | ❌ 不进 | 「添加面板」/命令面板 togglePane 开右 dock 面板 | calendar |
+| 核心 pane(不在前端注册表) | ❌ 不进 | 「添加面板」togglePane 开右 dock 面板 | pomodoro、outline、tags 等 |
+
+> 两类入口互不依赖:「左侧栏导航」由 `getNavPlugins()`(可带 `nav` 标记)驱动;
+> 「添加面板」菜单由 `PANE_META`/`PANE_REGISTRY` + `isPaneAddable()` 驱动(且只列已关闭面板)。
+> 做一个纯右 dock 面板 = 在 Pane 注册表加一项(进「添加面板」);要不要左侧栏导航再决定 `nav`。
 
 ---
 
@@ -189,8 +217,8 @@ pub trait PublishAdapter {
 | `pomodoro-plugin` | 后端内置 | `plugin.rs` | 番茄钟面板(Pane `pomodoro`) |
 | `sync-plugin` | 后端内置 | `plugin.rs` | 云同步设置(默认关闭) |
 | `publish-plugin` | 后端能力 | `plugin.rs` + `PublishAdapter` + 前端 `publish` view 插件 | 端到端样板 |
-| `（前端）kanban` | 前端 pane | `registry.tsx` | 看板面板(Pane `kanban`) |
-| `（前端）calendar` | 前端 pane | `registry.tsx` | 日历面板(Pane `calendar`),同时是核心导航 |
+| `（前端）kanban` | 前端 **view** | `registry.tsx` | 全屏看板视图(复用 `KanbanPane` 包 `KanbanView`);已由 pane 改为 view |
+| `（前端）calendar` | 前端 pane | `registry.tsx` | 日历右 dock 面板(Pane `calendar`);纯右 dock,不进左侧栏 |
 
 ### 新插件接入步骤(以「加一个进度追踪面板」为例)
 

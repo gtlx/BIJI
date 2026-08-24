@@ -38,7 +38,8 @@ function loadOrder(): Record<string, string[]> {
   }
 }
 
-interface KanbanPaneProps {
+/** 看板面板 props(供 KanbanView 全屏视图与右 dock 复用,导出给 registry 接线) */
+export interface KanbanPaneProps {
   notes: Note[];
   /** 把某篇笔记流转到某列(持久化由 App 负责) */
   onSetStatus: (note: Note, status: string) => void;

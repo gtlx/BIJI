@@ -336,6 +336,8 @@ export function PaneWorkspace({ layout, onLayoutChange, renderPane, paneEnabled 
                           <button
                             className="pane-tab-close"
                             title={`关闭 ${meta.label}`}
+                            // 阻断 pointerdown 冒泡到 tab 的 onTabDown(其 e.preventDefault 会吞掉后续 click,导致点 X 不生效)
+                            onPointerDown={(e) => e.stopPropagation()}
                             onClick={(e) => { e.stopPropagation(); closePane(paneId); }}
                           >
                             <StrokeIcon name="close" size={12} />
@@ -372,6 +374,8 @@ export function PaneWorkspace({ layout, onLayoutChange, renderPane, paneEnabled 
                             <span className="pane-head-icon"><StrokeIcon name={meta.icon} size={16} /></span>
                             <span className="pane-head-title">{meta.label}</span>
                             <button className="pane-close" title={`关闭 ${meta.label}`}
+                              // 阻断 pointerdown 冒泡到 header 的 onTabDown(其 e.preventDefault 会吞掉后续 click,导致点 X 不生效)
+                              onPointerDown={(e) => e.stopPropagation()}
                               onClick={(e) => { e.stopPropagation(); closePane(paneId); }}>
                               <StrokeIcon name="close" size={14} />
                             </button>

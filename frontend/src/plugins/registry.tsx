@@ -5,7 +5,19 @@
  *   - 核心定义「渲染入口接口」,插件声明「我提供这个视图/面板」;
  *   - 导航项 / 主区渲染分支从注册表生成(替换 App.tsx 原先写死的发布三处硬编码);
  *   - 发布(publish)注册为 view 型插件,成为端到端插件样板(后端 provides 能力 + 前端注册表);
- *   - 看板(kanban)为 pane 型插件样板,通过 Pane 系统渲染。
+ *
+ * 各内置插件当前 kind 与位置(2026-08 本轮更新,kanban 由 pane 改为 view):
+ *   - publish : view 型 —— 全屏主区视图(左侧栏进入),端到端样板;
+ *   - kanban  : view 型 —— 全屏主区视图(左侧栏进入,复用 KanbanPane 包 KanbanView 全屏容器),
+ *               已从右 dock 移除,不再是 pane 面板;
+ *   - calendar: pane 型 —— 纯右 dock 分栏面板(默认已打开),不进左侧栏(靠「添加面板」/命令面板打开);
+ *   - 番茄钟(pomodoro):核心 pane(在 Pane 注册表),不在前端插件注册表内,同样纯右 dock 面板。
+ *
+ * 进左侧栏导航 vs 只进右 dock 面板 的规则(见 getNavPlugins / FrontendPlugin.nav):
+ *   - view 型插件默认进左侧栏(nav 缺省/true),点开 → 全屏主区;
+ *   - pane 型插件默认不进左侧栏(纯右 dock,靠「添加面板」菜单 / 命令面板打开),
+ *     除非显式声明 nav:true;日历即 pane+nav:false 的样板;
+ *   - 「添加面板」候选仍由 Pane 注册表 + isPaneAddable 驱动,与导航相互独立。
  *
  * [M8 补:插件管理整合] 前端插件也纳入「插件管理」弹窗统一显示/开关:
  *   - 插件 enable 状态用 localStorage + 轻量订阅管理(不必后端持久化,够用即可);
@@ -17,7 +29,9 @@
  */
 import type { ReactNode } from 'react';
 import type { PaneId } from '../components/pane/types';
+import type { KanbanPaneProps } from '../components/KanbanPane';
 import { PublishPanel } from '../components/PublishPanel';
+import { KanbanView } from '../components/KanbanView';
 
 /** 前端插件作用域:view=独立主区全屏视图,pane=分栏面板 */
 export type FrontendPluginKind = 'view' | 'pane';
@@ -28,6 +42,9 @@ export interface FrontendPluginContext {
   onClose: () => void;
   /** 全局轻提示 */
   showToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
+  /** [kanban=view] 看板全屏视图所需的数据与操作(由 App 在主区渲染分流处注入);
+   *  未注入(纯静态预览等)时看板渲染为空交互。 */
+  kanban?: Pick<KanbanPaneProps, 'notes' | 'onSetStatus' | 'onOpenNote' | 'onNewCard' | 'onRename'>;
 }
 
 /** 前端插件接口(克制版):元信息 + 渲染入口 */
@@ -40,6 +57,13 @@ export interface FrontendPlugin {
   icon: string;
   /** 作用域:view 全屏主区 / pane 分栏面板 */
   kind: FrontendPluginKind;
+  /**
+   * 是否进入左侧栏导航(缺省 true):
+   * - view 型默认 true(全屏主区由左侧栏进入);
+   * - pane 型如设为 false 则纯右 dock 面板(如 calendar)不进左侧栏,
+   *   靠「添加面板」菜单 / 命令面板打开。
+   */
+  nav?: boolean;
   /** 插件版本(插件管理展示用) */
   version: string;
   /** 一句话描述(插件管理展示用) */
@@ -50,13 +74,15 @@ export interface FrontendPlugin {
   paneId?: PaneId;
 }
 
-/** 内置前端插件注册表:发布 = 端到端样板(view),看板 = 面板样板(pane) */
+/** 内置前端插件注册表:
+ *  publish / kanban = view 全屏主区;calendar = pane 右 dock 面板(不进左侧栏)。 */
 export const FRONTEND_PLUGINS: FrontendPlugin[] = [
   {
     id: 'publish',
     label: '发布',
     icon: 'publish',
-    kind: 'view',
+    kind: 'view', // view 型:左侧栏点开 → 全屏主区
+    nav: true,    // 进左侧栏(端到端样板,与后端 publish-plugin provides 呼应)
     version: '0.1.0',
     description: '发布笔记到静态站点(后端 publish-plugin 提供能力,本插件为前端入口)',
     renderView: ctx => <PublishPanel onClose={ctx.onClose} />,
@@ -65,16 +91,27 @@ export const FRONTEND_PLUGINS: FrontendPlugin[] = [
     id: 'kanban',
     label: '看板',
     icon: 'kanban',
-    kind: 'pane',
+    kind: 'view', // [2026-08 本轮] 由 pane 改为 view:左侧栏点开 → 全屏主区,不再进右 dock
+    nav: true,    // 进左侧栏全屏视图
     version: '0.1.0',
-    description: '三列看板面板(纯前端插件,基于笔记 frontmatter 状态)',
-    paneId: 'kanban',
+    description: '全屏看板视图(纯前端插件,基于笔记 frontmatter 状态;复用 KanbanPane 包 KanbanView 全屏容器)',
+    renderView: ctx => (
+      <KanbanView
+        notes={ctx.kanban?.notes ?? []}
+        onSetStatus={ctx.kanban?.onSetStatus ?? (() => {})}
+        onOpenNote={ctx.kanban?.onOpenNote ?? (() => {})}
+        onNewCard={ctx.kanban?.onNewCard ?? (() => {})}
+        onRename={ctx.kanban?.onRename ?? (() => {})}
+        onClose={ctx.onClose}
+      />
+    ),
   },
   {
     id: 'calendar',
     label: '日历',
     icon: 'calendar',
-    kind: 'pane',
+    kind: 'pane',   // pane 型:右 dock 分栏面板(默认已打开)
+    nav: false,     // [2026-08 本轮] 纯右 dock 面板:不进左侧栏(靠「添加面板」/命令面板打开)
     version: '0.1.0',
     description: '日历热力图面板(内置 pane 型前端插件,可随 enable 开关)',
     paneId: 'calendar',
@@ -153,10 +190,13 @@ export function getViewPlugin(id: string): FrontendPlugin | undefined {
   return p && isFrontendPluginEnabled(p.id) ? p : undefined;
 }
 
-/** 需要出现在导航栏的插件项(view 点击全屏 / pane 点击开面板)——仅列已启用插件 */
+/**
+ * 需要出现在左侧栏导航的插件项(view 全屏 / 显式 nav:true 的 pane)——仅列已启用插件。
+ * 纯右 dock 面板插件(nav:false,如 calendar)不进导航,仍可从「添加面板」菜单 / 命令面板打开。
+ */
 export function getNavPlugins(): FrontendPlugin[] {
   return FRONTEND_PLUGINS.filter(
-    p => (p.kind === 'view' || p.paneId) && isFrontendPluginEnabled(p.id),
+    p => p.nav !== false && isFrontendPluginEnabled(p.id),
   );
 }
 
@@ -197,8 +237,9 @@ export function getFrontendPluginByPane(paneId: PaneId): FrontendPlugin | undefi
 /**
  * 判断某分栏面板当前是否应出现在「添加面板」菜单里:
  * - 核心内置面板(无对应前端插件,如 outline/tags/properties 等)→ 恒可添加;
- * - 由前端插件提供(如 kanban/calendar)→ 仅当该插件已启用才可添加(关闭插件后标题不再入菜单)。
+ * - 由前端插件提供(如 calendar)→ 仅当该插件已启用才可添加(关闭插件后标题不再入菜单)。
  * 「添加面板」候选列表由 PANE_META 驱动(非插件注册表),这里补上 enable 关注,与导航/渲染一致。
+ *   (看板已改为 view 型,不再作为 pane 出现在此;calendar 仍是右 dock pane。)
  */
 export function isPaneAddable(paneId: PaneId): boolean {
   const plugin = getFrontendPluginByPane(paneId);
