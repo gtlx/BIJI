@@ -256,7 +256,7 @@ export class MockBackend implements BackendAdapter {
       new_note: 'Ctrl+N', new_folder: 'Ctrl+Shift+N', save: 'Ctrl+S', search: 'Ctrl+F',
       toggle_theme: 'Ctrl+Alt+T', open_settings: 'Ctrl+,', sync: 'Ctrl+Shift+S',
       toggle_left_sidebar: 'Ctrl+[', toggle_right_sidebar: 'Ctrl+]', toggle_graph: 'Ctrl+G',
-      toggle_outline: 'Ctrl+O', toggle_preview_mode: 'Ctrl+P', toggle_editor_mode: 'Ctrl+E',
+      toggle_outline: 'Ctrl+O', command_search: 'Ctrl+P', toggle_editor_mode: 'Ctrl+E', set_live_preview: 'Ctrl+I',
     },
     // [通知] 默认:自动消失 4 秒、右下角出现
     toast_duration_seconds: 4,

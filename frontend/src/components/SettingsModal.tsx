@@ -62,8 +62,9 @@ const SHORTCUT_FIELDS: { key: keyof AppSettings['shortcuts']; label: string }[] 
   { key: 'toggle_right_sidebar', label: '右栏' },
   { key: 'toggle_graph', label: '图谱' },
   { key: 'toggle_outline', label: '大纲' },
-  { key: 'toggle_preview_mode', label: '预览模式' },
-  { key: 'toggle_editor_mode', label: '编辑器模式' },
+  { key: 'command_search', label: '命令搜索' },
+  { key: 'toggle_editor_mode', label: '编辑/预览切换' },
+  { key: 'set_live_preview', label: '实时预览' },
 ];
 
 // ==================== [通知 / 关于调试] 常量 ====================
@@ -509,12 +510,13 @@ export function SettingsModal({ settings, folders, folderPresets, onFolderPreset
                   <span>自动保存</span>
                   <input type="checkbox" checked={localSettings.auto_save} onChange={e => setLocalSettings({ ...localSettings, auto_save: e.target.checked })} />
                 </label>
-                {/* [演变排序] 唯一的演变回归入口:开 = 时间戳基础上按创建时间重排并显示序号;关(默认)=仅常显时间戳 */}
+                {/* [演变排序] 显示模式选择:开 = 完整演变(时间戳+按创建时间重排+序号);关(默认)=块时间戳模式(仅时间戳)。
+                    需先开启工具栏「演变」总开关才生效。 */}
                 <label className="settings-field">
                   <span>演变排序</span>
                   <input type="checkbox" checked={evolutionSort} onChange={e => handleEvolutionSortChange(e.target.checked)} />
                 </label>
-                <p className="settings-hint">开:块按创建时间重排并显示序号(展示「先写哪段后写哪段」);关(默认):仅显示每段更新时间。时间戳始终显示。</p>
+                <p className="settings-hint">开:完整演变模式(每段时间戳 + 按创建时间重排 + 序号);关(默认):块时间戳模式(仅显示每段更新时间)。需先开启工具栏「演变」总开关才显示;总开关关时恢复普通块视图。</p>
                 <label className="settings-field">
                   <span>默认模板</span>
                   <select value={localSettings.template} onChange={e => setLocalSettings({ ...localSettings, template: e.target.value })}>
@@ -579,7 +581,7 @@ export function SettingsModal({ settings, folders, folderPresets, onFolderPreset
             {activeTab === 'shortcuts' && (
               <div className="settings-section">
                 <h3>快捷键</h3>
-                <p className="settings-hint">在这里自定义命令面板快捷键(如 Ctrl/Cmd+K 搜索、Ctrl/Cmd+P 命令面板)。填写组合键文本,保存后生效。</p>
+                <p className="settings-hint">在这里自定义快捷键文本,保存后生效。Ctrl+P 命令搜索、Ctrl+E 编辑/预览切换、Ctrl+I 实时预览。搜索用 Ctrl+K,保存 Ctrl+S。</p>
                 {SHORTCUT_FIELDS.map(({ key, label }) => (
                   <label key={key} className="settings-field">
                     <span>{label}</span>

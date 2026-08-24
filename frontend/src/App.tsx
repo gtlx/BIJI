@@ -232,6 +232,8 @@ export default function App() {
   const editorApiRef = useRef<{ save: () => void; insertAtCursor: (text: string) => void; focusContent: () => void } | null>(null);
   /** [Pane] 命令面板开关 */
   const [showCommandPalette, setShowCommandPalette] = useState(false);
+  /** [快捷键] 编辑器预览视图模式(live/edit/preview),经 externalPreviewMode 下发 Editor,供 Ctrl+E/Ctrl+I 切换 */
+  const [editorPreviewMode, setEditorPreviewMode] = useState<string>('live');
   /** [Pane] 模板插入弹窗开关 */
   const [showTemplateInsert, setShowTemplateInsert] = useState(false);
 
@@ -835,6 +837,13 @@ export default function App() {
     if (patch.theme) applyTheme(patch.theme as string);
   };
 
+  /** [快捷键] 切换主题:沿 light → dark → system 循环(与设置「外观→主题」同源) */
+  const cycleTheme = useCallback(() => {
+    if (!settings) return;
+    const next = settings.theme === 'light' ? 'dark' : settings.theme === 'dark' ? 'system' : 'light';
+    handleSettingsChange({ theme: next } as Partial<AppSettings>);
+  }, [settings, handleSettingsChange]);
+
   const handleTogglePlugin = async (id: string, enabled: boolean) => {
     await backend.togglePlugin(id, enabled);
     setPlugins(prev => prev.map(p => p.id === id ? { ...p, enabled } : p));
@@ -910,7 +919,7 @@ export default function App() {
         setShowSearch(true);
         return;
       }
-      // Ctrl/Cmd+P → 命令面板
+      // Ctrl/Cmd+P → 命令搜索(命令面板);行为不变,名实相符
       if (mod && k === 'p') {
         e.preventDefault();
         setShowCommandPalette(v => !v);
@@ -942,12 +951,22 @@ export default function App() {
         // [拖拽调宽] 修复:原 toggle_right_sidebar 切废弃布尔 rightPanelOpen,对真实右 dock 无效;
         // 改为切换 rightDockOpen,控制 PaneWorkspace 右 dock 整体展开/收起(与左栏 Ctrl+[ 对称)。
         [s.toggle_right_sidebar]: () => { e.preventDefault(); setRightDockOpen(prev => !prev); },
+        // [快捷键修正] 命令搜索:Ctrl+P 已由上方硬编码分支处理,这里保留设置项兜底(用户改键后走此路由)
+        [s.command_search]: () => setShowCommandPalette(v => !v),
+        // [快捷键修正] Ctrl+E:编辑模式 ↔ 预览模式切换(Editor 的 previewMode edit/preview,经 externalPreviewMode 下发)
+        [s.toggle_editor_mode]: () => { e.preventDefault(); setEditorPreviewMode(p => p === 'edit' ? 'preview' : 'edit'); },
+        // [快捷键修正] Ctrl+I:切到实时预览(live)
+        [s.set_live_preview]: () => { e.preventDefault(); setEditorPreviewMode('live'); },
+        // [快捷键修正] Ctrl+Alt+T:循环切换主题(light → dark → system)
+        [s.toggle_theme]: () => { e.preventDefault(); cycleTheme(); },
+        // [快捷键修正] Ctrl+O:切到大纲面板
+        [s.toggle_outline]: () => { e.preventDefault(); setWorkspaceView(true); togglePane('outline'); },
       };
       shortcuts[pressed]?.();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [settings, handleNewNote, handleNewFolder, activeNav, showSearch, showSettings, showPluginManager, showNewNoteModal, showCommandPalette, showTemplateInsert, commandActions]);
+  }, [settings, handleNewNote, handleNewFolder, activeNav, showSearch, showSettings, showPluginManager, showNewNoteModal, showCommandPalette, showTemplateInsert, commandActions, cycleTheme]);
 
   const pomodoroEnabled = plugins.some(p => p.id === 'pomodoro-plugin' && p.enabled);
 
@@ -978,6 +997,8 @@ export default function App() {
               onLinkClick={handleLinkClick}
               onTitleChange={handleTitleChange}
               noteBlocks={noteBlocks}
+              externalPreviewMode={editorPreviewMode}
+              onPreviewModeChange={setEditorPreviewMode}
               onRegisterApi={(api) => { editorApiRef.current = api; }}
               onToggleOutline={() => { setWorkspaceView(true); togglePane('outline'); }}
               onOpenBacklinks={() => { setWorkspaceView(true); togglePane('backlinks'); }}
@@ -1195,6 +1216,8 @@ export default function App() {
               onLinkClick={handleLinkClick}
               onTitleChange={handleTitleChange}
               noteBlocks={noteBlocks}
+              externalPreviewMode={editorPreviewMode}
+              onPreviewModeChange={setEditorPreviewMode}
               onRegisterApi={(api) => { editorApiRef.current = api; }}
               onToggleOutline={() => { setWorkspaceView(true); togglePane('outline'); }}
               onOpenBacklinks={() => { setWorkspaceView(true); togglePane('backlinks'); }}

@@ -58,10 +58,14 @@ export function Editor({
   const [editorMode, setEditorMode] = useState<string>('markdown');
   const [previewMode, setPreviewMode] = useState<string>('live');
   const [frontmatter, setFrontmatter] = useState<NoteFrontmatter>({});
-  /** [时间戳常显] 每段始终显示更新时间(合并后不再单独开关,默认常开;底层逻辑保留不动) */
-  const [showBlockTimestamps] = useState<boolean>(true);
-  /** M3 演变排序(原「演变模式/时间线重排」):开启后块按创建时间重排并显示序号,退出恢复 sort_order。
-      存储键改为 biji.evolution_sort(兼容旧键 biji.timeline_mode 作迁移兜底)。 */
+  /** [演变总开关] 工具栏「演变」按钮控制的演变功能总开关:开 = 启用整套演变显示(时间戳;
+      若设置「演变排序」开则再加排序+序号),关 = 普通块视图(不显示演变)。
+      存储键 biji.evolution_enabled,与「演变排序(biji.evolution_sort)」相互独立。 */
+  const [evolutionEnabled, setEvolutionEnabled] = useState<boolean>(() => {
+    try { return localStorage.getItem('biji.evolution_enabled') === '1'; } catch { return false; }
+  });
+  /** M3 演变显示模式:设置「演变排序」开关(默认关 = 块时间戳模式仅显示时间戳;开 = 完整演变模式:时间戳 + 按创建时间重排 + 序号)。
+      存储键改为 biji.evolution_sort(兼容旧键 biji.timeline_mode 作迁移兜底)。仅当 evolutionEnabled(总开关)为开时才起作用。 */
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [timelineMode, setTimelineMode] = useState<boolean>(() => {
     try {
@@ -121,18 +125,24 @@ export function Editor({
     if (externalPreviewMode && externalPreviewMode !== previewMode) setPreviewMode(externalPreviewMode);
   }, [externalPreviewMode]);
 
-  /** [演变排序] 监听「设置」里演变排序开关的变更(localStorage 同键),实时同步本组件状态。
-      设置弹窗与工具栏共用同一开关,底层 timelineMode/排序逻辑不动。 */
+  /** [演变] 同步两维状态:总开关(biji.evolution_enabled,工具栏)与显示模式(biji.evolution_sort,设置)。
+      监听各自的 change 事件 + storage 事件跨标签同步,实时更新本组件。底层 timelineMode/排序逻辑不动。 */
   useEffect(() => {
-    const syncEvolutionSort = () => {
+    const syncEnabled = () => {
+      try { setEvolutionEnabled(localStorage.getItem('biji.evolution_enabled') === '1'); } catch { /* ignore */ }
+    };
+    const syncSort = () => {
       try { setTimelineMode(localStorage.getItem('biji.evolution_sort') === '1'); } catch { /* ignore */ }
     };
-    syncEvolutionSort(); // 与设置里已改过的值对齐
-    window.addEventListener('biji:evolution-sort-changed', syncEvolutionSort);
-    window.addEventListener('storage', syncEvolutionSort); // 多标签页同步
+    const onStorage = () => { syncEnabled(); syncSort(); };
+    syncEnabled(); syncSort(); // 与 localStorage 已改过的值对齐
+    window.addEventListener('biji:evolution-enabled-changed', syncEnabled);
+    window.addEventListener('biji:evolution-sort-changed', syncSort);
+    window.addEventListener('storage', onStorage); // 多标签页同步
     return () => {
-      window.removeEventListener('biji:evolution-sort-changed', syncEvolutionSort);
-      window.removeEventListener('storage', syncEvolutionSort);
+      window.removeEventListener('biji:evolution-enabled-changed', syncEnabled);
+      window.removeEventListener('biji:evolution-sort-changed', syncSort);
+      window.removeEventListener('storage', onStorage);
     };
   }, []);
 
@@ -299,14 +309,14 @@ export function Editor({
     }
   };
 
-  /** [演变排序开关] 唯一演变入口:开 = 时间戳基础上 + 按创建时间重排 + 序号;关(默认) = 仅常显时间戳。
-      存储到 localStorage 并清理旧键;时间戳不再单独关,无需块时间戳切换函数。 */
-  const toggleTimelineMode = () => {
-    setTimelineMode(v => {
+  /** [演变总开关] 工具栏「演变」按钮:切换演变功能总开关(evolutionEnabled),写入 localStorage 并广播事件。
+      「演变排序」模式由设置独立控制,二者正交。 */
+  const toggleEvolution = () => {
+    setEvolutionEnabled(v => {
       const next = !v;
       try {
-        localStorage.setItem('biji.evolution_sort', next ? '1' : '0');
-        localStorage.removeItem('biji.timeline_mode'); // 清理旧键,统一用新键
+        localStorage.setItem('biji.evolution_enabled', next ? '1' : '0');
+        window.dispatchEvent(new CustomEvent('biji:evolution-enabled-changed', { detail: next }));
       } catch { /* ignore */ }
       return next;
     });
@@ -348,20 +358,24 @@ export function Editor({
     return items;
   }, [note, folders]);
 
-  /** M3:演变模式块列表(按创建时间排序 + 近期新块高亮) */
+  /** 完整演变模式 = 演变总开关开 且 设置「演变排序」开(时间戳 + 排序 + 序号);否则为块时间戳模式(仅时间戳)或普通视图。 */
+  const fullEvolution = evolutionEnabled && timelineMode;
+
+  /** M3:演变展示块列表——仅完整演变模式按创建时间重排,否则按原序(块时间戳模式不改序,普通视图更不排序)。 */
   const displayBlocks = useCallback((): NoteBlock[] => {
     if (!noteBlocks || noteBlocks.length === 0) return [];
-    if (!timelineMode) return noteBlocks;
+    if (!fullEvolution) return noteBlocks;
     return [...noteBlocks].sort((a, b) => a.created_at - b.created_at);
-  }, [noteBlocks, timelineMode]);
+  }, [noteBlocks, fullEvolution]);
 
   const blocksForRender = displayBlocks();
-  const useBlockRender = showBlockTimestamps || timelineMode;
+  /** 演变总开关开 → 用块渲染(至少显示时间戳);关 → 普通连续 markdown 视图(不显示演变)。 */
+  const useBlockRender = evolutionEnabled;
   const now = Date.now();
 
   /** M3:按块渲染(React 元素 → 时间戳可点、演变模式高亮) */
   const renderBlockList = (blocks: NoteBlock[]): React.ReactNode => {
-    const seq = timelineMode;
+    const seq = fullEvolution;
     return blocks.map((b, i) => {
       const recent = b.updated_at >= now - RECENT_WINDOW_MS;
       const tooltip = `创建于 ${new Date(b.created_at).toLocaleString()}\n最后修改于 ${new Date(b.updated_at).toLocaleString()}\n点击查看历史`;
@@ -465,11 +479,11 @@ export function Editor({
             >
               <StrokeIcon name="trash" size={18} />
             </button>
-            {/* [演变排序] 唯一演变入口:关(默认)=仅常显时间戳;开=时间戳+按创建时间重排+序号 */}
+            {/* [演变] 演变功能总开关:开=启用整套演变显示(时间戳;设置「演变排序」开则再+排序/序号),关=普通块视图 */}
             <button
-              className={`outline-toggle-btn ${timelineMode ? 'active' : ''}`}
-              onClick={toggleTimelineMode}
-              title={timelineMode ? '退出演变排序' : '演变排序:按块创建时间重排并显示序号(时间戳始终显示)'}
+              className={`outline-toggle-btn ${evolutionEnabled ? 'active' : ''}`}
+              onClick={toggleEvolution}
+              title={evolutionEnabled ? '关闭演变(恢复普通块视图)' : '演变:显示块时间戳(设置里可切换「块时间戳/完整演变」模式)'}
             >
               <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
                 <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm-1-13h2v6l4.28 2.54-1 1.72L11 13.6V7z"/>

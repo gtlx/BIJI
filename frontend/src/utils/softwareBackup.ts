@@ -21,7 +21,8 @@ export const SOFTWARE_CONFIG_KEYS: string[] = [
   'biji.frontend-plugin.enabled', // [插件] 被显式禁用的前端插件集合
   'biji.tree.expanded',           // [文件树] 文件夹展开状态
   'biji.kanban.column-order',     // [看板] 各列卡片排序记忆
-  'biji.evolution_sort',          // [编辑器] 演变排序开关(开=时间戳+按创建时间重排+序号;关=仅常显时间戳)
+  'biji.evolution_sort',          // [编辑器] 演变显示模式:开=完整演变(时间戳+排序+序号);关=块时间戳模式(仅时间戳)
+  'biji.evolution_enabled',       // [编辑器] 工具栏「演变」总开关:开=启用整套演变显示;关=普通块视图
 ];
 
 /** 软件数据备份文件版本号(结构变化时递增) */

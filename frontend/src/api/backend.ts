@@ -98,8 +98,9 @@ export interface ShortcutSettings {
   toggle_right_sidebar: string;
   toggle_graph: string;
   toggle_outline: string;
-  toggle_preview_mode: string;
+  command_search: string;
   toggle_editor_mode: string;
+  set_live_preview: string;
 }
 
 export interface GraphData {
@@ -422,8 +423,9 @@ export const DEFAULT_SHORTCUTS: ShortcutSettings = {
   toggle_right_sidebar: 'Ctrl+]',
   toggle_graph: 'Ctrl+G',
   toggle_outline: 'Ctrl+O',
-  toggle_preview_mode: 'Ctrl+P',
+  command_search: 'Ctrl+P',
   toggle_editor_mode: 'Ctrl+E',
+  set_live_preview: 'Ctrl+I',
 };
 
 // 默认模板(前端兜底,真实后端以 getTemplates 为准)。含顶层目录预设的四个内置模板:
