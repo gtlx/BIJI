@@ -77,3 +77,11 @@
 - **AI 接口预留**:内核 `AiProvider` trait 抽象(检索上下文→LLM),第一期只留接口,后续语义检索/AI 问答/摘要
 - **API 接口(bill 同款)**:内核能力全部暴露 REST API(笔记/块/历史/搜索/导出),前端走 API(本地服务模式),外部可定制
 - 双向链接/图谱/标签并入 M2/M3(块级后 wikilink 作用于块,图谱按块关系)
+
+## 已知待修项(2026-08-25 记录,用户先用几天观察)
+
+- **左侧栏 hover 文字抽搐**(Wayland/软件渲染下):鼠标移到左侧导航项(`.side-nav-item`)或文件树项时,文字抖动/抽搐。**根因疑似**:`.side-nav-item` 用了 `transition: all 0.18s ease`(Sidebar.css:116),hover 时过渡所有属性(背景/颜色/box-shadow/伪元素左边条),在 WebKit 软件渲染下触发重绘抖动。**候选修法**:把 `transition: all` 改为只过渡 `background-color,color`(去掉 all),或在 `@media (hover:hover)` + prefers-reduced-motion 下关闭平滑。待用户用几天确认具体是哪个元素后修复(biji-project-dev 技能同步)。
+
+## 待办备忘(2026-08-25)
+- 桌面版启动在 Niri/Wayland 需 `WEBKIT_DISABLE_COMPOSITING_MODE=1 GDK_BACKEND=wayland`(软件渲染,GBM buffer 失败),可考虑做 .desktop 启动器内置这些环境变量。
+- 数据真实落盘于 `~/.local/share/biji-note/biji.db`(含 .git 版本管理),非 `~/.config`。备份/迁移盯此目录。
